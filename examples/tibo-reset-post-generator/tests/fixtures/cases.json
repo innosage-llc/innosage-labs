@@ -20,8 +20,10 @@
         "post_time_beijing": null,
         "reset_time_beijing": null,
         "poster_time": "重置时间待确认",
-        "must_not_claim_all_accounts": true
-      }
+        "must_not_claim_all_accounts": true,
+        "render_mode": "edit_existing_poster"
+      },
+      "base_image_accessible": true
     },
     {
       "id": "explicit_future_reset_instant",
@@ -41,8 +43,10 @@
         "post_time_beijing": null,
         "reset_time_beijing": "2026-10-27T00:30:00+08:00",
         "poster_time": "预计北京时间10月27日00:30",
-        "must_not_claim_all_accounts": true
-      }
+        "must_not_claim_all_accounts": true,
+        "render_mode": "edit_existing_poster"
+      },
+      "base_image_accessible": true
     },
     {
       "id": "irrelevant_post",
@@ -62,8 +66,10 @@
         "post_time_beijing": null,
         "reset_time_beijing": null,
         "poster_time": null,
-        "must_not_claim_all_accounts": true
-      }
+        "must_not_claim_all_accounts": true,
+        "render_mode": null
+      },
+      "base_image_accessible": false
     },
     {
       "id": "unreadable_url_only",
@@ -83,8 +89,60 @@
         "post_time_beijing": null,
         "reset_time_beijing": null,
         "poster_time": null,
+        "must_not_claim_all_accounts": true,
+        "render_mode": null
+      },
+      "base_image_accessible": false
+    },
+    {
+      "id": "base_image_unavailable",
+      "source": {
+        "kind": "USER_QUOTE",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "Today is a reset.",
+        "displayed_post_date": null,
+        "displayed_post_clock": null,
+        "viewer_timezone": null,
+        "reset_event_iso": null
+      },
+      "base_image_accessible": false,
+      "expected": {
+        "disposition": "INCOMPLETE",
+        "failure_reason": "BASE_IMAGE_UNAVAILABLE",
+        "claim_status": "CLAIMED",
+        "post_time_beijing": null,
+        "reset_time_beijing": null,
+        "poster_time": "时间待确认",
+        "render_mode": "edit_existing_poster",
         "must_not_claim_all_accounts": true
       }
     }
-  ]
+  ],
+  "template": {
+    "default_base_image": "assets/codex-10-26极简重置更新公告海报.png",
+    "git_blob_sha": "44fee2832dd283e8f168a7ca1eee6a71bd3e0416",
+    "default_render_mode": "edit_existing_poster",
+    "missing_base_outcome": "INCOMPLETE — BASE_IMAGE_UNAVAILABLE",
+    "protected_regions": [
+      "OpenAI/Codex logo",
+      "Codex/ChatGPT header",
+      "Tibo profile picture",
+      "@thsottiaux handle",
+      "red accent",
+      "3:4 composition"
+    ],
+    "editable_text_regions": [
+      "date",
+      "reset time or status",
+      "Chinese translation",
+      "footnote"
+    ],
+    "deliverables": [
+      "edited poster image",
+      "separate Chinese title",
+      "separate Chinese caption",
+      "evidence ledger"
+    ]
+  }
 }
