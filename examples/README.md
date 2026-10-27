@@ -4,6 +4,7 @@ This is an **index**, not a mirror. The original project README, code, versions,
 
 | Project | What you can try | Canonical source | Notes |
 | --- | --- | --- | --- |
+| **Tibo Reset Post Generator** | From Tibo post evidence to a real Chinese poster and caption | [Project and Web quick start](tibo-reset-post-generator/README.md) | Checks reset claims, timestamps and image-output limitations; no bundled third-party assets |
 | **Draft Skills** | Install agent skills for Draft CLI page workflows | [Repository + installation](https://github.com/innosage-llc/draft-skills#readme) | Check the current skill version and CLI compatibility; a skill update does not automatically upgrade your runtime |
 | **InnoSage DevTools** | Run browser-based QR, document, audio, image and video tools | [Live collection](https://innosage.co/tools) · [Repository](https://github.com/innosage-llc/innosage-tools) | Browser-first/local processing where supported; review upstream privacy notes and tool-specific constraints |
 | **Issue → PR workflow** | Copy a bounded task prompt for a coding agent | [Workflow](../workflows/issue-to-pr/README.md) · [Prompt](../workflows/issue-to-pr/PROMPT.md) | A documentation template, **not** an installed agent or automation service |

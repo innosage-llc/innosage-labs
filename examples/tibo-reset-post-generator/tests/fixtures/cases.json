@@ -1,0 +1,90 @@
+{
+  "format_version": 1,
+  "note": "Synthetic examples for contract verification only. Not evidence of a live Tibo reset or that any LLM follows the Skill.",
+  "cases": [
+    {
+      "id": "clock_without_timezone",
+      "source": {
+        "kind": "USER_SCREENSHOT",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "Today is a reset.",
+        "displayed_post_date": "2026-10-26",
+        "displayed_post_clock": "1:21 PM",
+        "viewer_timezone": null,
+        "reset_event_iso": null
+      },
+      "expected": {
+        "disposition": "DRAFT",
+        "claim_status": "CLAIMED",
+        "post_time_beijing": null,
+        "reset_time_beijing": null,
+        "poster_time": "重置时间待确认",
+        "must_not_claim_all_accounts": true
+      }
+    },
+    {
+      "id": "explicit_future_reset_instant",
+      "source": {
+        "kind": "USER_QUOTE",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "A reset is scheduled for 2026-10-26 09:30 UTC-07.",
+        "displayed_post_date": null,
+        "displayed_post_clock": null,
+        "viewer_timezone": null,
+        "reset_event_iso": "2026-10-26T09:30:00-07:00"
+      },
+      "expected": {
+        "disposition": "DRAFT",
+        "claim_status": "ANNOUNCED",
+        "post_time_beijing": null,
+        "reset_time_beijing": "2026-10-27T00:30:00+08:00",
+        "poster_time": "预计北京时间10月27日00:30",
+        "must_not_claim_all_accounts": true
+      }
+    },
+    {
+      "id": "irrelevant_post",
+      "source": {
+        "kind": "USER_QUOTE",
+        "author_handle": "@thsottiaux",
+        "reset_related": false,
+        "source_text": "Day 21 — a general product update.",
+        "displayed_post_date": null,
+        "displayed_post_clock": null,
+        "viewer_timezone": null,
+        "reset_event_iso": null
+      },
+      "expected": {
+        "disposition": "NOT_APPLICABLE",
+        "claim_status": "UNKNOWN",
+        "post_time_beijing": null,
+        "reset_time_beijing": null,
+        "poster_time": null,
+        "must_not_claim_all_accounts": true
+      }
+    },
+    {
+      "id": "unreadable_url_only",
+      "source": {
+        "kind": "UNAVAILABLE",
+        "author_handle": null,
+        "reset_related": null,
+        "source_text": null,
+        "displayed_post_date": null,
+        "displayed_post_clock": null,
+        "viewer_timezone": null,
+        "reset_event_iso": null
+      },
+      "expected": {
+        "disposition": "NEEDS_EVIDENCE",
+        "claim_status": "UNKNOWN",
+        "post_time_beijing": null,
+        "reset_time_beijing": null,
+        "poster_time": null,
+        "must_not_claim_all_accounts": true
+      }
+    }
+  ]
+}
