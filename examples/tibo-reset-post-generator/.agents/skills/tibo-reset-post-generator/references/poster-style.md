@@ -1,40 +1,56 @@
-# Poster and caption design contract
+# Tibo example poster: preservation-first design contract
 
-This describes **layout and evidence placement**, not a redistributable base image. If the user supplies an authorized reference/base poster, preserve its overall composition and replace only the content necessary to communicate the new facts accurately.
+This **specific example** uses the previously published poster in `../../../assets/codex-10-26极简重置更新公告海报.png` (relative to `SKILL.md`) as the **default edit target**. See the [project asset note](../../../../assets/README.md) for provenance. This is not a generic brand-neutral template.
 
-## Image output
+## Rendering mode and loading gate
 
-- Render **one real PNG/JPEG**, portrait **3:4** (for example 1200×1600, 1086×1448 or another exact 3:4 size).
-- Minimal editorial design: near-white ground, black headline, muted charcoal supporting text, restrained red rule; generous whitespace. Avoid narrow/compressed Chinese fonts and tiny footnotes.
-- Suggested hierarchy: (1) small brand-neutral “Codex / 重置动态” or user-authorized brand label, (2) big **evidence-backed** date or time/status, (3) short source/translation, (4) attribution and caveat.
-- **If no verified reset event time:** make “重置时间待确认” / “Tibo 提及重置” the oversized headline instead of a fabricated HH:MM. A post date may be shown only if supported, labeled correctly (e.g. `原帖显示日期` if screenshot has no absolute zone).
-- Keep every Chinese glyph and symbol legible, use balanced margins, no text overlap or clipping. The user-supplied base may be recolored/rebalanced only as needed for readability.
-- Render as an image with the environment's available image tool. **Text-only briefs, SVG code and mockups do not satisfy the PNG/JPEG requirement.**
+- Default: `edit_existing_poster`, **not** text-to-image regeneration. Use GPT's image **editing** capability with the **original PNG bytes** in its image-input context.
+- When working from GitHub, navigate to the project asset and download/attach the PNG if the current ChatGPT client cannot pass a repo image directly into editing. A filename/URL or thumbnail screenshot is not proof that full original pixels were loaded.
+- A missing/unreadable default image is `INCOMPLETE — BASE_IMAGE_UNAVAILABLE`. Do not silently substitute a newly generated poster. `generate_new_poster` is a separate **explicitly requested** mode outside this example's default behavior.
 
-## Source block and caveat
+## Protected regions — preserve as-is
 
-- Attribute by name/handle only when supported: `Tibo · @thsottiaux`.
-- Separate `原文` from `译文`; if only a summary is printed, label it `原帖摘要`.
-- Keep a short uncertainty label visibly on the poster when significant (e.g. `*具体重置时间及适用套餐待确认`).
-- Avoid names, avatars, brand logos, platform UI reproductions and third-party imagery supplied without clear reuse permission. In the absence of a licensed base, use **neutral text-only** branding or a user-owned logo.
+| Region | Preservation objective |
+| --- | --- |
+| Top left | Existing OpenAI/Codex logo **and** `Codex / ChatGPT ｜ 重置更新` branding, same placement and scale |
+| Attribution | Tibo's existing profile photograph, name and `@thsottiaux` — do not replace, stylize or crop |
+| Graphic structure | White background, existing red horizontal accent, margins, whitespace, large main time/date hierarchy |
+| All other untouched elements | Same visual appearance as the reference; edit only approved text slots |
 
-## Caption (Chinese default, Xiaohongshu-first)
+The owner explicitly authorizes preserving these **already present** image elements in this example. They are not a license grant for independent redistribution or third-party reuse. Do not redraw logos or hallucinate a different face.
 
-1. One short hook that is factual rather than sensational.
-2. What the author **said**, based on the source; distinguish it from an observed quota reset.
-3. The single most decision-relevant uncertainty (timestamp/coverage/plan).
-4. Original link and concise tags only when useful; no manufactured referral or marketing metrics.
+## Editable text zones — minimal delta
 
-Use a compact 80–180 Chinese-character starting point; adapt naturally to the platform without hard-coding an exact character count. No claim of “100% reset” from one person's post. No auto-posting.
+1. Date label/date text, only if backed by the **new** source evidence. Old `10月26日` is example history, not current fact.
+2. Large `13:21*` **time/status text**, only if the actual reset event time is known; otherwise replace with a short accurate status like `时间待确认` within the same visual area. Old clock is not evidence of the new reset.
+3. The text in the translated Tibo quote / source-summary block, preserving `原帖摘译` attribution convention and the static avatar/handle.
+4. Small bottom footnote/source caveat, changing only what the new evidence requires.
 
-## Visual QA checklist
+**No other poster changes.** The **social title and body caption** are text deliverables **outside the image**, not new overlay panels. Avoid redesigns, added backgrounds, decorative graphics or extra badges.
 
-- [ ] Exactly 3:4 ratio; full outer margins visible.
-- [ ] Text correct in simplified Chinese and no cropped glyphs.
-- [ ] Largest text is justified by the evidence.
-- [ ] Source/translation distinction not lost.
-- [ ] Timestamp type and unknown-zone caveat correct.
-- [ ] No unauthorised logos, portraits, screenshots or stolen assets.
-- [ ] Final PNG/JPEG genuinely generated and inspected, not inferred from an image-generation prompt.
+## Fit and fidelity rules
 
-The user reviews and manually publishes after this step.
+- Output a real **3:4 PNG/JPEG** using image edit, preferably matching the original pixel dimensions and content bounding boxes when the tool permits.
+- Prefer the original alignment, font weight, line spacing, padding, contrast and scale. Never sacrifice readability to force lengthy translation into the same line count.
+- If new quote is longer, rewrap **only its text zone**; minimally reduce that text's size if required. Do not crowd the lower footnote, move the logo or avatar, or shift the red line.
+- If source text can't fit without substantial layout drift, return `INCOMPLETE — NEEDS_REVISION` with a concise proposed shorter faithful paraphrase for the user, instead of claiming it is done.
+- Image editing is generative and may change pixels outside selected text regions. Fidelity must be **checked visually after generation**, not assumed. Compare base and output for logo/avatar/header/red line; if changed, retry a targeted text-only edit.
+
+## Factual labeling and title/caption
+
+- Preserve source identity: `Tibo · @thsottiaux`. Distinguish direct quote, Chinese translation, and summarized meaning.
+- Do not carry forward the old poster's `13:21*`, date, old translation or footnote for a different announcement unless the **new evidence** supports them.
+- Never conflate source post's display clock with Beijing reset-event time. When unresolved, state the uncertainty in a visible footnote and choose a truthful prominent status.
+- Separate **headline/title** (copyable outside image) from **caption** (short factual Chinese post body, concise source link, one uncertainty note); no clickbait or unsupported all-account quota promises.
+
+## Final compare checklist
+
+- [ ] The **original committed PNG** (or its exact user-attached copy) was provided to GPT image editing, not just viewed as a GitHub web page.
+- [ ] OpenAI/Codex logo, `Codex / ChatGPT` header, Tibo portrait/name/handle, red rule, background and overall layout are visually preserved.
+- [ ] Only the four approved text zones changed; no extraneous objects/panels.
+- [ ] Correct simplified Chinese, no overlaps, no clipping and **3:4** proportions.
+- [ ] Every new date/time is evidence-backed; unknown reset time does not leave `13:21*` from the old poster.
+- [ ] Separate social title and caption are both present, with correct source/caveat.
+- [ ] Differences and limitations are reported honestly; no auto-publication.
+
+A renderer cannot guarantee a perfect pixel match. Failed preservation => `INCOMPLETE — NEEDS_REVISION`, not `READY_FOR_REVIEW`.

@@ -38,6 +38,6 @@ Labs is a **curated entry point, not a mirror**. Draft Skills and InnoSage DevTo
 
 Every contribution should state **what it does, how to try it, what was actually verified, and what is not guaranteed**. Do not include credentials, private user data, sensitive transcripts, internal-only infrastructure details, or unreviewed private source code.
 
-See [Contributing and publication safety](CONTRIBUTING.md). Code and original materials in **this repository** are licensed under [MIT](LICENSE); linked projects retain their own licenses and terms.
+See [Contributing and publication safety](CONTRIBUTING.md). Our original code and documentation in this repository are licensed under [MIT](LICENSE). **Embedded third-party logos, likenesses or other identity assets in an example image are not independently relicensed by MIT**; see each example's asset policy. Linked projects retain their own licenses and terms.
 
 [Launch scope and acceptance criteria](https://github.com/innosage-llc/innosage-labs/issues/1)
