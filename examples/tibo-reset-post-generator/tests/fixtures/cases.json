@@ -159,7 +159,7 @@
   "template": {
     "default_base_image": "assets/codex-10-26极简重置更新公告海报.png",
     "git_blob_sha": "44fee2832dd283e8f168a7ca1eee6a71bd3e0416",
-    "default_render_mode": "edit_existing_poster",
+    "default_render_mode": "text_region_edit",
     "missing_base_outcome": "INCOMPLETE — BASE_IMAGE_UNAVAILABLE",
     "protected_regions": [
       "OpenAI/Codex logo",
@@ -180,6 +180,14 @@
       "separate Chinese title",
       "separate Chinese caption",
       "evidence ledger"
+    ],
+    "fallback_render_mode": "gpt_image_edit",
+    "portable_asset": "assets/base-poster.png",
+    "qa_required": [
+      "base_git_blob_sha",
+      "protected_pixel_differences",
+      "pixels_changed_outside_editable_regions",
+      "text_bounds_pass"
     ]
   }
 }
