@@ -19,7 +19,7 @@ except ImportError as exc:
 NAME = "codex-10-26极简重置更新公告海报.png"
 EXPECTED_BLOB = "44fee2832dd283e8f168a7ca1eee6a71bd3e0416"
 HERE = Path(__file__).resolve().parent.parent
-DEFAULTS = (HERE / "assets/base-poster.png", HERE.parents[2] / "assets" / NAME)
+DEFAULTS = (HERE / "assets/base-poster.png", HERE / "../../../assets" / NAME)
 LAYOUT = HERE / "references/layout.json"
 FONTS = (
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
