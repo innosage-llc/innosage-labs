@@ -10,6 +10,7 @@ InnoSage Labs is a public collection of small tools, agent workflows, and engine
 
 | Artifact | When it helps | Try / read |
 | --- | --- | --- |
+| **Tibo Reset Post Generator** | Turn a sourced reset update into a genuine 3:4 Chinese poster + caption | [Try the Web-first project](examples/tibo-reset-post-generator/README.md) |
 | **Issue → PR workflow** | Give a coding agent a bounded task and demand a reviewable, evidence-backed PR | [Workflow + copy/paste prompt](workflows/issue-to-pr/README.md) |
 | **Draft Skills** | Work with Draft pages from supported agent/CLI environments | [Install and compatibility guide](https://github.com/innosage-llc/draft-skills#readme) |
 | **InnoSage DevTools** | Use local-first browser tools for PDF, audio, video, images, and QR codes | [Live tools](https://innosage.co/tools) · [Source](https://github.com/innosage-llc/innosage-tools) |
