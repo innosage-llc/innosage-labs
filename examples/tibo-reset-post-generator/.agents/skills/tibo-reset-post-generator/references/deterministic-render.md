@@ -10,7 +10,7 @@ This is a fixed-example **local Pillow** lane. It is not an X crawler, LLM, or o
 
 ## Local command
 
-    python3 -m pip install 'Pillow>=12,<14'
+    python3 -m pip install 'Pillow>=12.1,<14'
     python3 scripts/render_poster.py --input examples/deterministic-input.json --out-dir ./out --font /path/to/installed/CJK-font.ttf
 
 Use --font only for fonts already installed and authorized locally. The ZIP bundles **no fonts**. Without a CJK font the command fails. The example JSON is explicitly fictitious; replace evidence, claim status, date, hero, quote, title and caption with a sourced real case before publication. A local checkout may call the same script under .agents/skills/... without extracting a ZIP.
