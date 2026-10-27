@@ -97,7 +97,7 @@ class TestPublicSkillContract(unittest.TestCase):
         # The example intentionally includes ONE founder-selected public base PNG.
         self.assertTrue(DEFAULT_IMAGE.is_file())
         raw = DEFAULT_IMAGE.read_bytes()
-        self.assertTrue(raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+        self.assertTrue(raw.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertGreaterEqual(len(raw), 33)
         length = struct.unpack(">I", raw[8:12])[0]
         self.assertEqual(raw[12:16], b"IHDR")
@@ -109,7 +109,7 @@ class TestPublicSkillContract(unittest.TestCase):
         self.assertGreater(width, 0)
         self.assertGreater(height, 0)
         self.assertEqual(width * 4, height * 3, "default poster must be 3:4")
-        blob = b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw
+        blob = b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
         self.assertEqual(hashlib.sha1(blob).hexdigest(), EXPECTED_BASE_IMAGE_BLOB_SHA)
 
     def test_only_allow_selected_example_image(self):
