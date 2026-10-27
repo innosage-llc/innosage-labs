@@ -1,6 +1,6 @@
 # Synthetic case: screenshot clock with unknown timezone
 
-**This is fictional source text for a deterministic Skill regression, not a reproduced X post or a claim about Tibo's actual reset.** The project **does** include a real, previously published base poster with logo/avatar in `../../../assets/`, but this fixture does not distribute or reproduce source screenshots or extra portraits.
+**This is fictional source text for a deterministic Skill regression, not a reproduced X post or a claim about Tibo's actual reset.** The project **does** include a real, previously published base poster with logo/avatar in `../../../../assets/` (relative to this example document), but this fixture does not distribute or reproduce source screenshots or extra portraits.
 
 ## Input (simulated)
 
