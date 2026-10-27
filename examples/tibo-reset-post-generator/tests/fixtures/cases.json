@@ -117,6 +117,43 @@
         "render_mode": "edit_existing_poster",
         "must_not_claim_all_accounts": true
       }
+    },
+    {
+      "id": "mixed_topic_reset_editorial",
+      "source": {
+        "kind": "USER_QUOTE",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "Day 18/ Decisions API reached GA. OpenResponses joined an organization. Uber is exploring Codex. But yes... a reset is planned. Details will follow.",
+        "displayed_post_date": null,
+        "displayed_post_clock": null,
+        "viewer_timezone": null,
+        "reset_event_iso": null
+      },
+      "base_image_accessible": true,
+      "expected": {
+        "disposition": "DRAFT",
+        "claim_status": "ANNOUNCED",
+        "post_time_beijing": null,
+        "reset_time_beijing": null,
+        "poster_time": "重置时间待确认",
+        "must_not_claim_all_accounts": true,
+        "render_mode": "edit_existing_poster",
+        "poster_label": "原帖摘要",
+        "poster_copy": "Tibo 提到：将进行一次重置。",
+        "poster_body_max_lines": 2,
+        "omit_from_poster": [
+          "Day 18",
+          "Decisions API",
+          "OpenResponses",
+          "Uber"
+        ],
+        "caption_may_include": [
+          "Decisions API",
+          "OpenResponses",
+          "Uber"
+        ]
+      }
     }
   ],
   "template": {

@@ -18,16 +18,34 @@ Base image: the actual attached original file
 
 Use GPT image EDITING, not fresh generation. Preserve the existing
 OpenAI/Codex logo and header, Tibo profile photo/handle, red accent,
-white background, 3:4 layout and typography. Change ONLY the date,
-the evidence-backed reset time/status, the Chinese translated quote,
-and any necessary bottom caveat. Never reuse the old "13:21*" or date
-as facts about a new post. If exact reset time is not known, write
-a truthful compact "时间待确认" in the existing time area.
+white background and 3:4 composition.
+
+BEFORE image editing, prepare a tiny reset-only POSTER_COPY:
+keep Tibo as authority, just ONE faithful reset excerpt or labeled
+summary (target 1-2 short Chinese lines) and the supported reset
+time/status. DO NOT put unrelated Day-18 releases (Decisions API,
+OpenResponses, Uber etc.), a full article, or technical recaps on
+the poster: move those into the separate BODY caption instead.
+Use 原帖节选 for faithful abbreviated quotation, 原帖摘要 for paraphrase;
+do not wrap paraphrases in quotation marks.
+
+Preserve the original wide whitespace. Make only the large time/status
+black and bold; use lighter, charcoal/gray normal-weight quote text
+and a short muted footnote (target <=2 readable lines).
+NEVER shrink-to-fit a long paragraph, make all text bold/black, or
+fill empty space. Change ONLY date, evidence-backed reset time/status,
+short translated reset excerpt/summary and essential footer caveat.
+Never reuse the old "13:21*" or date as facts about a new post.
+If exact reset time is unknown use a truthful "时间待确认".
 Return (1) short evidence ledger, (2) ACTUAL edited 3:4 poster image,
 (3) separate concise Chinese social TITLE, (4) Chinese BODY caption.
-Check the image against the original before marking READY_FOR_REVIEW.
-If base pixels were unavailable or protected graphics drift badly,
-return INCOMPLETE with the precise reason. Do not post automatically.
+Compare with the base at mobile-feed size. If body text is longer
+than 2 short lines, lower area is crowded, the poster has multiple
+competing black/bold paragraphs or whitespace is lost, shorten
+poster copy and retry. If still crowded, report
+INCOMPLETE — NEEDS_REVISION (TOO_DENSE), never READY_FOR_REVIEW.
+If base pixels were unavailable or protected graphics drift,
+return INCOMPLETE with a precise reason. Do not post automatically.
 ```
 
 5. Inspect image against original before manually posting. Check unchanged logo/avatar/header/red line, only intended text changes, time-source correctness, fit, title and caption.
@@ -45,6 +63,8 @@ The Skill folder can be installed where your workspace supports it. **The defaul
 - Real original image bytes were loaded into the image-edit tool.
 - No changes to logo, avatar, identity labels, red accent, 3:4 composition except best-effort generative drift corrected through comparison.
 - Only four factual text areas were changed; no invented timestamp from the old image.
+- Poster has ONE bold time/status hero, softer normal-weight reset-only copy (1–2 short lines), muted short footnote and obvious original whitespace; no unrelated releases on the poster.
+- Source excerpt is faithful or is labeled `原帖摘要`, without misleading quotation marks.
 - Social title and caption were returned **separately**.
 - Actual rendered image exists, readable and inspected.
 - No auto-posting, unverified scope claims or false `READY_FOR_REVIEW`.
