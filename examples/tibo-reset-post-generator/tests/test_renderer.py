@@ -1,6 +1,8 @@
 """P0 integration tests. Run in an actual repo checkout with canonical poster."""
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -82,6 +84,31 @@ class TestRenderer(unittest.TestCase):
         data["poster"]["hero"] = "02:00已重置"
         with self.assertRaisesRegex(self.renderer.ValidationError,"UNSOURCED_TIME"):
             self.renderer.validated_input(data)
+
+    def test_cli_writes_machine_readable_qa_for_success_and_failure(self):
+        font = self.renderer.choose_font(None)
+        script = SKILL / "scripts/render_poster.py"
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            success = subprocess.run([
+                sys.executable, str(script), "--input", str(SOURCE),
+                "--out-dir", str(root/"good"), "--font", font
+            ], text=True, capture_output=True)
+            self.assertEqual(success.returncode, 0, success.stderr)
+            qa = json.loads((root/"good/qa.json").read_text(encoding="utf-8"))
+            self.assertEqual(qa["status"], "READY_FOR_REVIEW")
+            self.assertEqual(qa["pixels_changed_outside_editable_regions"], 0)
+            wrong = root/"wrong.png"
+            Image.new("RGB", (1086, 1448), "white").save(wrong)
+            fail = subprocess.run([
+                sys.executable, str(script), "--input", str(SOURCE),
+                "--out-dir", str(root/"bad"), "--base", str(wrong), "--font", font
+            ], text=True, capture_output=True)
+            self.assertNotEqual(fail.returncode, 0)
+            badqa = json.loads((root/"bad/qa.json").read_text(encoding="utf-8"))
+            self.assertEqual(badqa["status"], "INCOMPLETE")
+            self.assertIn("BASE_HASH_MISMATCH", badqa["reason"])
+            self.assertFalse((root/"bad/poster.png").exists())
 
     def test_portable_zip_clean_extract(self):
         with tempfile.TemporaryDirectory() as d:
