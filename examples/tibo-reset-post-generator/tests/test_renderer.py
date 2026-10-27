@@ -35,6 +35,13 @@ class TestRenderer(unittest.TestCase):
         self.assertGreaterEqual(quote[1], identity[3])
         self.assertFalse(self.renderer.intersection(identity, quote))
 
+    def test_direct_tmp_skill_import_does_not_index_missing_parent(self):
+        source = (SKILL / "scripts/render_poster.py").read_text(encoding="utf-8")
+        filename = "/tmp/tibo-reset-post-generator/scripts/render_poster.py"
+        space = {"__name__": "standalone_import_check", "__file__": filename}
+        exec(compile(source, filename, "exec"), space)
+        self.assertEqual(space["DEFAULTS"][0], Path("/tmp/tibo-reset-post-generator/assets/base-poster.png"))
+
     def test_asset_identity(self):
         self.assertTrue(CANONICAL.exists(), "canonical PNG required in Git checkout")
         self.assertEqual(self.renderer.blob_sha(CANONICAL.read_bytes()), self.renderer.EXPECTED_BLOB)
