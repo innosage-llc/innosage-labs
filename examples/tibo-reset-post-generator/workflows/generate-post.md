@@ -1,46 +1,52 @@
-# Generate a reset post — human-facing entry point
+# Generate a Tibo reset post — edit the existing example
 
-This is a **launch checklist**, not a second Skill specification. The single source of truth for the agent's behavior is [`SKILL.md`](../.agents/skills/tibo-reset-post-generator/SKILL.md), plus the two reference files inside its folder.
+**Default:** use the [published example base poster](../assets/codex-10-26极简重置更新公告海报.png), preserve its original OpenAI/Codex logo, Tibo profile photo, handle, layout and red rule, and change only factual text. The single canonical execution contract is [`SKILL.md`](../.agents/skills/tibo-reset-post-generator/SKILL.md) with its [evidence](../.agents/skills/tibo-reset-post-generator/references/evidence-rules.md) and [poster](../.agents/skills/tibo-reset-post-generator/references/poster-style.md) references.
 
-## Option A — ChatGPT Web, with no Skill installed
+## ChatGPT Web (works without installing a Skill)
 
-1. Open a new ChatGPT conversation with image-generation/editing capability.
-2. Upload **your own** original Tibo post screenshot or paste his exact post text (or give the public X URL); optionally upload a base poster that you can reuse.
-3. Make the Skill instructions available:
-   - Preferred: attach [`SKILL.md`](../.agents/skills/tibo-reset-post-generator/SKILL.md), [`evidence-rules.md`](../.agents/skills/tibo-reset-post-generator/references/evidence-rules.md), and [`poster-style.md`](../.agents/skills/tibo-reset-post-generator/references/poster-style.md).
-   - Or explicitly ask ChatGPT to read these files from the public GitHub project; **verify it actually reads them**. If URL access fails, upload them instead.
-4. Paste this request (replace bracketed parts):
+1. Open [the actual default PNG](../assets/codex-10-26极简重置更新公告海报.png) on GitHub and **download/attach the full image file** to your ChatGPT conversation. If ChatGPT's image editor can read the source image directly from the repo, verify that it actually loaded the original PNG. A link/filename or browser screenshot alone isn't equivalent.
+2. Supply a Tibo reset X URL, original post screenshot, or exact quote. Link-only evidence might be inaccessible: provide a screenshot or pasted text if needed. Keep your input post distinct from the **old poster's text**.
+3. Make the Skill available to ChatGPT: upload [`SKILL.md`](../.agents/skills/tibo-reset-post-generator/SKILL.md), [`evidence-rules.md`](../.agents/skills/tibo-reset-post-generator/references/evidence-rules.md) and [`poster-style.md`](../.agents/skills/tibo-reset-post-generator/references/poster-style.md), or have ChatGPT explicitly fetch/read all three before invoking. GitHub being linked is **not** automatic Skill loading.
+4. Paste this task, replacing the bracketed source and platform:
 
 ```text
-Use the attached / successfully read Tibo Reset Post Generator SKILL.md and its
-references. Source: [POST LINK, SCREENSHOT, OR EXACT QUOTE].
-Base poster: [ATTACHED AUTHORISED IMAGE, OR "none"].
-Platform: Xiaohongshu. Language: Simplified Chinese.
+Use the Tibo Reset Post Generator Skill and its two references.
+Source evidence: [TIBO ORIGINAL POST URL / SCREENSHOT / EXACT QUOTE]
+Platform: [XIAOHONGSHU, WECHAT OR GENERIC]; language: zh-CN.
+Base image: the actual attached original file
+  codex-10-26极简重置更新公告海报.png.
 
-Return a short evidence/uncertainty ledger, one ACTUAL 3:4 PNG or JPEG poster,
-and a concise Chinese caption. Preserve source-versus-inference distinctions.
-Never invent a reset time from the post display clock. If image rendering is
-not available, mark the result INCOMPLETE; don't give only a design brief and
-claim success. Stop before publishing anywhere.
+Use GPT image EDITING, not fresh generation. Preserve the existing
+OpenAI/Codex logo and header, Tibo profile photo/handle, red accent,
+white background, 3:4 layout and typography. Change ONLY the date,
+the evidence-backed reset time/status, the Chinese translated quote,
+and any necessary bottom caveat. Never reuse the old "13:21*" or date
+as facts about a new post. If exact reset time is not known, write
+a truthful compact "时间待确认" in the existing time area.
+Return (1) short evidence ledger, (2) ACTUAL edited 3:4 poster image,
+(3) separate concise Chinese social TITLE, (4) Chinese BODY caption.
+Check the image against the original before marking READY_FOR_REVIEW.
+If base pixels were unavailable or protected graphics drift badly,
+return INCOMPLETE with the precise reason. Do not post automatically.
 ```
 
-5. Inspect the output. If the model cannot read `SKILL.md` and both references, treat this attempt as **not skill-driven**. Upload the files and retry rather than assuming compliance.
+5. Inspect image against original before manually posting. Check unchanged logo/avatar/header/red line, only intended text changes, time-source correctness, fit, title and caption.
 
-## Option B — Installed ChatGPT Skill (eligible account)
+## Using a locally discovered Skill in Codex
 
-Go to **Plugins → Skills**; install/upload this project's self-contained `.agents/skills/tibo-reset-post-generator/` directory using the supported skill-upload flow. Exact workspace entitlements and upload formats may vary. Confirm the skill is visible before invoking it using `@` or selecting it. Then send the source post and permitted base image. Check that a real image was produced.
+From a checkout, run `cd examples/tibo-reset-post-generator`, then use `$tibo-reset-post-generator` or `/skills` where supported. The default PNG is under `assets/`, and the Skill is under `.agents/skills/`. No image editor is guaranteed in Codex: when absent, return `INCOMPLETE — RENDERER_UNAVAILABLE` and hand off original PNG + evidence to ChatGPT Web.
 
-## Option C — Codex / agent with a local repo
+## Installed ChatGPT Skill (when supported)
 
-Run from the project directory, **not** the Labs root. Invoke `$tibo-reset-post-generator` or choose it via `/skills`, supplying the post evidence and an authorized base image. If that agent has no image renderer, stop at `INCOMPLETE` with a handoff for Web; don't claim the required PNG was made.
+The Skill folder can be installed where your workspace supports it. **The default PNG lives in the example project, outside the installable Skill folder.** In ChatGPT Web, independently attach that PNG to each generation; an installed Skill doesn't imply image assets from GitHub have been mounted.
 
-## Quality gate (manual, before you post)
+## Pass/fail checklist
 
-- Source identified; claim versus independent observation distinguished.
-- Original displayed clock was **not** automatically interpreted as Beijing time.
-- A rendered **3:4** poster exists, Chinese text is legible, margins not cut off.
-- Caption does not claim all users/plans received a reset.
-- Source attribution and caveat remain on poster or caption.
-- Nothing has been auto-published.
+- Real original image bytes were loaded into the image-edit tool.
+- No changes to logo, avatar, identity labels, red accent, 3:4 composition except best-effort generative drift corrected through comparison.
+- Only four factual text areas were changed; no invented timestamp from the old image.
+- Social title and caption were returned **separately**.
+- Actual rendered image exists, readable and inspected.
+- No auto-posting, unverified scope claims or false `READY_FOR_REVIEW`.
 
-For edge cases and expected behavior see the [synthetic sample](../.agents/skills/tibo-reset-post-generator/examples/sample-case.md).
+See the [synthetic example](../.agents/skills/tibo-reset-post-generator/examples/sample-case.md) for an unknown-time regression.

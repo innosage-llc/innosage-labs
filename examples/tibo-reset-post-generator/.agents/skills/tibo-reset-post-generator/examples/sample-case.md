@@ -1,6 +1,6 @@
 # Synthetic case: screenshot clock with unknown timezone
 
-**This is fictional test data for the Skill, not a reproduced X post or a claim about Tibo's actual reset.** No original screenshots, portraits, logos or source account assets are included.
+**This is fictional source text for a deterministic Skill regression, not a reproduced X post or a claim about Tibo's actual reset.** The project **does** include a real, previously published base poster with logo/avatar in `../../../assets/`, but this fixture does not distribute or reproduce source screenshots or extra portraits.
 
 ## Input (simulated)
 
@@ -11,7 +11,7 @@
 - Screenshot labels: `Oct 26, 2026 · 1:21 PM`.
 - Source screenshot viewer timezone: **unknown**.
 - Independent fetch: **not performed**.
-- Base poster: a blank, owned 3:4 minimal layout, or none.
+- Base poster: **the existing committed example PNG** (same OpenAI/Codex logo, Tibo avatar and red accent), not a neutral redesign. If its image bytes can't be loaded by GPT editing, stop at `INCOMPLETE — BASE_IMAGE_UNAVAILABLE`.
 
 ## Expected evidence ledger
 
@@ -29,16 +29,17 @@ The agent must **not** write “北京时间 13:21 已重置” or “全部 Pro
 
 ## Example poster copy / expected visual result
 
-- Small heading: `Codex / 重置动态`
-- Date label: `原帖显示日期：10月26日` (or omit date if unsupported in a real case)
-- **Large headline: `重置时间待确认`**
-- Source label: `原帖摘要（演示数据）`
-- Main text: `Tibo 表示今天有重置，具体生效时间未提供。`
-- Footnote: `*展示时间 1:21 PM 的时区未知，非重置时刻。`
-- Art direction: actual rendered PNG/JPEG, 3:4, white space, black type, muted text and red accent; no third-party photo/logo.
+- **Keep unchanged:** existing OpenAI/Codex logo + header, Tibo avatar/name/handle, red underline, background, overall 3:4 composition.
+- Date label: `原帖显示日期：10月26日` (fictional screenshot display; omit if unsupported in a real case).
+- **Replace the old large `13:21*` with `时间待确认`**, fitting the existing time box.
+- Source label: `原帖摘译（演示数据）`.
+- Main text: `Tibo 表示今天有重置，具体生效时间未提供。`.
+- Footnote: `*截图显示 1:21 PM，但时区未知，非重置时刻。`.
+- Separate social **title**: `Tibo 提及 Codex 重置，时间仍待确认`.
+- Do not redraw the logo/avatar or introduce a new layout; produce an actual edited 3:4 image.
 
 ## Example Chinese caption (draft, not automatically posted)
 
 > 【演示案例】模拟来源提到一次 Codex 重置，但截图上的 1:21 PM 未注明时区，也没有明确重置发生的分钟或适用套餐。不要把发帖时间当成重置时间。正式发布前，请核实原帖及账号范围。
 
-This documented expectation is **not** proof the image was rendered. In an end-to-end run, the assistant must produce and inspect a real image before saying `READY_FOR_REVIEW`.
+This documented expectation is **not** proof the image was edited. In an end-to-end run, the assistant must load the original image pixels into GPT editing, produce and visually compare a real image, and return separate title + caption before saying `READY_FOR_REVIEW`.
