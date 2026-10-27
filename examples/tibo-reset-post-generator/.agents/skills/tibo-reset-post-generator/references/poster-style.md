@@ -20,11 +20,19 @@ Priority order:
 
 **Fail gate:** If the edited image still resembles an all-black/all-bold 4–6-line news recap, has dense lower-body text, or sacrifices the base image's whitespace, report `INCOMPLETE — NEEDS_REVISION (TOO_DENSE)`; not `READY_FOR_REVIEW`.
 
+## Two rendering paths and pixel evidence
+
+**Preferred for this fixed example: deterministic `text_region_edit`.** A local Pillow renderer uses an explicit `references/layout.json` edit allowlist; it verifies canonical base image bytes and recomputes pixel differences after saving the PNG. The source still needs evidence preparation before local rendering. The edited rectangle set includes the short source label as a subregion of the quote block. Protected Tibo identity, original logo/header and red rule stay outside all editable rectangles. All edit output must retain the original dimensions and 3:4 ratio.
+
+**Optional `gpt_image_edit`:** GPT can update the same base if the client has genuine image-edit access. It is **generative**, so a visually close result is not a guarantee of zero pixel drift. Keep source-grounded and density QA; do not claim deterministic pixel guarantees without running an actual comparison.
+
+**Background limitation:** local text-slot clearing approximates the base background *inside* approved rectangles using nearby blank margins; exact texture matching within those rectangles is not guaranteed. Original pixels **outside** the editable rectangles are preserved. If the source image's old text extends outside those rectangles, treat the result as needing revision rather than widening the mask over protected elements.
+
 ## Rendering mode and loading gate
 
-- Default: `edit_existing_poster`, **not** text-to-image regeneration. Use GPT's image **editing** capability with the **original PNG bytes** in its image-input context.
+- Default: **`text_region_edit` with a verified base and local Python/Pillow + CJK font** for pixel-preserving fixed-layout output. `gpt_image_edit` is optional when a suitable client is available; text-to-image regeneration is not default.
 - When working from GitHub, navigate to the project asset and download/attach the PNG if the current ChatGPT client cannot pass a repo image directly into editing. A filename/URL or thumbnail screenshot is not proof that full original pixels were loaded.
-- A missing/unreadable default image is `INCOMPLETE — BASE_IMAGE_UNAVAILABLE`. Do not silently substitute a newly generated poster. `generate_new_poster` is a separate **explicitly requested** mode outside this example's default behavior.
+- A missing/unreadable canonical or packaged PNG is `INCOMPLETE — BASE_IMAGE_UNAVAILABLE`. A hash mismatch is `BASE_HASH_MISMATCH`; missing font is `FONT_UNAVAILABLE`; overflow is `TOO_DENSE`. Do not silently substitute new or unverified artwork. `generate_new_poster` is a separate explicitly requested mode outside this fixed example.
 
 ## Protected regions — preserve as-is
 

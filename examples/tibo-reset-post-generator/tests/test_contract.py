@@ -152,8 +152,11 @@ class TestPublicSkillContract(unittest.TestCase):
         template = data["template"]
         self.assertEqual(template["default_base_image"], DEFAULT_IMAGE.relative_to(PROJECT).as_posix())
         self.assertEqual(template["git_blob_sha"], EXPECTED_BASE_IMAGE_BLOB_SHA)
-        self.assertEqual(template["default_render_mode"], "edit_existing_poster")
+        self.assertEqual(template["default_render_mode"], "text_region_edit")
+        self.assertEqual(template["fallback_render_mode"], "gpt_image_edit")
         self.assertIn("BASE_IMAGE_UNAVAILABLE", template["missing_base_outcome"])
+        self.assertEqual(template["portable_asset"], "assets/base-poster.png")
+        self.assertIn("base_git_blob_sha", template["qa_required"])
         self.assertIn("Tibo profile picture", template["protected_regions"])
         self.assertIn("OpenAI/Codex logo", template["protected_regions"])
         self.assertIn("Chinese translation", template["editable_text_regions"])
