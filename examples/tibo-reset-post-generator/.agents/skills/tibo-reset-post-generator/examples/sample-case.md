@@ -43,3 +43,29 @@ The agent must **not** write “北京时间 13:21 已重置” or “全部 Pro
 > 【演示案例】模拟来源提到一次 Codex 重置，但截图上的 1:21 PM 未注明时区，也没有明确重置发生的分钟或适用套餐。不要把发帖时间当成重置时间。正式发布前，请核实原帖及账号范围。
 
 This documented expectation is **not** proof the image was edited. In an end-to-end run, the assistant must load the original image pixels into GPT editing, produce and visually compare a real image, and return separate title + caption before saying `READY_FOR_REVIEW`.
+
+
+## Synthetic mixed-topic reset case — editorial regression
+
+This **fictional composite** is for information-priority testing only. It is **not** Tibo's actual post or evidence that any reset happened.
+
+**Input source (fictional):**
+
+> Day 18/ Decisions API reached GA. OpenResponses joined an organization. Uber is exploring Codex. But yes… a reset is planned. Details will follow.
+
+**Wrong poster:** reproduce all announcements as a 4–6-line heavy black paragraph, shrink text to fit, and fill the original template's white space.
+
+**Expected poster-only copy (the source text area):**
+
+- Existing Tibo avatar/name/handle stays unchanged in the base template.
+- Hero status: `重置时间待确认` (because the fictional source gives **no** exact event time).
+- Label: `原帖摘要` (**not** `原帖节选`, as the following is a paraphrase).
+- Body, **one short line**: `Tibo 提到：将进行一次重置。`
+- A short muted caveat, only if needed: `*具体时间和适用范围待确认。`
+- **No** `Decisions API`, `OpenResponses`, `Uber` or `Day 18` in the poster text. Do not add filler to occupy open space.
+
+**Separate Chinese title:** `Tibo 预告新一轮重置，时间待确认`
+
+**Separate caption:** `【演示案例】模拟来源预告将有一次重置，具体发生时间和适用范围尚未明确。它还谈到 Decisions API、OpenResponses 等其他动态，但海报只保留 Reset 核心信息。正式发布前请重新核对真实原帖。`
+
+**Visual quality check:** preserve the original logo/avatar/red line; main time/status remains the only heavy black element; the single-line poster summary uses a softer regular weight and the footer muted gray; original whitespace is intentionally visible.

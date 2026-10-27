@@ -2,6 +2,24 @@
 
 This **specific example** uses the previously published poster in `../../../assets/codex-10-26极简重置更新公告海报.png` (relative to `SKILL.md`) as the **default edit target**. See the [project asset note](../../../../assets/README.md) for provenance. This is not a generic brand-neutral template.
 
+## Editorial hierarchy and breathing room (MVP quality gate)
+
+**The poster is a one-message teaser, not a full news translation. Negative space is part of the design and must not be filled.**
+
+Priority order:
+1. **Hero:** evidence-backed reset **time, deadline or status** (one dominant black/bold visual element). Do not imply a deadline is the actual execution time.
+2. **Authority:** existing Tibo photo/name/handle; preserve it, do not turn the quote into a second giant headline.
+3. **Reset excerpt or summary:** just **one reset-related idea**, **1–2 short lines** in the original source area. Target concise Chinese rather than a paragraph. Details such as Day counters, Decisions API, OpenResponses, Uber, and unrelated release items belong in the **separate social caption**, if relevant.
+4. **Caveat:** **1–2 small legible lines** in muted gray, including only the material uncertainty, not a full explanation of every timezone possibility. Elaborate explanations go to the caption/evidence ledger.
+
+**Typography and color:**
+- Keep the original logo/header/photo/red accent as-is; one dominant **black bold** hero only. Secondary quote/summary should be **regular/medium**, **dark slate/charcoal** rather than equally heavy jet black. Tertiary footnote uses **muted gray** with readable contrast.
+- Use differences in **font size, weight and tone**, not several equally oversized or equally bold black blocks competing for attention. Keep the vertical gaps of the original template; do **not** scale up the body to fill open space.
+- First **delete non-reset content**; second summarize or select a faithful short excerpt; only then adjust line breaks minimally. **Do not use shrink-to-fit as a substitute for editorial judgment.**
+- If the source contains multiple announcements and the meaningful reset phrase cannot fit without crowding, use an **accurate reset-only paraphrase** tagged `原帖摘要`. Use `原帖节选` with `…` and quotation marks **only for a faithful omitted passage**; never imply omitted clauses say something different.
+
+**Fail gate:** If the edited image still resembles an all-black/all-bold 4–6-line news recap, has dense lower-body text, or sacrifices the base image's whitespace, report `INCOMPLETE — NEEDS_REVISION (TOO_DENSE)`; not `READY_FOR_REVIEW`.
+
 ## Rendering mode and loading gate
 
 - Default: `edit_existing_poster`, **not** text-to-image regeneration. Use GPT's image **editing** capability with the **original PNG bytes** in its image-input context.
@@ -32,8 +50,8 @@ The owner explicitly authorizes preserving these **already present** image eleme
 
 - Output a real **3:4 PNG/JPEG** using image edit, preferably matching the original pixel dimensions and content bounding boxes when the tool permits.
 - Prefer the original alignment, font weight, line spacing, padding, contrast and scale. Never sacrifice readability to force lengthy translation into the same line count.
-- If new quote is longer, rewrap **only its text zone**; minimally reduce that text's size if required. Do not crowd the lower footnote, move the logo or avatar, or shift the red line.
-- If source text can't fit without substantial layout drift, return `INCOMPLETE — NEEDS_REVISION` with a concise proposed shorter faithful paraphrase for the user, instead of claiming it is done.
+- If the source is longer, **shorten it to the reset excerpt/summary first**; rewrap only within its original text zone. Do not use small type or compress the footnote to force unrelated information onto the poster. Do not move logo/avatar/red line.
+- If a concise, truthful reset phrase still can't fit cleanly, return `INCOMPLETE — NEEDS_REVISION (TOO_DENSE)` and offer a shorter faithful paraphrase. The original poster's whitespace is an acceptance criterion, not disposable empty space.
 - Image editing is generative and may change pixels outside selected text regions. Fidelity must be **checked visually after generation**, not assumed. Compare base and output for logo/avatar/header/red line; if changed, retry a targeted text-only edit.
 
 ## Factual labeling and title/caption
@@ -48,6 +66,9 @@ The owner explicitly authorizes preserving these **already present** image eleme
 - [ ] The **original committed PNG** (or its exact user-attached copy) was provided to GPT image editing, not just viewed as a GitHub web page.
 - [ ] OpenAI/Codex logo, `Codex / ChatGPT` header, Tibo portrait/name/handle, red rule, background and overall layout are visually preserved.
 - [ ] Only the four approved text zones changed; no extraneous objects/panels.
+- [ ] **Reset-only information** under source attribution, at most **1–2 short lines**, not a full mixed-topic article recap; non-reset details moved into separate caption.
+- [ ] **One bold hero only**; secondary source text visibly lighter/softer in weight and tone; footnote muted gray, **1–2 readable lines**. Original whitespace remains generous.
+- [ ] Accurate `原帖节选` vs `原帖摘要` label; no misleading quotation marks or omission.
 - [ ] Correct simplified Chinese, no overlaps, no clipping and **3:4** proportions.
 - [ ] Every new date/time is evidence-backed; unknown reset time does not leave `13:21*` from the old poster.
 - [ ] Separate social title and caption are both present, with correct source/caveat.

@@ -65,6 +65,7 @@ class TestPublicSkillContract(unittest.TestCase):
             "irrelevant_post",
             "unreadable_url_only",
             "base_image_unavailable",
+            "mixed_topic_reset_editorial",
         })
         clock = cases["clock_without_timezone"]
         self.assertIsNone(clock["source"]["viewer_timezone"])
@@ -82,7 +83,8 @@ class TestPublicSkillContract(unittest.TestCase):
             self.assertIsNone(cases[cid]["expected"]["poster_time"])
             self.assertIsNone(cases[cid]["expected"]["reset_time_beijing"])
             self.assertIsNone(cases[cid]["expected"]["render_mode"])
-        for cid in ("clock_without_timezone", "explicit_future_reset_instant"):
+        for cid in ("clock_without_timezone", "explicit_future_reset_instant",
+                    "mixed_topic_reset_editorial"):
             self.assertTrue(cases[cid]["base_image_accessible"])
             self.assertEqual(cases[cid]["expected"]["render_mode"], "edit_existing_poster")
         missing = cases["base_image_unavailable"]
@@ -92,6 +94,31 @@ class TestPublicSkillContract(unittest.TestCase):
         self.assertEqual(missing["expected"]["render_mode"], "edit_existing_poster")
         for c in cases.values():
             self.assertTrue(c["expected"]["must_not_claim_all_accounts"])
+
+    def test_mixed_topic_reset_editorial_budget(self):
+        data = json.loads(FIXTURES.read_text(encoding="utf-8"))
+        case = next(c for c in data["cases"] if c["id"] == "mixed_topic_reset_editorial")
+        expected = case["expected"]
+        self.assertTrue(case["source"]["reset_related"])
+        self.assertEqual(expected["claim_status"], "ANNOUNCED")
+        self.assertIsNone(expected["reset_time_beijing"])
+        self.assertEqual(expected["poster_label"], "原帖摘要")
+        self.assertIn("重置", expected["poster_copy"])
+        self.assertLessEqual(len(expected["poster_copy"]), 32)
+        self.assertEqual(expected["poster_body_max_lines"], 2)
+        self.assertTrue(expected["caption_may_include"])
+        for term in expected["omit_from_poster"]:
+            self.assertIn(term, case["source"]["source_text"])
+            self.assertNotIn(term, expected["poster_copy"])
+        style = (SKILL / "references/poster-style.md").read_text(encoding="utf-8")
+        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+        workflow = (PROJECT / "workflows/generate-post.md").read_text(encoding="utf-8")
+        for token in ("原帖摘要", "原帖节选", "TOO_DENSE", "1–2 short lines"):
+            self.assertIn(token, skill)
+        for token in ("negative space", "INCOMPLETE", "原帖摘要", "OpenResponses"):
+            self.assertIn(token.lower(), style.lower())
+        self.assertIn("BEFORE image editing", workflow)
+        self.assertIn("BODY caption", workflow)
 
     def test_default_image_is_original_png_and_3_by_4(self):
         # The example intentionally includes ONE founder-selected public base PNG.
