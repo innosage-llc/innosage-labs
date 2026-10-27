@@ -142,7 +142,7 @@ class TestPublicSkillContract(unittest.TestCase):
         for token in ("Tibo", "OpenAI/Codex", "时间待确认", "3:4"):
             self.assertIn(token, style)
         self.assertIn("ACTUAL edited 3:4 poster image", workflow)
-        self.assertIn("separate Chinese social TITLE", workflow)
+        self.assertIn("separate concise Chinese social TITLE", workflow)
         self.assertIn("attach its actual PNG bytes", project_readme)
 
 
