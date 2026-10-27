@@ -1,6 +1,6 @@
 # Copy/paste task: GitHub issue → reviewable PR
 
-**Before sending:** replace all four bracketed placeholders and confirm the target repository's local instructions. This file is a template; it does not execute by itself.
+**Before sending:** replace all five bracketed placeholders and confirm the target repository's local instructions. This file is a template; it does not execute by itself.
 
 ---
 
@@ -10,6 +10,7 @@ Implement the GitHub issue below in the authorized checkout, verify the work usi
 
 - **Repository:** `[OWNER/REPO]`
 - **GitHub issue:** `[ISSUE_URL]`
+- **Issue number (in this repository):** `[ISSUE_NUMBER]`
 - **Base branch:** `[BASE_BRANCH]`
 - **Relevant verification commands:** `[VERIFICATION_COMMANDS]`
 
@@ -20,7 +21,7 @@ Implement the GitHub issue below in the authorized checkout, verify the work usi
 3. Implement the smallest complete change. If requirements conflict or the task demands unapproved security/auth, production, data migration or permission changes, stop and report the question before modifying those areas.
 4. Execute the applicable **local** repository verification commands. Record each command and its **observed** outcome. Report failures/skips, not invented successes; don't install privileged dependencies or bypass tests to force a green result.
 5. Inspect the diff for unrelated edits, private data, leaked credentials, sensitive URLs, unlicensed content and inadvertent behavior changes.
-6. Commit and push the authorized branch; create a PR against `[BASE_BRANCH]` with **`Closes #N`**, where N is the actual issue number in `[OWNER/REPO]`. If incomplete, use `Related to #N` and explain what remains.
+6. Commit and push the authorized branch; create a PR against `[BASE_BRANCH]` with **`Closes #[ISSUE_NUMBER]`** after replacing that placeholder with the actual issue number in `[OWNER/REPO]`. If incomplete, use `Related to #[ISSUE_NUMBER]` and explain what remains.
 7. Leave the PR **open and unmerged** for human review. Never deploy or change repository permissions without separate authorization.
 
 ## PR body
@@ -29,7 +30,7 @@ Implement the GitHub issue below in the authorized checkout, verify the work usi
 - What changed, and how this satisfies the issue
 
 ### Issue linkage
-Closes #N
+Closes #[ISSUE_NUMBER]
 
 ### Changes
 - Key files and rationale
