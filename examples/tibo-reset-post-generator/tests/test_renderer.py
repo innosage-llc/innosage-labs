@@ -27,6 +27,14 @@ class TestRenderer(unittest.TestCase):
         cls.renderer = load(SKILL / "scripts/render_poster.py", "poster_renderer")
         cls.builder = load(PROJECT / "build_skill.py", "skill_builder")
 
+    def test_avatar_region_extends_below_portrait_and_precedes_quote(self):
+        layout = json.loads((SKILL / "references/layout.json").read_text(encoding="utf-8"))
+        identity = layout["protected_regions"]["tibo_identity"]
+        quote = layout["editable_regions"]["quote"]
+        self.assertGreaterEqual(identity[3], 1023)
+        self.assertGreaterEqual(quote[1], identity[3])
+        self.assertFalse(self.renderer.intersection(identity, quote))
+
     def test_asset_identity(self):
         self.assertTrue(CANONICAL.exists(), "canonical PNG required in Git checkout")
         self.assertEqual(self.renderer.blob_sha(CANONICAL.read_bytes()), self.renderer.EXPECTED_BLOB)
