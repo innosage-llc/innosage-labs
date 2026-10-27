@@ -22,7 +22,7 @@ No InnoSage-specific scripts, servers, or accounts are required.
 ## Five-minute start
 
 1. Write a bounded issue: describe the observed problem, desired behavior, acceptance criteria, non-goals, and relevant evidence.
-2. Open [PROMPT.md](PROMPT.md) and replace its placeholders: `REPOSITORY`, `ISSUE_URL`, `BASE_BRANCH`, `VERIFICATION_COMMANDS`. Do **not** leave placeholders in the agent task.
+2. Open [PROMPT.md](PROMPT.md) and replace **all five bracketed placeholders**: `[OWNER/REPO]`, `[ISSUE_URL]`, `[ISSUE_NUMBER]`, `[BASE_BRANCH]`, `[VERIFICATION_COMMANDS]`. The issue URL and number must refer to the same issue in that repository. Do **not** leave placeholders in the agent task.
 3. Send the filled-in prompt to your coding agent while it is working in the intended repository.
 4. Require a branch-scoped diff, observed verification results, and a PR explicitly linked to the issue.
 5. Review the PR and evidence; **a human makes the merge decision**.
