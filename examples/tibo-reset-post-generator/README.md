@@ -11,7 +11,7 @@ A concrete, **example-first** InnoSage Labs workflow for updating a previously p
 The source image remains **one canonical file** in project `assets/`. Run [`build_skill.py`](build_skill.py) from a clean repo checkout to create a portable, hash-verified Skill ZIP **without committing a second image**. The package includes `assets/base-poster.png`, the local Pillow [renderer](.agents/skills/tibo-reset-post-generator/scripts/render_poster.py), its [layout](.agents/skills/tibo-reset-post-generator/references/layout.json) and [example JSON](.agents/skills/tibo-reset-post-generator/examples/deterministic-input.json). No fonts are included.
 
 ```sh
-python3 -m pip install 'Pillow>=12,<14'
+python3 -m pip install 'Pillow>=12.1,<14'
 python3 examples/tibo-reset-post-generator/build_skill.py
 python3 examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/scripts/render_poster.py \
   --input examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/examples/deterministic-input.json \
