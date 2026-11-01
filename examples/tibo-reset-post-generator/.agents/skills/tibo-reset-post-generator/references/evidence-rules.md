@@ -6,7 +6,7 @@ Use these rules whenever the Skill determines reset status, converts a time, tra
 
 | Label | What it means | What may be stated |
 | --- | --- | --- |
-| `DIRECT_SOURCE` | The agent directly fetched the identified original post and checked author/text/timestamp | Direct original-post wording/time, within what was actually read |
+| `DIRECT_SOURCE` | The agent directly inspected the identified original post (including a connected read-only browser tab) and checked author/text/timestamp | Direct original-post wording/time, within what was actually read; a blocked generic web request does not negate separately observed original tab evidence |
 | `ARCHIVE_CROSSCHECK` | Original X page inaccessible; two identifiable public archives/mirrors are independently inspected and compared | “公开存档交叉核对显示…”; **never** claim original X was directly fetched |
 | `USER_SCREENSHOT` | A screenshot supplied by the user, not independently checked | “截图显示…” with screenshot limits |
 | `USER_QUOTE` | User-provided pasted source text, without independent web access | “用户提供的文字显示…” |
@@ -24,6 +24,14 @@ A public URL may be inaccessible to an agent. Do not treat fetch errors as proof
 - `NEEDS_EVIDENCE`: source text/identity isn't available.
 
 `DIRECT_SOURCE + CLAIMED` or `ARCHIVE_CROSSCHECK + CLAIMED` can be valid: **neither proves every account was reset**. A renderer's `READY_FOR_REVIEW` status means the graphic passed its rendering checks, not that source attribution or quota propagation was independently certified.
+
+## Short progress-signal trap
+
+- `Banked 1/2` **on its own** supports that the named author reported a first-of-two banked-reset milestone. If a distinct earlier post forecast two resets, cite it as **context**, not as a replacement for the current original.
+- With no independent account Usage observation, use `CLAIMED`, **not** `OBSERVED`. This describes a reported milestone and is **not** the `ANNOUNCED` state for a purely future action.
+- `1/2` is **not** an account-credit balance, confirmed worldwide rollout count, entitlement guarantee, redemption event, second-reset completion or expiration date. Ask the reader to check Usage and any shown expiration; don't invent a uniform cutoff.
+- `post_published_at` remains distinct from `reset_event_at`; a post timestamp is not a backend-grant timestamp. When the latter is absent, keep it `unknown`.
+- A headline like `第一张重置卡已发放` must be clearly sourced to the author and accompanied by a per-account availability caveat; never silently strengthen it to `所有用户已到账`.
 
 ## Time types: NEVER conflate them
 
