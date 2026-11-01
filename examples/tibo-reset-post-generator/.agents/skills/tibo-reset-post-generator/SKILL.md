@@ -5,7 +5,7 @@ license: MIT
 compatibility: Deterministic mode requires Python 3 and Pillow plus an installed CJK font; GPT image editing is optional when available. Original X source may require screenshot or archive corroboration.
 metadata:
   author: InnoSage Labs
-  version: "0.4.0"
+  version: "0.4.1"
 ---
 
 # Tibo Reset Post Generator
@@ -38,6 +38,12 @@ The ZIP is **derived at packaging time**, not a second canonical committed PNG. 
 Use when the user supplies a Tibo / @thsottiaux post about Codex/ChatGPT quota resets, reset timing, or reset announcements and wants a social poster + caption.
 
 Do not run for unrelated Tibo posts, arbitrary creators, recurring social monitoring, unknown account identity with no supporting screenshot, or auto-publishing. If the author/topic cannot be identified, return `NEEDS_EVIDENCE` instead of manufacturing a Tibo quote.
+
+## Short reset-progress messages (e.g. `Banked 1/2`)
+
+Some real updates are only two or three words. Read the **exact short original post**, with author and publication time, and separately link any earlier context post used to interpret it. A phrase like `Banked 1/2` following an earlier two-day banked-reset forecast is a **source-reported first-of-two progress signal**: classify the claim as `CLAIMED`, not an independently `OBSERVED` credit or an `ANNOUNCED` future reset. The ordinal `1/2` is the author's sequence, **not** proof the second credit was delivered, that the first reached all eligible plans, or that the recipient redeemed it.
+
+The poster must say only that Tibo reported `Banked 1/2` (or a concise, labeled `原帖摘要`); do not turn it into `全员已到账` or `额度已自动重置`. Keep the original source URL in the **separate body caption**, give the reader a practical `Usage` self-check, and label eligibility, per-account arrival, redemption and expiration as unverified unless separate evidence exists. Treat the post timestamp as publication only; a one-line progress post does **not** supply the exact reset-event time. Re-read source freshness at the actual publication checkpoint; do not reuse this case's dates as a general template.
 
 ## Required inputs
 
