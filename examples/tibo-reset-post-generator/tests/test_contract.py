@@ -66,6 +66,7 @@ class TestPublicSkillContract(unittest.TestCase):
             "unreadable_url_only",
             "base_image_unavailable",
             "mixed_topic_reset_editorial",
+            "short_banked_progress",
         })
         clock = cases["clock_without_timezone"]
         self.assertIsNone(clock["source"]["viewer_timezone"])
@@ -94,6 +95,26 @@ class TestPublicSkillContract(unittest.TestCase):
         self.assertEqual(missing["expected"]["render_mode"], "edit_existing_poster")
         for c in cases.values():
             self.assertTrue(c["expected"]["must_not_claim_all_accounts"])
+
+    def test_short_banked_progress_signal_is_not_account_proof(self):
+        cases = {c["id"]: c for c in json.loads(FIXTURES.read_text(encoding="utf-8"))["cases"]}
+        case = cases["short_banked_progress"]
+        expected = case["expected"]
+        self.assertEqual(case["source"]["source_text"], "Banked 1/2")
+        self.assertEqual(expected["claim_status"], "CLAIMED")
+        self.assertIsNone(case["source"]["reset_event_iso"])
+        self.assertIsNone(expected["reset_time_beijing"])
+        self.assertEqual(expected["post_time_beijing"], "2026-11-01T08:43:20+08:00")
+        self.assertTrue(expected["must_not_claim_all_accounts"])
+        self.assertTrue(expected["must_not_claim_second_arrived"])
+        self.assertTrue(expected["must_not_infer_expiration"])
+        self.assertEqual(expected["render_mode"], "text_region_edit")
+        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+        rules = (SKILL / "references/evidence-rules.md").read_text(encoding="utf-8")
+        for token in ("Short reset-progress messages", "Banked 1/2", "Usage", "CLAIMED", "OBSERVED"):
+            self.assertIn(token, skill)
+        for token in ("Short progress-signal trap", "Banked 1/2", "reset_event_at"):
+            self.assertIn(token, rules)
 
     def test_mixed_topic_reset_editorial_budget(self):
         data = json.loads(FIXTURES.read_text(encoding="utf-8"))
