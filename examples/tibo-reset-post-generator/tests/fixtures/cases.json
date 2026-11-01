@@ -154,6 +154,37 @@
           "Uber"
         ]
       }
+    },
+    {
+      "id": "short_banked_progress",
+      "source": {
+        "kind": "DIRECT_SOURCE",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "Banked 1/2",
+        "context_source_text": "Next two days will be resets… banked…",
+        "post_published_at": "2026-11-01T00:43:20Z",
+        "reset_event_iso": null,
+        "viewer_timezone": "Asia/Shanghai"
+      },
+      "base_image_accessible": true,
+      "expected": {
+        "disposition": "DRAFT",
+        "claim_status": "CLAIMED",
+        "post_time_beijing": "2026-11-01T08:43:20+08:00",
+        "reset_time_beijing": null,
+        "poster_time": "Banked 1/2",
+        "poster_label": "原帖摘要",
+        "poster_copy": "Tibo 更新：Banked 1/2",
+        "caption_must_include": [
+          "Usage",
+          "https://x.com/thsottiaux/status/EXAMPLE"
+        ],
+        "must_not_claim_all_accounts": true,
+        "must_not_claim_second_arrived": true,
+        "must_not_infer_expiration": true,
+        "render_mode": "text_region_edit"
+      }
     }
   ],
   "template": {
