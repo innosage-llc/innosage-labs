@@ -3,6 +3,24 @@
 Parent: https://github.com/innosage-llc/innosage-labs/issues/11
 Public-safe status; NOT a Founder acceptance receipt.
 
+## BRAVIA recording and internal TLS build — 2026-11-03 incremental
+
+- **T2 technical capture PASS:** Actual Sony BRAVIA physical-device app
+  completed a bounded recording, Stop and local-save UI confirmation;
+  Android AppOps independently recorded RECORD_AUDIO allow with about
+  5.6 seconds of microphone operation. The native playback control was
+  invoked, but **human speech audibility is NOT YET VERIFIED**.
+- **T4 partial, not full PASS:** To avoid changing the TV's global certificate
+  trust, the internal APK build now optionally embeds ONLY the public local
+  LAN CA for this app. Generated Android Network Security Configuration
+  keeps cleartext disabled and certificate/hostname verification enabled;
+  signed APK built and installed successfully. An authenticated upload from
+  this BRAVIA remains **NOT VERIFIED** until the operator enters the existing
+  private Workspace Token directly into the app.
+- **T3/T4/T5/T6 remain open** until actual source audio, private HTTPS upload,
+  Web replay and restart/idempotence evidence exist. No test audio, secret,
+  private device address or certificate key enters the public repository.
+
 ## Current acceptance authority and physical device — 2026-11-03
 
 **Master [#11](https://github.com/innosage-llc/innosage-labs/issues/11)

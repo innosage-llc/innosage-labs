@@ -1,7 +1,8 @@
-"""Allow Android *explicitly installed* user CA certificates in this INTERNAL APK.
+"""Private-LAN HTTPS trust for this internal Android APK.
 
-Still verifies certificate chain, hostname and expiry. Never disables TLS.
-Not intended for publicly distributed Android builds.
+Keep normal hostname, certificate chain and expiry validation. If the local
+ignored public CA exists, bundle it for app-only trust; never bundle keys or
+disable TLS. Not for publicly distributed builds.
 """
 from pathlib import Path
 
@@ -23,6 +24,21 @@ if 'android:allowBackup="true"' in content:
 elif 'android:allowBackup="false"' not in content:
     raise SystemExit("Android backup policy unknown: refusing build")
 
+# Test builds may include ONLY the public LAN CA certificate, scoped to this
+# internal app. This avoids installing a device-wide root CA on Android TVs.
+# The CA private key and all workspace secrets remain outside the APK.
+from shutil import copyfile
+
+private_ca_public = Path(__file__).resolve().parents[1] / ".data/tls/ca.crt"
+extra_anchors = ""
+if private_ca_public.is_file():
+    import ssl
+    ssl.PEM_cert_to_DER_cert(private_ca_public.read_text())
+    raw = android / "app/src/main/res/raw"
+    raw.mkdir(parents=True, exist_ok=True)
+    copyfile(private_ca_public, raw / "innosage_lan_ca.pem")
+    extra_anchors = '<certificates src="@raw/innosage_lan_ca"/>'
+
 directory = android / "app/src/main/res/xml"
 directory.mkdir(parents=True, exist_ok=True)
 (directory / "network_security_config.xml").write_text(
@@ -30,8 +46,8 @@ directory.mkdir(parents=True, exist_ok=True)
     '<network-security-config>\n'
     '  <base-config cleartextTrafficPermitted="false">\n'
     '    <trust-anchors><certificates src="system"/>'
-    '<certificates src="user"/></trust-anchors>\n'
+    '<certificates src="user"/>' + extra_anchors + '</trust-anchors>\n'
     '  </base-config>\n'
     '</network-security-config>\n'
 )
-print("Internal APK trusts installed user CA; certificate verification remains enabled")
+print("Internal APK uses verified TLS; optional bundled public LAN CA:", bool(extra_anchors))

@@ -57,9 +57,11 @@ Docker network-denied deterministic test gate.
 3. For Android/private-LAN access set BIND_IP to the authorized Mac private
    address. Run bash scripts/make-lan-cert.sh PRIVATE_MAC_IP, mount the
    private server cert/key under .data/tls and configure TLS_CERT_PATH and
-   TLS_KEY_PATH accordingly. Install ONLY .data/tls/ca.crt as a user CA
-   on authorized devices (the key stays on Mac). Do not disable cert
-   verification or enable router forwarding.
+   TLS_KEY_PATH accordingly. The internal APK build automatically embeds
+   **only the public** .data/tls/ca.crt into this app's own trust anchors
+   when present; this avoids installing a system-wide CA on Android TVs.
+   The CA private key stays on Mac. TLS hostname/chain verification remains
+   enabled. Do not expose the service through public router forwarding.
 4. Build the standalone signed internal APK with
    bash scripts/build-android.sh; install the resulting ignored
    app/android/app/build/outputs/apk/release/app-release.apk onto an
