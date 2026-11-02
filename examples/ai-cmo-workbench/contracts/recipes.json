@@ -1,0 +1,43 @@
+{
+  "contract_version": 1,
+  "recipes": [
+    {
+      "id": "meeting_summary",
+      "version": 1,
+      "label": "会议整理：摘要／决策／建议／待确认事项",
+      "input": [
+        "timestamped_transcript",
+        "source_provenance",
+        "processing_consent"
+      ],
+      "outputs": [
+        "summary",
+        "decisions_confirmed",
+        "suggestions_unapproved",
+        "unanswered",
+        "actions",
+        "safety_notes"
+      ],
+      "rights": "internal_analysis_only"
+    },
+    {
+      "id": "cmo_business_intake",
+      "version": 1,
+      "label": "CMO 经营洞察：客户问题／内容机会／事实核验",
+      "input": [
+        "timestamped_transcript",
+        "source_provenance",
+        "processing_consent"
+      ],
+      "outputs": [
+        "summary",
+        "customer_questions",
+        "verified_product_facts",
+        "candidate_topics",
+        "unverified_claims",
+        "confidentiality_notes"
+      ],
+      "rights": "internal_analysis_only"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "InnoSage AI CMO",
+    "slug": "innosage-ai-cmo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "platforms": [
+      "android",
+      "web"
+    ],
+    "android": {
+      "package": "com.innosage.aicmoworkbench",
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET"
+      ],
+      "usesCleartextTraffic": false
+    },
+    "web": {
+      "bundler": "metro",
+      "name": "InnoSage AI CMO"
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow InnoSage AI CMO to record meeting audio.",
+          "enableBackgroundRecording": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing"
+    ]
+  }
+}
