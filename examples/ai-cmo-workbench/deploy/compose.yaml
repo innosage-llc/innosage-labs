@@ -1,0 +1,21 @@
+services:
+  ai-cmo:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: innosage-ai-cmo-demo:local
+    env_file:
+      - ../.env
+    environment:
+      DATA_ROOT: /data
+      WEB_DIR: /app/web
+      EDGE_SPEECH_BASE_URL: http://host.docker.internal:8765
+    ports:
+      - "${BIND_IP:-127.0.0.1}:8433:8433"
+    volumes:
+      - ../.data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
