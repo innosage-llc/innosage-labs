@@ -3,6 +3,57 @@
 Parent: https://github.com/innosage-llc/innosage-labs/issues/11
 Public-safe status; NOT a Founder acceptance receipt.
 
+## Final Mock MVP verification (2026-11-02)
+
+Founder approved deterministic fixture-driven Mock acceptance and requested
+closure once the MVP passes. No paid API validation is part of this milestone.
+
+- PASS: bash scripts/run-checks.sh --mock on Mac Studio returned exit 0;
+  29 Python tests passed with container networking disabled. The tests cover
+  Golden Scenario hashes, both Recipes, CMO decision, WAL crash recovery,
+  publication prohibition, and zero API token accounting.
+- PASS: Browser E2E returned MOCK_E2E_PASS: synthetic microphone,
+  authenticated HTTPS upload, new Intake automatically considered by the
+  next Mock CMO, downloadable PNG, publication endpoints refused, zero JS errors.
+- PASS: Android native upload fixed for RN Unsupported FormDataPart error by
+  using Expo File.upload MULTIPART on Android. Standalone APK rebuilt and
+  v2 signed, installed and launched on Mac Studio Android emulator.
+- PASS: Emulator logged in over trusted private-LAN HTTPS, completed native
+  recording and upload. Server readback showed a 35,957-byte recording,
+  status ANALYZED_CANDIDATE, with linked Mock Intake and origin
+  MOCK_FIXTURE_NOT_AUDIO.
+- PASS: AI_CMO_EXECUTION_MODE=mock and ASR_EXECUTION_MODE=mock use isolated
+  /data/mock. No OpenAI API Key or model billing. No public platform action.
+- DEFERRED: physical Android phone installation and on-device LAN/CA test;
+  actual local Qwen transcription and real LLM quality. Emulator evidence
+  is not physical device evidence.
+
+Closing the current issue means Mock-only prototype acceptance, NOT
+production readiness or successful live model/platform integration.
+
+## CURRENT Founder-approved Mock-only acceptance (supersedes old real-API gates)
+
+- This milestone MUST NOT use a real OpenAI API Key or paid LLM E2E. Live
+  provider integration, credits verification and model performance are deferred.
+- Golden fixture SHA and two Recipe outputs pinned in
+  contracts/fixtures/mock-cmo-v1.json and golden-mock-v1.json.
+- Network-disabled Docker Python test gate checks deterministic transcript,
+  schema, CMO decision, zero token usage, original PNG watermark, storage,
+  authentication, consent and hard block of fake public publication.
+- Chrome fixture E2E has already passed: synthetic audio recorded/uploaded
+  over real authenticated private-LAN HTTPS; Mock Intake and CMO flow returned
+  a downloaded, visibly watermarked PNG; API status reported 0 model requests;
+  fake publication approval and receipt returned HTTP 409.
+- Default Mock state is isolated under /data/mock and has no access to the
+  external model or actual Qwen adapter via its execution branches.
+- An Android emulator is a useful engineering check, but a real Android
+  phone and real mic/private CA/LAN experience require Founder final test.
+- IMPORTANT: a fake transcript is unrelated to uploaded audio. This
+  verifies the UX/integration workflow only, not transcription accuracy
+  or CMO strategy.
+- Later historical live-mode requirements below are not part of this
+  Mock-first acceptance. Master #11 remains open until Founder verification.
+
 ## M1 · Capture
 - PASS: Mac Studio arm64, one product Docker server container, Expo Web, Android release APK successfully compiled and signature-verified.
 - PASS: 21 isolated no-network backend/contract tests including WAL/snapshot failure, upload idempotency, auth, consent, stale approval, Qwen adapter and mocked CMO decision.

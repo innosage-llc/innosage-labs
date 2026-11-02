@@ -136,6 +136,91 @@ class HttpContractTests(unittest.TestCase):
         self.assertEqual(
             len([j for j in store().items("jobs") if j.get("source_id")=="model_budget_fixture"]),0)
 
+    def test_mock_only_full_flow_never_calls_paid_apis_or_qwen(self):
+        import time
+        from unittest.mock import AsyncMock, patch
+        from server.main import store
+        conf={
+            "AI_CMO_EXECUTION_MODE":"mock",
+            "ASR_EXECUTION_MODE":"mock",
+            "OPENAI_API_KEY":"sk-FIXTURE-NOT-A-REAL-TOKEN",
+        }
+        payload=b"Test-only bytes, not a real speech sample." * 6
+        with patch.dict(os.environ,conf),patch(
+             "server.main.transcribe",new=AsyncMock(side_effect=AssertionError("Qwen must not run"))) as qwen,patch(
+             "server.main.analyze_transcript",new=AsyncMock(side_effect=AssertionError("OpenAI Intake must not run"))) as analyze,patch(
+             "server.main.decide_next_action",new=AsyncMock(side_effect=AssertionError("OpenAI CMO must not run"))) as decide:
+            status=self.client.get("/api/status",headers=self.auth)
+            self.assertEqual(status.status_code,200)
+            self.assertEqual(status.json()["execution_mode"],"mock")
+            self.assertEqual(status.json()["transcription_mode"],"mock")
+            submitted=self.client.post("/api/recordings",
+                data={
+                    "client_id":"fixture_mock_full","recipe":"cmo_business_intake",
+                    "consent":"true","llm_consent":"false"
+                },
+                files={"audio":("fixture.webm",payload,"audio/webm")},
+                headers=self.auth
+            )
+            self.assertEqual(submitted.status_code,200,submitted.text)
+            started=self.client.post("/api/recordings/fixture_mock_full/process",headers=self.auth)
+            self.assertEqual(started.status_code,200,started.text)
+            jobid=started.json()["id"]
+            for _ in range(100):
+                job=self.client.get("/api/jobs/"+jobid,headers=self.auth).json()
+                if job["status"] in ("COMPLETED","BLOCKED"): break
+                time.sleep(0.02)
+            self.assertEqual(job["status"],"COMPLETED",job)
+            recording=self.client.get("/api/recordings/fixture_mock_full",headers=self.auth).json()
+            self.assertEqual(recording["transcript_origin"],"MOCK_FIXTURE_NOT_AUDIO")
+            transcript=self.client.get("/api/recordings/fixture_mock_full/transcript",headers=self.auth).json()["text"]
+            self.assertIn("与用户录音内容无关",transcript)
+            self.assertNotIn("Test-only bytes",transcript)
+            intakeid=job["intake_id"]
+            intake=store().get("intakes",intakeid)
+            self.assertEqual(intake["execution_mode"],"mock")
+            self.assertEqual(intake["model_usage"]["requests"],0)
+            self.assertEqual(intake["model_usage"]["provider"],"MOCK_NO_API")
+            self.assertIn("MOCK",intake["summary"])
+            approve=self.client.post("/api/intakes/"+intakeid+"/approve",
+                json={"reviewed_source":True,"public_claims":["Some fake claim to approve."]},
+                headers=self.auth)
+            self.assertEqual(approve.status_code,409)
+            cmo=self.client.post("/api/cmo/run",headers=self.auth)
+            self.assertEqual(cmo.status_code,200,cmo.text)
+            cmojid=cmo.json()["id"]
+            for _ in range(100):
+                result=self.client.get("/api/jobs/"+cmojid,headers=self.auth).json()
+                if result["status"] in ("COMPLETED","BLOCKED"): break
+                time.sleep(0.02)
+            self.assertEqual(result["status"],"COMPLETED",result)
+            decision=store().get("decisions",result["decision_id"])
+            self.assertEqual(decision["execution_mode"],"mock")
+            self.assertEqual(decision["status"],"MOCK_ONLY")
+            self.assertIn(intakeid,decision["source_intake_ids"])
+            package=store().get("packages",decision["package_id"])
+            self.assertEqual(package["status"],"MOCK_REVIEW_ONLY")
+            self.assertEqual(package["execution_mode"],"mock")
+            self.assertFalse(package["is_public_claims_verified"])
+            cover=self.client.get("/api/packages/"+package["id"]+"/cover",headers=self.auth)
+            self.assertEqual(cover.status_code,200)
+            self.assertEqual(cover.content[:8],bytes([137,80,78,71,13,10,26,10]))
+            pub=self.client.post("/api/packages/"+package["id"]+"/approve",
+                json={"verified_sources":True,"expected_version":1},headers=self.auth)
+            self.assertEqual(pub.status_code,409)
+            receipt=self.client.post("/api/packages/"+package["id"]+"/receipt",
+                json={"url":"https://www.xiaohongshu.com/explore/test-fake"},
+                headers=self.auth)
+            self.assertEqual(receipt.status_code,409)
+            edited=self.client.post("/api/packages/"+package["id"]+"/edit",
+                json={"title":"Edited mock heading","caption":"Still mock content"},
+                headers=self.auth)
+            self.assertEqual(edited.status_code,200,edited.text)
+            self.assertEqual(edited.json()["status"],"MOCK_REVIEW_ONLY")
+            qwen.assert_not_awaited()
+            analyze.assert_not_awaited()
+            decide.assert_not_awaited()
+
     def test_cmo_does_not_send_revoked_private_summary_to_llm(self):
         import time
         from unittest.mock import patch

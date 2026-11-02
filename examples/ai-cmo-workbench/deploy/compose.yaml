@@ -7,7 +7,7 @@ services:
     env_file:
       - ../.env
     environment:
-      DATA_ROOT: /data
+      DATA_ROOT: ${PRODUCT_DATA_ROOT:-/data}
       WEB_DIR: /app/web
       EDGE_SPEECH_BASE_URL: http://host.docker.internal:8765
     ports:

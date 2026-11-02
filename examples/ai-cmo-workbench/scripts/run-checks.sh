@@ -10,7 +10,10 @@ docker build -f deploy/Dockerfile -t innosage-ai-cmo-demo:local . > /tmp/innosag
 echo "[3/3] Isolated synthetic API/state/CMO tests (network denied)"
 docker run --rm --network none --entrypoint python -w /app innosage-ai-cmo-demo:local \
   -m unittest discover -s tests -v
-if [[ "$#" -gt 0 && "$1" == "--web" ]]; then
+if [[ "$#" -gt 0 && "$1" == "--mock" ]]; then
+  echo "[4] Fixture-driven browser E2E against running private Mock server (no LLM cost)"
+  node app/e2e-mock.mjs
+elif [[ "$#" -gt 0 && "$1" == "--web" ]]; then
   echo "[4] HTTPS synthetic Web browser + recording upload E2E (active private LAN required)"
   node app/e2e-web.mjs
 fi

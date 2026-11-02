@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from .agent_runtime import MissingAgentConfig, analyze_transcript, decide_next_action, ready
 from .poster import render_cover
+from .mock_runtime import analyze_fixture, decide_fixture, transcribe_fixture
 from .speech import SpeechError, configured as speech_configured, transcribe
 from .store import StateStore
 
@@ -31,6 +32,22 @@ RECIPE_CONTRACT = json.loads((Path(__file__).resolve().parents[1] / "contracts/r
 RECIPES = {x["id"]: x["label"] for x in RECIPE_CONTRACT["recipes"]}
 ACTIVE_TASKS: set[asyncio.Task] = set()
 UPLOAD_LOCK = asyncio.Lock()  # One client-zero upload admission owner
+
+def execution_mode() -> str:
+    return os.getenv("AI_CMO_EXECUTION_MODE", "live").strip().lower()
+
+def asr_mode() -> str:
+    return os.getenv("ASR_EXECUTION_MODE", "local_qwen").strip().lower()
+
+def validate_execution_modes() -> None:
+    if execution_mode() not in ("mock", "live"):
+        raise RuntimeError("Invalid AI_CMO_EXECUTION_MODE; expected mock or live")
+    if asr_mode() not in ("mock", "local_qwen"):
+        raise RuntimeError("Invalid ASR_EXECUTION_MODE; expected mock or local_qwen")
+    if execution_mode() == "live" and asr_mode() == "mock":
+        raise RuntimeError("Live model cannot consume a mock transcription")
+    if execution_mode() == "mock" and ROOT in (Path("/data"), Path("/data/live")):
+        raise RuntimeError("Mock mode requires dedicated, isolated PRODUCT_DATA_ROOT (e.g. /data/mock)")
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -51,6 +68,7 @@ def access(x_workspace_key: str | None = Header(default=None)):
 @asynccontextmanager
 async def lifespan(app):
     global STATE
+    validate_execution_modes()
     ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
     for name in ("blobs", "tmp", "transcripts", "covers"):
         (ROOT / name).mkdir(exist_ok=True, mode=0o700)
@@ -87,6 +105,8 @@ def health():
 @app.get("/api/status")
 def status(workspace=Depends(access)):
     return {"workspace":workspace, "recipes": RECIPES,
+            "execution_mode":execution_mode(), "transcription_mode":asr_mode(),
+            "mock_no_external_ai":execution_mode()=="mock",
             "openai_configured":ready(), "edge_configured":speech_configured(),
             "model":os.getenv("OPENAI_MODEL","gpt-5-mini"),
             "credits_balance":"UNVERIFIED", "server_time":now()}
@@ -252,20 +272,26 @@ async def _process(recording_id: str, job_id: str, recipe: str):
             if hashlib.sha256(markdown.encode()).hexdigest() != source.get("transcript_sha256"):
                 raise SpeechError("Retained transcript checksum mismatch")
         else:
-            if not speech_configured():
-                raise SpeechError("Edge Speech service credential not configured")
-            audio, temporary = await _qwen_input(source)
-            # Durably fence before a potentially accepted external Qwen POST.
-            # A crash/timeout here cannot be automatically retried unless a
-            # verified local transcript already exists.
-            store().write("jobs", job_id, {
-                **store().get("jobs",job_id), "stage":"QWEN_MAY_HAVE_ACCEPTED",
-                "updated":now()
-            })
-            try:
-                result, markdown = await transcribe(audio, audio.suffix.lower(), recording_id)
-            finally:
-                if temporary: audio.unlink(missing_ok=True)
+            if asr_mode()=="mock":
+                # No audio analysis occurs; a known synthetic fixture is used.
+                store().write("jobs", job_id, {
+                    **store().get("jobs",job_id),
+                    "stage":"MOCK_TRANSCRIPTION_NO_AUDIO_ANALYSIS", "updated":now()
+                })
+                result, markdown = transcribe_fixture(recording_id)
+            else:
+                if not speech_configured():
+                    raise SpeechError("Edge Speech service credential not configured")
+                audio, temporary = await _qwen_input(source)
+                # Durably fence before a potentially accepted external Qwen POST.
+                store().write("jobs", job_id, {
+                    **store().get("jobs",job_id), "stage":"QWEN_MAY_HAVE_ACCEPTED",
+                    "updated":now()
+                })
+                try:
+                    result, markdown = await transcribe(audio, audio.suffix.lower(), recording_id)
+                finally:
+                    if temporary: audio.unlink(missing_ok=True)
             temp = transcript_path.with_suffix(".part")
             with temp.open("w", encoding="utf-8") as f:
                 f.write(markdown)
@@ -287,29 +313,39 @@ async def _process(recording_id: str, job_id: str, recipe: str):
                     **current, "status":"TRANSCRIBED",
                     "transcript_sha256":hashlib.sha256(markdown.encode()).hexdigest(),
                     "transcript_segments":len(result.get("transcription",{}).get("segments",[])),
-                    "qwen_cleanup":result.get("_adapter_cleanup", "NOT_VERIFIED")
+                    "qwen_cleanup":result.get("_adapter_cleanup", "NOT_VERIFIED"),
+                    "transcript_origin":(
+                        "MOCK_FIXTURE_NOT_AUDIO" if asr_mode()=="mock"
+                        else "LOCAL_QWEN_AUTHENTIC"
+                    )
                 })
         # No external Qwen call is necessary after durable transcript readback.
         store().write("jobs", job_id, {
             **store().get("jobs",job_id), "stage":"TRANSCRIPT_DURABLE",
             "updated":now()
         })
-        # Explicitly bound the consent decision to the external-dispatch event.
-        # A later revocation forbids future calls; it cannot revoke in-flight
-        # provider processing that already began.
-        with store().guard:
-            current = store().get("recordings", recording_id)
-            if not current or not current.get("llm_consent"):
-                raise MissingAgentConfig("No current OpenAI consent; Qwen transcript retained")
-            if not ready():
-                raise MissingAgentConfig("OpenAI API key/Agents SDK not configured; Qwen transcript retained")
-            job = store().get("jobs", job_id)
+        # In Mock mode NO provider dispatch is allowed, even if credentials
+        # happen to exist. In Live mode enforce current consent at dispatch.
+        if execution_mode()=="mock":
             store().write("jobs", job_id, {
-                **job, "stage":"OPENAI_DISPATCHED", "updated":now(),
-                "consent_decided_at":now(),
-                "consent_recording_version":current.get("llm_consent_updated_at")
+                **store().get("jobs",job_id),
+                "stage":"MOCK_AGENT_NO_API", "updated":now()
             })
-        intake_output = await analyze_transcript(markdown, recipe, recording_id)
+            intake_output = analyze_fixture(markdown, recipe, recording_id)
+        else:
+            with store().guard:
+                current = store().get("recordings", recording_id)
+                if not current or not current.get("llm_consent"):
+                    raise MissingAgentConfig("No current OpenAI consent; Qwen transcript retained")
+                if not ready():
+                    raise MissingAgentConfig("OpenAI API key/Agents SDK not configured; Qwen transcript retained")
+                job = store().get("jobs", job_id)
+                store().write("jobs", job_id, {
+                    **job, "stage":"OPENAI_DISPATCHED", "updated":now(),
+                    "consent_decided_at":now(),
+                    "consent_recording_version":current.get("llm_consent_updated_at")
+                })
+            intake_output = await analyze_transcript(markdown, recipe, recording_id)
         model_usage = intake_output.pop("_model_usage", {"dollar_cost":"UNKNOWN"})
         intake = {
             "id":"i_" + recording_id, "source_id":recording_id,
@@ -319,6 +355,11 @@ async def _process(recording_id: str, job_id: str, recipe: str):
             "visibility":"private_candidate",
             "status":"ANALYZED_CANDIDATE", "created":now(),
             "recipe_contract_version":RECIPE_CONTRACT["contract_version"],
+            "execution_mode":execution_mode(),
+            "transcript_origin":store().get("recordings", recording_id).get(
+                "transcript_origin", "UNKNOWN"
+            ),
+            "mock_fixture":execution_mode()=="mock",
             "transcript_sha256":hashlib.sha256(markdown.encode()).hexdigest(),
             "source_sha256":source["sha256"], "rights":"internal_analysis_only"
         }
@@ -354,10 +395,14 @@ async def process_recording(recording_id: str, workspace=Depends(access)):
         if any(j.get("stage")=="QWEN_MAY_HAVE_ACCEPTED"
                and j.get("status")!="COMPLETED" for j in previous):
             raise HTTPException(409,"Qwen_result_unknown_requires_operator_reconciliation")
-    if entry.get("llm_consent") and _agent_run_count() >= int(os.getenv("MAX_AGENT_RUNS_PER_DAY","6")):
+    if (execution_mode()=="live" and entry.get("llm_consent")
+            and _agent_run_count() >= int(os.getenv("MAX_AGENT_RUNS_PER_DAY","6"))):
         raise HTTPException(429,"daily_model_run_limit_reached")
+    if execution_mode()=="mock" and _mock_run_count() >= 30:
+        raise HTTPException(429, "mock_daily_job_limit_reached")
     job = {"id":"j_" + uuid.uuid4().hex, "kind":"intake","source_id":recording_id,
-           "llm_intended":bool(entry.get("llm_consent")),
+           "execution_mode":execution_mode(),
+           "llm_intended":bool(entry.get("llm_consent")) and execution_mode()=="live",
            "status":"QUEUED","created":now(), "updated":now()}
     store().write("jobs", job["id"], job)
     schedule(_process(recording_id, job["id"], entry["recipe"]))
@@ -388,6 +433,8 @@ def approve_intake(intake_id: str, body: PublicClaimsApproval,
     with store().guard:
         existing = store().get("intakes",intake_id)
         if not existing: raise HTTPException(404, "intake_not_found")
+        if existing.get("execution_mode")=="mock":
+            raise HTTPException(409, "mock_intake_cannot_be_approved_as_fact")
         # Promote only individually reviewed claims, not a private transcript
         # or its unverified broad business summary.
         return store().write("intakes",intake_id,{
@@ -396,6 +443,12 @@ def approve_intake(intake_id: str, body: PublicClaimsApproval,
             "status":"APPROVED_FOR_USE","approved_at":now(),
             "rights":"verified_claims_only"
         })
+
+def _mock_run_count():
+    today = datetime.now(timezone.utc).date().isoformat()
+    return sum(1 for j in store().items("jobs")
+               if j.get("execution_mode")=="mock" and
+               j.get("created","")[:10]==today)
 
 def _agent_run_count():
     today = datetime.now(timezone.utc).date().isoformat()
@@ -407,7 +460,14 @@ async def _run_cmo(job_id: str):
     job = store().get("jobs",job_id)
     store().write("jobs",job_id,{**job,"status":"RUNNING","updated":now()})
     try:
-        source_items = sorted(store().items("intakes"),key=lambda x:x["created"],reverse=True)[:12]
+        available = store().items("intakes")
+        if execution_mode()=="mock":
+            available = [item for item in available
+                         if item.get("execution_mode")=="mock"]
+        else:
+            available = [item for item in available
+                         if item.get("execution_mode")!="mock"]
+        source_items = sorted(available,key=lambda x:x["created"],reverse=True)[:12]
         evidence = []
         for item in source_items:
             source_record = (store().get("recordings",item["source_id"])
@@ -420,30 +480,43 @@ async def _run_cmo(job_id: str):
                 "visibility":item["visibility"],
                 # A prior consent revocation disables further CMO uploads of
                 # any private summary even if Intake was analyzed earlier.
-                "summary":item["summary"] if consent_now else "",
+                "summary":item["summary"] if (
+                    consent_now or (
+                        execution_mode()=="mock" and item.get("execution_mode")=="mock"
+                    )
+                ) else "",
                 "approved_public_claims":public_claims,
                 "source_llm_consent":consent_now,
+                "execution_mode":item.get("execution_mode","live"),
             })
-        decision = await decide_next_action(
-            store().get("workspaces",WORKSPACE)["objective"],evidence
-        )
+        objective = store().get("workspaces",WORKSPACE)["objective"]
+        if execution_mode()=="mock":
+            decision = decide_fixture(objective, evidence)
+        else:
+            decision = await decide_next_action(objective, evidence)
         model_usage = decision.pop("_model_usage", {"dollar_cost":"UNKNOWN"})
         did = "d_" + uuid.uuid4().hex
         record = {"id":did, "created":now(), "workspace_id":WORKSPACE,
                   "model_usage":model_usage,
-                  "objective":store().get("workspaces",WORKSPACE)["objective"],
+                  "objective":objective,
+                  "execution_mode":execution_mode(),
                   "decision":decision, "source_intake_ids":[s["id"] for s in evidence],
-                  "status":"READY_FOR_APPROVAL" if decision.get("publishable") else "EXECUTED",
+                  "status":("MOCK_ONLY" if execution_mode()=="mock" else
+                            ("READY_FOR_APPROVAL" if decision.get("publishable") else "EXECUTED")),
                   "external_outcome":"none"}
         store().write("decisions", did, record)
         if decision.get("title") and decision.get("caption"):
             package_id = "p_" + uuid.uuid4().hex
             image = ROOT / "covers" / (package_id + ".png")
-            render_cover(image, decision["title"], decision.get("poster_lines",[]))
+            render_cover(image, decision["title"], decision.get("poster_lines",[]),
+                         is_mock=execution_mode()=="mock")
             package = {"id":package_id,"decision_id":did,"created":now(),
                 "version":1,"title":decision["title"],"caption":decision["caption"],
                 "tags":decision.get("tags",[]),"image":image.name,
-                "status":"DRAFT","is_public_claims_verified":decision.get("publishable",False)}
+                "execution_mode":execution_mode(), "mock_fixture":execution_mode()=="mock",
+                "status":"MOCK_REVIEW_ONLY" if execution_mode()=="mock" else "DRAFT",
+                "is_public_claims_verified":(decision.get("publishable",False)
+                                             and execution_mode()=="live")}
             store().write("packages",package_id,package)
             record["package_id"]=package_id
             store().write("decisions",did,record)
@@ -459,10 +532,14 @@ async def _run_cmo(job_id: str):
 
 @app.post("/api/cmo/run")
 async def run_cmo(workspace=Depends(access)):
-    if not ready(): raise HTTPException(503,"OpenAI_Agent_unavailable")
-    if _agent_run_count() >= int(os.getenv("MAX_AGENT_RUNS_PER_DAY","6")):
-        raise HTTPException(429, "daily_model_run_limit_reached")
-    job={"id":"j_"+uuid.uuid4().hex,"kind":"cmo","created":now(),"updated":now(),"status":"QUEUED"}
+    if execution_mode()=="live":
+        if not ready(): raise HTTPException(503,"OpenAI_Agent_unavailable")
+        if _agent_run_count() >= int(os.getenv("MAX_AGENT_RUNS_PER_DAY","6")):
+            raise HTTPException(429, "daily_model_run_limit_reached")
+    elif _mock_run_count() >= 30:
+        raise HTTPException(429, "mock_daily_job_limit_reached")
+    job={"id":"j_"+uuid.uuid4().hex,"kind":"cmo","execution_mode":execution_mode(),
+         "created":now(),"updated":now(),"status":"QUEUED"}
     store().write("jobs",job["id"],job)
     schedule(_run_cmo(job["id"]))
     return job
@@ -492,9 +569,12 @@ def edit_package(package_id:str, body:PackageEdit, workspace=Depends(access)):
         if not item: raise HTTPException(404,"package_not_found")
         version=item["version"]+1
         filename=package_id+"_v"+str(version)+".png"
-        render_cover(ROOT/"covers"/filename,body.title,[])
+        render_cover(ROOT/"covers"/filename,body.title,[],
+                     is_mock=item.get("execution_mode")=="mock")
         updated={**item,"version":version,"title":body.title,"caption":body.caption,
-                 "image":filename,"status":"DRAFT","approved_version":None,
+                 "image":filename,
+                 "status":"MOCK_REVIEW_ONLY" if item.get("execution_mode")=="mock" else "DRAFT",
+                 "approved_version":None,
                  "is_public_claims_verified":False,"edited":now()}
         return store().write("packages",package_id,updated)
 
@@ -509,6 +589,8 @@ def approve_package(package_id:str,body:HumanApproval,workspace=Depends(access))
     with store().guard:
         item=store().get("packages",package_id)
         if not item: raise HTTPException(404,"package_not_found")
+        if item.get("execution_mode")=="mock":
+            raise HTTPException(409,"mock_package_cannot_be_approved_for_publication")
         if item["version"] != body.expected_version:
             raise HTTPException(409,"approval_version_conflict")
         updated={**item,"status":"AWAITING_HUMAN_PLATFORM_COMMIT",
@@ -522,6 +604,8 @@ class PublicationReceipt(BaseModel):
 def receipt(package_id:str,body:PublicationReceipt,workspace=Depends(access)):
     item=store().get("packages",package_id)
     if not item: raise HTTPException(404,"package_not_found")
+    if item.get("execution_mode")=="mock":
+        raise HTTPException(409,"mock_package_cannot_report_real_publication")
     if item.get("approved_version") != item["version"]:
         raise HTTPException(409,"approval_outdated")
     if not body.url.startswith("https://"):
