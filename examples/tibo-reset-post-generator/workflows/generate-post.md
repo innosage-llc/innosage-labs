@@ -2,6 +2,22 @@
 
 **Default:** use the [published example base poster](../assets/codex-10-26极简重置更新公告海报.png), preserve its original OpenAI/Codex logo, Tibo profile photo, handle, layout and red rule, and change only factual text. The single canonical execution contract is [`SKILL.md`](../.agents/skills/tibo-reset-post-generator/SKILL.md) with its [evidence](../.agents/skills/tibo-reset-post-generator/references/evidence-rules.md) and [poster](../.agents/skills/tibo-reset-post-generator/references/poster-style.md) references.
 
+## Preferred reproducible path (local Python, no backend)
+
+From a clean Git checkout with Python 3, Pillow and an installed CJK font:
+
+```sh
+python3 examples/tibo-reset-post-generator/build_skill.py --out /tmp/tibo-reset-post-generator.zip
+python3 examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/scripts/render_poster.py \
+  --input examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/examples/deterministic-input.json \
+  --out-dir /tmp/tibo-render
+python3 -m unittest discover -s examples/tibo-reset-post-generator/tests -v
+```
+
+Use the fictional JSON only as a smoke test. For an actual post, **replace it with separately verified evidence and concise poster/title/caption fields**. The renderer does not read X and does not generate facts. Output: `poster.png`, `title.txt`, `caption.md`, `qa.json`. Packaged ZIP can be extracted and used outside the repository because it includes the verified canonical poster at `assets/base-poster.png`. See [deterministic renderer contract](../.agents/skills/tibo-reset-post-generator/references/deterministic-render.md).
+
+If this is ordinary ChatGPT Web without Python execution access, this local lane cannot be assumed available. Prefer handoff to a local runner; use optional GPT image editing only where available and report its actual fidelity limitations.
+
 ## ChatGPT Web (works without installing a Skill)
 
 1. Open [the actual default PNG](../assets/codex-10-26极简重置更新公告海报.png) on GitHub and **download/attach the full image file** to your ChatGPT conversation. If ChatGPT's image editor can read the source image directly from the repo, verify that it actually loaded the original PNG. A link/filename or browser screenshot alone isn't equivalent.
@@ -16,7 +32,10 @@ Platform: [XIAOHONGSHU, WECHAT OR GENERIC]; language: zh-CN.
 Base image: the actual attached original file
   codex-10-26极简重置更新公告海报.png.
 
-Use GPT image EDITING, not fresh generation. Preserve the existing
+If a local Python/Pillow renderer is available, prefer the deterministic
+text_region_edit path with canonical original PNG and qa.json.
+Otherwise use optional GPT image EDITING, not fresh generation. In either
+case preserve the existing
 OpenAI/Codex logo and header, Tibo profile photo/handle, red accent,
 white background and 3:4 composition.
 
