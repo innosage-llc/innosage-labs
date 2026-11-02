@@ -11,7 +11,7 @@ def _font(size: int):
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()
 
-def render_cover(target: Path, title: str, lines: list[str]) -> None:
+def render_cover(target: Path, title: str, lines: list[str], is_mock: bool = False) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (1080, 1440), "#f9fafb")
     draw = ImageDraw.Draw(image)
@@ -46,6 +46,14 @@ def render_cover(target: Path, title: str, lines: list[str]) -> None:
             y += 83
     draw.text((72, 1370), "Source-aware draft • Human review required",
               font=_font(24), fill=grey)
+    if is_mock:
+        # Never generate an ordinary-looking publishable image from fake data.
+        draw.rectangle((0, 0, 1080, 96), fill="#7f1d1d")
+        draw.text((70, 22), "MOCK - INTERNAL TEST ONLY",
+                  font=_font(38), fill="#ffffff")
+        draw.rectangle((0, 1310, 1080, 1360), fill="#fee2e2")
+        draw.text((75, 1314), "模拟内容 · 不是真实转录 · 禁止对外发布",
+                  font=_font(30), fill="#7f1d1d")
     # Make the generated media durable and complete before its metadata can be
     # journal-acknowledged; never expose a partially written final PNG path.
     import os

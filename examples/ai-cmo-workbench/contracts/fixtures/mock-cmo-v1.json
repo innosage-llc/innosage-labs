@@ -1,0 +1,77 @@
+{
+  "schema_version": "ai-cmo-fixture/v1",
+  "scenario_id": "android-capture-to-xhs-review",
+  "description": "Synthetic data for code and UI verification; NOT derived from any uploaded audio or model.",
+  "transcription_segments": [
+    {
+      "start_ms": 0,
+      "end_ms": 5000,
+      "text": "这是预先编写的模拟会议资料，与用户录音内容无关。"
+    },
+    {
+      "start_ms": 5000,
+      "end_ms": 11000,
+      "text": "模拟主题：把手机会议录音、经营知识和 AI CMO 工作流连接起来。"
+    },
+    {
+      "start_ms": 11000,
+      "end_ms": 17000,
+      "text": "模拟待验证的问题：怎样减少录音搬运和手动寻找资料的步骤。"
+    }
+  ],
+  "recipes": {
+    "meeting_summary": {
+      "summary": "[MOCK — 仅供流程验证，不可发布] 模拟会议摘要，关联资料编号 __SOURCE_ID__；不代表模型分析或原始录音内容。",
+      "decisions_confirmed": [],
+      "suggestions_unapproved": [
+        "[MOCK] 评估是否将会议采集接入社媒运营流程"
+      ],
+      "unanswered": [
+        "[MOCK] 实际客户是否觉得这种采集方式更省力？"
+      ],
+      "actions": [
+        "[MOCK] 对真实资料执行后续授权测试"
+      ],
+      "safety_notes": [
+        "模拟结果不得作为真实会议决策"
+      ]
+    },
+    "cmo_business_intake": {
+      "summary": "[MOCK — 仅供流程验证，不可发布] 模拟经营洞察：来自资料编号 __SOURCE_ID__ 的固定示例，不是真实内容识别。",
+      "customer_questions": [
+        "[MOCK] 手机录音能否低操作成本进入运营系统？"
+      ],
+      "verified_product_facts": [],
+      "candidate_topics": [
+        "[MOCK] 手机采集 → Intake → CMO 的端到端演示"
+      ],
+      "unverified_claims": [
+        "尚未证明能提高实际获客或带来收入"
+      ],
+      "confidentiality_notes": [
+        "演示样例不可对外引用为真实客户证词"
+      ]
+    }
+  },
+  "cmo": {
+    "outcome": "ADJUST",
+    "next_action": "[MOCK] 用一份模拟资料生成小红书内部审核样稿",
+    "falsifier": "真实模型运行和真实经营反馈尚未验证",
+    "verification_required": [
+      "需要实际录音转录、OpenAI API 验证与人工事实审核",
+      "模拟内容禁止对外发布"
+    ],
+    "publishable": false,
+    "title": "MOCK｜会议内容如何进入 AI CMO",
+    "caption": "【MOCK 演示文案 · 不可直接发布】\n本例仅演示手机录音 → 转录 → Intake → CMO → 审核内容包。\n这里的文字是固定样例，不代表 OpenAI 的真实建议或已验证商业成果。",
+    "tags": [
+      "内部演示",
+      "Mock"
+    ],
+    "poster_lines": [
+      "模拟数据 · 非真实转录",
+      "采集 → Intake → CMO",
+      "仅供内部审核流程演示"
+    ]
+  }
+}

@@ -8,16 +8,16 @@ import {
   useAudioRecorder, useAudioRecorderState
 } from 'expo-audio';
 import * as SecureStore from 'expo-secure-store';
-import { File, Paths } from 'expo-file-system';
+import { File, Paths, UploadType } from 'expo-file-system';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 
 type Recording = {
-  id: string; created: string; recipe: string; status: string; bytes: number; llm_consent?: boolean;
+  id: string; created: string; recipe: string; status: string; bytes: number; llm_consent?: boolean; transcript_origin?: string;
 };
 type Intake = {
   id: string; recipe: string; summary: string; status: string;
-  visibility: string; analysis: Record<string, unknown>;
+  visibility: string; analysis: Record<string, unknown>; execution_mode?: string; transcript_origin?: string;
   approved_public_claims?: string[];
 };
 type Decision = {
@@ -27,7 +27,7 @@ type Decision = {
 };
 type Package = {
   id: string; version: number; title: string; caption: string; tags: string[];
-  status: string; approved_version?: number;
+  status: string; approved_version?: number; execution_mode?: string;
 };
 type Job = { id: string; kind:string; status: string; error?: string; decision_id?: string; intake_id?: string; };
 
@@ -71,6 +71,7 @@ function Tag({text}: {text:string}) {
 export default function App() {
   const recorder = useAudioRecorder({...RecordingPresets.HIGH_QUALITY,directory:'document'});
   const recorderState = useAudioRecorderState(recorder);
+  const [isLocallyRecording,setIsLocallyRecording] = useState(false);
   const [server,setServer] = useState(
     Platform.OS === 'web' && typeof window !== 'undefined'
       ? window.location.origin
@@ -94,6 +95,9 @@ export default function App() {
   const [editCaption,setEditCaption] = useState('');
   const [receipt,setReceipt] = useState('');
   const [allowOpenAI,setAllowOpenAI] = useState(false);
+  const [executionMode,setExecutionMode] = useState<'unknown'|'mock'|'live'>('unknown');
+  const [transcriptionMode,setTranscriptionMode] = useState('unknown');
+  const mockMode = executionMode==='mock';
   const [claimsForApproval,setClaimsForApproval] = useState<Record<string,string>>({});
   const [coverUri,setCoverUri] = useState('');
 
@@ -160,7 +164,13 @@ export default function App() {
   const connect = async() => {
     try{
       setBusy(true);
-      await request('/api/status');
+      const serverState=await request('/api/status');
+      setExecutionMode(serverState.execution_mode==='mock'?'mock':'live');
+      setTranscriptionMode(serverState.transcription_mode || 'unknown');
+      if(serverState.execution_mode==='mock'){
+        setAllowOpenAI(false);
+        await savedSet('allow_openai_analysis','no');
+      }
       await Promise.all([savedSet('server',base),savedSet('token',token)]);
       setAuthorized(true);setNotice('已连接 InnoSage 内部工作区');
       await refresh();
@@ -173,12 +183,14 @@ export default function App() {
       if(!p.granted) throw new Error('麦克风权限未授权');
       await setAudioModeAsync({playsInSilentMode:true,allowsRecording:true});
       await recorder.prepareToRecordAsync(); recorder.record();
+      setIsLocallyRecording(true);
       setNotice('正在录音，停止后将保存到本机应用文档目录。');
     }catch(e){setNotice('录音失败：'+getMessage(e))}
   };
   const end = async() => {
     try{
       await recorder.stop();
+      setIsLocallyRecording(false);
       if(!recorder.uri) throw new Error('录音文件不可用');
       const id='a'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,11);
       let uri=recorder.uri;
@@ -221,21 +233,42 @@ export default function App() {
     if(!recordingUri||!clientId) return;
     try {
       setBusy(true);setNotice('上传中，未确认前原件保留在手机。');
-      const form=new FormData();
-      form.append('client_id',clientId);
-      form.append('recipe',recipe);
-      form.append('consent','true');
-      form.append('llm_consent',allowOpenAI?'true':'false');
+      let result: {id:string};
       if(Platform.OS==='web'){
+        const form=new FormData();
+        form.append('client_id',clientId);
+        form.append('recipe',recipe);
+        form.append('consent','true');
+        form.append('llm_consent',!mockMode&&allowOpenAI?'true':'false');
         const blob=await (await fetch(recordingUri)).blob();
         form.append('audio',blob,'recording-'+clientId+'.webm');
+        result=await request('/api/recordings',{method:'POST',body:form});
       }else{
-        const suffix=recordingUri.split('?')[0].split('.').pop()?.toLowerCase() || 'm4a';
-        form.append('audio', {uri:recordingUri,name:'recording-'+clientId+'.'+suffix,
-          type:suffix==='mp3'?'audio/mpeg':suffix==='wav'?'audio/wav':'audio/mp4'} as any);
+        // Expo's native File uploader is supported on Android; the Web
+        // FormData uploader cannot use RN 0.88's unsupported FormDataPart.
+        // Only the file bytes are uploaded; on failure the local source remains.
+        const suffix=recordingUri.split('?')[0].split('.').pop()?.toLowerCase()||'m4a';
+        const mimeType=suffix==='wav'?'audio/wav':
+          suffix==='mp3'?'audio/mpeg':suffix==='webm'?'audio/webm':'audio/mp4';
+        const response=await new File(recordingUri).upload(base+'/api/recordings',{
+          httpMethod:'POST',uploadType:UploadType.MULTIPART,
+          fieldName:'audio',mimeType,
+          parameters:{
+            client_id:clientId,recipe,consent:'true',
+            llm_consent:!mockMode&&allowOpenAI?'true':'false',
+          },
+          headers:{'X-Workspace-Key':token.trim()}
+        });
+        let parsed:any;
+        try {parsed=JSON.parse(response.body);}
+        catch {throw new Error('上传服务未返回有效 JSON，HTTP '+response.status);}
+        if(response.status<200 || response.status>=300)
+          throw new Error('上传失败 HTTP '+response.status+': '+JSON.stringify(parsed.detail||'未知错误'));
+        result=parsed;
       }
-      const result=await request('/api/recordings',{method:'POST',body:form});
-      setNotice('已上传：'+result.id+'，正在启动本地 Qwen + Recipe...');
+      setNotice('已上传：'+result.id+
+        (mockMode?'，正在运行离线模拟转录与 Mock Recipe（不分析录音）...':
+        '，正在启动本地 Qwen + Recipe...'));
       const j=await request('/api/recordings/'+result.id+'/process',{method:'POST'});
       setJob(j);
       await refresh();
@@ -247,7 +280,7 @@ export default function App() {
     try{
       setBusy(true);
       const existing=recordings.find(r=>r.id===id);
-      if(allowOpenAI && existing && !existing.llm_consent){
+      if(!mockMode && allowOpenAI && existing && !existing.llm_consent){
         await request('/api/recordings/'+encodeURIComponent(id)+'/consent',{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({allow_openai_analysis:true})
@@ -274,7 +307,7 @@ export default function App() {
     try {
       setBusy(true);
       const j=await request('/api/cmo/run',{method:'POST'});
-      setJob(j);setNotice('CMO 正在考虑最新的 Intake...');
+      setJob(j);setNotice(mockMode?'Mock CMO 正在模拟考虑最新 Intake（不调用模型）...':'CMO 正在考虑最新的 Intake...');
     }catch(e){setNotice('CMO 未启动：'+getMessage(e))}
     finally{setBusy(false)}
   };
@@ -381,7 +414,15 @@ export default function App() {
         <View style={styles.brand}><View style={styles.mark}/><Text style={styles.brandText}>InnoSage <Text style={{color:COLORS.primary}}>AI CMO</Text></Text>
           <Tag text="PRIVATE LAN · DEMO"/></View>
         <Text style={styles.hero}>Capture. Learn. Grow.</Text>
-        <Text style={styles.muted}>真实业务资料，成为下一轮社媒决策的依据。</Text>
+        <Text style={styles.muted}>从业务资料到运营内容的工作流；真实能力与模拟步骤分别验证。</Text>
+        {mockMode && <View style={styles.notice}>
+          <Text style={styles.noticeText}>MOCK 演示模式 · 不调用 OpenAI API</Text>
+          <Text style={styles.small}>
+            {transcriptionMode==='mock'
+              ? '转录文本是固定演示样例，与录音实际内容无关；'
+              : '转录通过已授权的本地 Qwen 处理；'} Intake、CMO 决策和封面均为模拟，禁止直接用于公开发布。
+          </Text>
+        </View>}
         <Panel title="工作区连接" sub="同一个 Mac Studio 后端；密钥不会打包进 APK。">
           <Text style={styles.label}>服务地址（Mac 可以 localhost；手机请填 https://Mac的局域网地址:8433）</Text>
           <TextInput style={styles.input} value={server} onChangeText={setServer}
@@ -404,12 +445,12 @@ export default function App() {
         {tab==='capture'&&<>
           <Panel title="从手机带来真实业务知识" sub="录音只在停止后上传；上传前保留本机原件。">
             <View style={styles.actions}>
-              {!recorderState.isRecording?
+              {!isLocallyRecording?
                 <Action label="● 开始录音" onPress={begin} disabled={busy}/>:
                 <Action label="■ 停止并保存" onPress={end}/>}
               {recordingUri?<Action label="▷ 播放本地录音" quiet onPress={listenLocal}/>:null}
             </View>
-            {recorderState.isRecording?
+            {isLocallyRecording?
               <Text style={styles.label}>正在录制 {Math.round(recorderState.durationMillis/1000)} 秒</Text>:null}
             <Text style={styles.label}>选择分析 Recipe</Text>
             {([['meeting_summary','会议整理：摘要／待确认事项'],
@@ -418,11 +459,16 @@ export default function App() {
                 <Text style={styles.body}>{recipe===key?'◉':'○'} {label}</Text>
               </Pressable>
             )}
-            <Pressable onPress={()=>{const next=!allowOpenAI;setAllowOpenAI(next);
+            {mockMode?
+              <View style={styles.recipe}>
+                <Text style={styles.body}>MOCK：不会发送文本到 OpenAI</Text>
+                <Text style={styles.small}>仅测试录音上传与任务流转。模拟转录不是对刚才录音的识别。</Text>
+              </View>
+            :<Pressable onPress={()=>{const next=!allowOpenAI;setAllowOpenAI(next);
                 void savedSet('allow_openai_analysis',next?'yes':'no')}} style={styles.recipe}>
               <Text style={styles.body}>{allowOpenAI?'☑':'☐'} 我允许所选转录文本发送到 OpenAI API 做分析</Text>
-              <Text style={styles.small}>原始音频在 Mac Studio 使用本地 Qwen；分析文本会外发到模型服务。仅内部授权资料。</Text>
-            </Pressable>
+              <Text style={styles.small}>本地 Qwen 转录；获授权文本会发送到模型服务。</Text>
+            </Pressable>}
             {recordingUri?<Action label={busy?'处理中...':'上传并执行 Recipe'} onPress={upload} disabled={busy}/>:null}
           </Panel>
           <Panel title="已接收的录音" sub="来自 Mac Studio 持久化存储，重新启动容器后仍可查看。">
@@ -430,6 +476,8 @@ export default function App() {
               <View key={r.id} style={styles.item}>
                 <View style={styles.itemHead}><Text style={styles.itemTitle}>{r.id}</Text><Tag text={r.status}/></View>
                 <Text style={styles.muted}>{r.recipe} · {Math.round(r.bytes/1024)} KB</Text>
+                {r.transcript_origin==='MOCK_FIXTURE_NOT_AUDIO'?
+                  <Text style={styles.small}>MOCK 转录：固定样例，与实际录音无关</Text>:null}
                 <Action quiet label="▷ Web 回放" onPress={()=>void listenRemote(r.id)}/>
                 {r.llm_consent?
                   <Action quiet label="撤销后续 OpenAI 分析授权" onPress={()=>void revokeConsent(r.id)}/>:null}
@@ -446,7 +494,9 @@ export default function App() {
                 <Text style={styles.body}>{i.summary}</Text>
                 <Text style={styles.muted}>来源：{i.id} · {i.visibility}</Text>
                 <Text style={styles.small}>{JSON.stringify(i.analysis).slice(0,1500)}</Text>
-                {i.visibility!=='public_approved'?<>
+                {i.execution_mode==='mock'?
+                  <Text style={styles.small}>MOCK 知识，不可批准为真实公开事实。</Text>
+                :i.visibility!=='public_approved'?<>
                   <Text style={styles.label}>人工核验后的可公开事实（每行一条，禁止包含私人资料）</Text>
                   <TextInput value={claimsForApproval[i.id]||''} multiline
                     style={[styles.input,{minHeight:68}]}
@@ -463,8 +513,8 @@ export default function App() {
           </Panel>
         </>}
         {tab==='cmo'&&<>
-          <Panel title="让 CMO 选择下一步" sub="每次 Run 自动读取新增 Intake；没有可靠证据时应选择 SKIP。">
-            <Action label={busy?'处理中...':'Run Social Growth Loop'} onPress={runCMO} disabled={busy}/>
+          <Panel title="让 CMO 选择下一步" sub={mockMode?'模拟检查最新 Intake 并生成演示内容，不代表真实运营策略。':'每次 Run 自动读取新增 Intake；没有可靠证据时应选择 SKIP。'}>
+            <Action label={busy?'处理中...':mockMode?'Run Mock Growth Loop':'Run Social Growth Loop'} onPress={runCMO} disabled={busy}/>
           </Panel>
           <Panel title="决策与理由">
             {decisions.length===0?<Text style={styles.muted}>尚无 CMO 决策</Text>:decisions.map(d=>
@@ -481,6 +531,7 @@ export default function App() {
             {packages.length===0?<Text style={styles.muted}>CMO 尚未生成完整内容包。</Text>:packages.map(p=>
               <View key={p.id} style={styles.item}>
                 <View style={styles.itemHead}><Text style={styles.itemTitle}>{p.title}</Text><Tag text={'v'+p.version+' · '+p.status}/></View>
+                {p.execution_mode==='mock'?<Text style={styles.small}>固定 Mock 样稿，已加水印，禁止发布。</Text>:null}
                 <Text style={styles.muted} numberOfLines={3}>{p.caption}</Text>
                 <Action quiet label="打开审核" onPress={()=>choosePackage(p)}/>
               </View>
@@ -496,12 +547,17 @@ export default function App() {
               <Action label="复制标题／正文／标签" quiet onPress={copyPackageText}/>
               <Action label="下载／分享 PNG 图片" quiet onPress={exportCover}/>
               <Action label="保存修改" quiet onPress={editPackage}/>
-              <Action label="已核验事实，批准当前版本" onPress={approvePackage}/>
+              {selected.execution_mode!=='mock'?
+                <Action label="已核验事实，批准当前版本" onPress={approvePackage}/>:null}
             </View>
-            <Text style={styles.label}>本人完成小红书发布后，回填实际链接（未做平台核验）</Text>
-            <TextInput style={styles.input} value={receipt} onChangeText={setReceipt}
-              placeholder="https://www.xiaohongshu.com/explore/..." autoCapitalize="none"/>
-            <Action quiet label="登记发布链接（UNVERIFIED）" onPress={reportPublished}/>
+            {selected.execution_mode==='mock'?
+              <Text style={styles.small}>MOCK：仅供查看、复制和导出带水印样例；批准和发布记录被后端禁止。</Text>:
+            <>
+              <Text style={styles.label}>本人完成小红书发布后，回填实际链接（未做平台核验）</Text>
+              <TextInput style={styles.input} value={receipt} onChangeText={setReceipt}
+                placeholder="https://www.xiaohongshu.com/explore/..." autoCapitalize="none"/>
+              <Action quiet label="登记发布链接（UNVERIFIED）" onPress={reportPublished}/>
+            </>}
           </Panel>}
         </>}
         {busy?<ActivityIndicator size="large" color={COLORS.primary}/>:null}
