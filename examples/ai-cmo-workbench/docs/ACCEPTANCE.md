@@ -3,6 +3,37 @@
 Parent: https://github.com/innosage-llc/innosage-labs/issues/11
 Public-safe status; NOT a Founder acceptance receipt.
 
+## Current acceptance authority and physical device — 2026-11-03
+
+**Master [#11](https://github.com/innosage-llc/innosage-labs/issues/11)
+is OPEN.** The 2026-11-02 Mock-only closure statements below are
+historical; they do **not** waive the original real Android, Qwen,
+OpenAI SDK/CMO and human-reviewed content acceptance. Deterministic
+Mock/Golden tests remain the primary development and regression method.
+
+Founder explicitly approved **Sony BRAVIA 4K VH21** as the physical
+Android audio-capture test target under
+[#23](https://github.com/innosage-llc/innosage-labs/issues/23):
+
+- **T0 PASS:** authorized private ADB, Android 12/API31 ARMv7,
+  built-in-microphone input route, no microphone mute, signed APK
+  compatible with its ABI, private backend healthy.
+- **T1 PASS:** internal APK v0.1.0 installed, native main activity
+  resumed on the real TV. `RECORD_AUDIO` currently granted. These
+  conditions do not establish a valid recorded waveform.
+- **T2–T6 NOT VERIFIED:** actual consented voice capture, durable
+  non-silent file and playback, private HTTPS audio upload, replay
+  and idempotence on this TV, Mock Intake source receipt. Do not use
+  fixed Mock text as evidence of what was spoken.
+- **Remaining:** BRAVIA proof is valid real-device Android audio
+  evidence once T2–T6 pass, but separate phone-portrait UX and
+  eventual bounded real Qwen/OpenAI acceptance under #11 remain
+  required. No paid API call or actual social publishing occurs
+  during #23.
+
+Only sanitized device model/build/status is committed; no device
+IP, ADB serial, workspace token, private CA/key or test audio.
+
 ## Final Mock MVP verification (2026-11-02)
 
 Founder approved deterministic fixture-driven Mock acceptance and requested
