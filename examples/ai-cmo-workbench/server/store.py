@@ -83,7 +83,16 @@ class StateStore:
         snapshots = [self._read_snapshot(self.snap),
                      self._read_snapshot(self.root / "snapshot.prev")]
         checkpoints = {s["seq"]: s for s in snapshots if s is not None}
+        # Durable first creation of the journal filename is a separate directory
+        # fsync step from fsyncing its later transaction contents.
+        was_absent = not self.journal.exists()
         self.journal.touch(exist_ok=True)
+        if was_absent:
+            directory_fd = os.open(self.root, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
         with self.journal.open("rb") as f:
             while True:
                 hdr = f.read(4)

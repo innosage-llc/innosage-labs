@@ -255,6 +255,13 @@ async def _process(recording_id: str, job_id: str, recipe: str):
             if not speech_configured():
                 raise SpeechError("Edge Speech service credential not configured")
             audio, temporary = await _qwen_input(source)
+            # Durably fence before a potentially accepted external Qwen POST.
+            # A crash/timeout here cannot be automatically retried unless a
+            # verified local transcript already exists.
+            store().write("jobs", job_id, {
+                **store().get("jobs",job_id), "stage":"QWEN_MAY_HAVE_ACCEPTED",
+                "updated":now()
+            })
             try:
                 result, markdown = await transcribe(audio, audio.suffix.lower(), recording_id)
             finally:
@@ -265,6 +272,11 @@ async def _process(recording_id: str, job_id: str, recipe: str):
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(temp, transcript_path)
+            directory_fd = os.open(transcript_path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
             # Never overwrite a successful consent revocation made while Qwen
             # was processing. Only update transcription fields on FRESH state.
             with store().guard:
@@ -277,6 +289,11 @@ async def _process(recording_id: str, job_id: str, recipe: str):
                     "transcript_segments":len(result.get("transcription",{}).get("segments",[])),
                     "qwen_cleanup":result.get("_adapter_cleanup", "NOT_VERIFIED")
                 })
+        # No external Qwen call is necessary after durable transcript readback.
+        store().write("jobs", job_id, {
+            **store().get("jobs",job_id), "stage":"TRANSCRIPT_DURABLE",
+            "updated":now()
+        })
         # Explicitly bound the consent decision to the external-dispatch event.
         # A later revocation forbids future calls; it cannot revoke in-flight
         # provider processing that already began.
@@ -324,9 +341,19 @@ async def process_recording(recording_id: str, workspace=Depends(access)):
     if not entry: raise HTTPException(404, "recording_not_found")
     if entry.get("status") == "ANALYZED_CANDIDATE":
         raise HTTPException(409, "intake_already_created")
-    pending = [j for j in store().items("jobs") if j.get("source_id")==recording_id
-               and j["status"] in ("RUNNING","QUEUED")]
+    previous = [j for j in store().items("jobs")
+                if j.get("source_id")==recording_id and j.get("kind")=="intake"]
+    pending = [j for j in previous if j.get("status") in ("RUNNING","QUEUED")]
     if pending: return pending[0]
+    # Unknown side effects are not idempotent: Qwen may already have accepted
+    # an upload, and a model call may already have consumed API credits.
+    if any(j.get("stage")=="OPENAI_DISPATCHED"
+           and j.get("status")!="COMPLETED" for j in previous):
+        raise HTTPException(409,"OpenAI_result_unknown_requires_operator_reconciliation")
+    if entry.get("status") not in ("TRANSCRIBED","ANALYZED_CANDIDATE"):
+        if any(j.get("stage")=="QWEN_MAY_HAVE_ACCEPTED"
+               and j.get("status")!="COMPLETED" for j in previous):
+            raise HTTPException(409,"Qwen_result_unknown_requires_operator_reconciliation")
     if entry.get("llm_consent") and _agent_run_count() >= int(os.getenv("MAX_AGENT_RUNS_PER_DAY","6")):
         raise HTTPException(429,"daily_model_run_limit_reached")
     job = {"id":"j_" + uuid.uuid4().hex, "kind":"intake","source_id":recording_id,
@@ -381,11 +408,22 @@ async def _run_cmo(job_id: str):
     store().write("jobs",job_id,{**job,"status":"RUNNING","updated":now()})
     try:
         source_items = sorted(store().items("intakes"),key=lambda x:x["created"],reverse=True)[:12]
-        evidence = [{"id":s["id"], "status":s["status"],"visibility":s["visibility"],
-                     "summary":s["summary"],
-                     "approved_public_claims":s.get("approved_public_claims",[])
-                     if s.get("visibility") == "public_approved" else []}
-                     for s in source_items]
+        evidence = []
+        for item in source_items:
+            source_record = (store().get("recordings",item["source_id"])
+                             if item.get("source_id") else None)
+            consent_now = bool(source_record and source_record.get("llm_consent"))
+            public_claims = (item.get("approved_public_claims",[])
+                             if item.get("visibility") == "public_approved" else [])
+            evidence.append({
+                "id":item["id"], "status":item["status"],
+                "visibility":item["visibility"],
+                # A prior consent revocation disables further CMO uploads of
+                # any private summary even if Intake was analyzed earlier.
+                "summary":item["summary"] if consent_now else "",
+                "approved_public_claims":public_claims,
+                "source_llm_consent":consent_now,
+            })
         decision = await decide_next_action(
             store().get("workspaces",WORKSPACE)["objective"],evidence
         )

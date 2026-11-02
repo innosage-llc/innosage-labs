@@ -136,6 +136,116 @@ class HttpContractTests(unittest.TestCase):
         self.assertEqual(
             len([j for j in store().items("jobs") if j.get("source_id")=="model_budget_fixture"]),0)
 
+    def test_cmo_does_not_send_revoked_private_summary_to_llm(self):
+        import time
+        from unittest.mock import patch
+        from server.main import store
+        rid="revoked_source"
+        store().write("recordings",rid,{
+            "id":rid,"status":"ANALYZED_CANDIDATE",
+            "llm_consent":False,"recipe":"cmo_business_intake",
+            "sha256":"b"*64,"blob":"fixture.m4a"
+        })
+        iid="i_revoked_source"
+        store().write("intakes",iid,{
+            "id":iid,"source_id":rid,"status":"ANALYZED_CANDIDATE",
+            "visibility":"private_candidate",
+            "summary":"PRIVATE_INTERNAL_COST_DATA_DO_NOT_TRANSMIT",
+            "created":"2026-11-02T18:00:00+00:00"
+        })
+        async def safe_decision(objective,sources):
+            one=next(x for x in sources if x["id"]==iid)
+            self.assertEqual(one["summary"],"")
+            self.assertFalse(one["source_llm_consent"])
+            return {
+                "outcome":"SKIP","next_action":"No approved evidence to publish",
+                "rationale":"Current consent missing","falsifier":"New authorized source",
+                "considered":[{"intake_id":x["id"],"disposition":"blocked",
+                               "reason":"No release permission"} for x in sources],
+                "publishable":False,"title":"","caption":"",
+                "tags":[],"poster_lines":[],"_model_usage":{"dollar_cost":"MOCK"}
+            }
+        with patch("server.main.ready",return_value=True),patch(
+             "server.main.decide_next_action",side_effect=safe_decision):
+            queued=self.client.post("/api/cmo/run",headers=self.auth)
+            self.assertEqual(queued.status_code,200,queued.text)
+            jid=queued.json()["id"]
+            for _ in range(80):
+                result=self.client.get("/api/jobs/"+jid,headers=self.auth).json()
+                if result["status"] in ("COMPLETED","BLOCKED"): break
+                time.sleep(0.025)
+            self.assertEqual(result["status"],"COMPLETED",result)
+
+    def test_uncertain_prior_external_side_effect_blocks_replay(self):
+        from server.main import store
+        base={"id":"fixture_unknown","workspace_id":"innosage-client-zero",
+              "created":"2026-11-02T00:00:00+00:00","recipe":"meeting_summary",
+              "bytes":300,"sha256":"a"*64,"blob":"synthetic.m4a",
+              "llm_consent":True,"status":"CAPTURED"}
+        store().write("recordings","fixture_unknown",base)
+        store().write("jobs","j_uncertain_qwen",{
+            "id":"j_uncertain_qwen","source_id":"fixture_unknown",
+            "kind":"intake","status":"BLOCKED","stage":"QWEN_MAY_HAVE_ACCEPTED"
+        })
+        result=self.client.post("/api/recordings/fixture_unknown/process",headers=self.auth)
+        self.assertEqual(result.status_code,409)
+        self.assertIn("Qwen_result_unknown",result.json()["detail"])
+        store().write("recordings","fixture_unknown",{**base,"status":"TRANSCRIBED"})
+        store().write("jobs","j_uncertain_openai",{
+            "id":"j_uncertain_openai","source_id":"fixture_unknown",
+            "kind":"intake","status":"BLOCKED","stage":"OPENAI_DISPATCHED"
+        })
+        again=self.client.post("/api/recordings/fixture_unknown/process",headers=self.auth)
+        self.assertEqual(again.status_code,409)
+        self.assertIn("OpenAI_result_unknown",again.json()["detail"])
+
+    def test_cmo_creates_real_png_media_and_export_route(self):
+        import time
+        from unittest.mock import patch
+        from server.main import store
+        approved={
+            "id":"i_approved_fixture","status":"APPROVED_FOR_USE",
+            "visibility":"public_approved","created":"2026-11-02T18:00:00+00:00",
+            "summary":"Internal candidate summary, not itself a public claim",
+            "approved_public_claims":["InnoSage Draft is a local-first Markdown editor."]
+        }
+        store().write("intakes",approved["id"],approved)
+        async def fake_public_decision(objective,sources):
+            self.assertTrue(any(x["id"]=="i_approved_fixture" and
+                x.get("approved_public_claims") for x in sources))
+            return {
+                "outcome":"ADJUST","next_action":"Prepare one authentic tutorial post",
+                "rationale":"One approved public fact available",
+                "falsifier":"No qualified reader follow-up",
+                "considered":[{"intake_id":x["id"],
+                  "disposition":"considered_and_used" if x["id"]=="i_approved_fixture"
+                  else "considered_irrelevant","reason":"Synthetic evaluation"} for x in sources],
+                "publishable":True,"title":"来自一个真实产品的教程",
+                "caption":"InnoSage Draft 是一个本地优先 Markdown 编辑器。",
+                "tags":["AI"],"poster_lines":["合成测试，不是实贴"],
+                "_model_usage":{"input_tokens":21,"output_tokens":14,"dollar_cost":"MOCK_ONLY"}
+            }
+        with patch("server.main.ready",return_value=True), patch(
+              "server.main.decide_next_action",side_effect=fake_public_decision):
+            response=self.client.post("/api/cmo/run",headers=self.auth)
+            self.assertEqual(response.status_code,200,response.text)
+            job_id=response.json()["id"]
+            for _ in range(100):
+                job=self.client.get("/api/jobs/"+job_id,headers=self.auth).json()
+                if job["status"] in ("COMPLETED","BLOCKED"): break
+                time.sleep(0.02)
+            self.assertEqual(job["status"],"COMPLETED",job)
+            packages=self.client.get("/api/packages",headers=self.auth).json()
+            package=next(x for x in packages if x["decision_id"]==job["decision_id"])
+            self.assertTrue(package["title"])
+            self.assertEqual(package["status"],"DRAFT")
+            image=self.client.get("/api/packages/"+package["id"]+"/cover",headers=self.auth)
+            self.assertEqual(image.status_code,200)
+            self.assertEqual(image.content[:8],bytes([137,80,78,71,13,10,26,10]))
+            self.assertGreater(len(image.content),900)
+            denied=self.client.get("/api/packages/"+package["id"]+"/cover")
+            self.assertEqual(denied.status_code,401)
+
     def test_cmo_starts_from_new_intakes_without_paths(self):
         import time
         from unittest.mock import patch, AsyncMock

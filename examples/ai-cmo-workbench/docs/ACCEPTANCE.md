@@ -5,7 +5,7 @@ Public-safe status; NOT a Founder acceptance receipt.
 
 ## M1 · Capture
 - PASS: Mac Studio arm64, one product Docker server container, Expo Web, Android release APK successfully compiled and signature-verified.
-- PASS: 19 isolated no-network backend/contract tests including WAL/snapshot failure, upload idempotency, auth, consent, stale approval, Qwen adapter and mocked CMO decision.
+- PASS: 21 isolated no-network backend/contract tests including WAL/snapshot failure, upload idempotency, auth, consent, stale approval, Qwen adapter and mocked CMO decision.
 - PASS: Headless Chrome authenticated navigation, fake-mic recording and actual HTTPS server upload; test-only browser certificate exception did not alter runtime TLS verification. Separate curl verified the real server certificate with its private CA.
 - PASS (emulator only): Android 35 ARM AVD installed standalone APK, launched, granted mic permission and recorded/stopped/saved locally with no native fatal exception.
 - NOT_VERIFIED: physical-phone APK install, trusted CA on physical device, actual microphone/audio playback and authenticated phone-to-Mac upload.
@@ -38,7 +38,7 @@ Public-safe status; NOT a Founder acceptance receipt.
 6. Record source SHA, APK hash, container digest, accurate costs and PASS/FAIL/NOT_RUN statuses; preserve Master #11 OPEN until Founder final acceptance.
 
 ## Subsequent engineering checks (2026-11-02)
-- PASS: current Python backend and fake model policy: 19 no-network tests, including public-claim approval scope, consent revocation, WAL failure, and Qwen cleanup mock.
+- PASS: current Python backend and fake model policy: 22 no-network tests, including public-claim approval scope, consent revocation, WAL failure, and Qwen cleanup mock.
 - PASS: Web render smoke verified three screens and zero uncaught JS errors; Chrome fake microphone/browser HTTPS integration tested separately under private credentials.
 - PASS: signed Android APK built via isolated clean build, installed and launched in Android ARM emulator; device-local saved recording UI and upload action observed.
 - PASS: native file moves to app document storage before success acknowledgement. Android system backup is disabled for private meeting media.
@@ -48,3 +48,19 @@ Public-safe status; NOT a Founder acceptance receipt.
 - NOT_VERIFIED: Physical Android phone install, mic/playback and authenticated LAN upload; no physical Android phone is attached to Mac Studio.
 - BLOCKED: OpenAI API Key has not been provisioned in this product runtime; credit grant/expiry unknown, real Agents SDK invocation not run.
 - Master #11 OPEN pending genuine Founder final acceptance. Do not convert these partial engineering passes into a complete product claim.
+
+## Review increment — externally uncertain execution (2026-11-02)
+- PASS: durable QWEN_MAY_HAVE_ACCEPTED and OPENAI_DISPATCHED fences prevent another billable/external request after an unresolved attempt. A verified saved transcript can proceed without resending Qwen.
+- PASS: network-denied 22 tests include uncertain Qwen/OpenAI HTTP 409 checks and mocked CMO output generating an actual PNG served via authenticated API.
+- PASS: product container recreation plus LAN health and Chrome synthetic microphone -> authenticated real upload; no private media entered Git.
+- NOT VERIFIED: real paid OpenAI model execution, physical Android phone microphone/LAN, actual human XHS platform commit.
+- An engineering PR merge does not establish full Master acceptance; #11 remains open until required real checks and Founder review.
+
+
+## Final engineering review incremental evidence
+- PASS: 22 Python tests on rebuilt image with --network none, plus Expo TypeScript compile and synthetic Chrome Web end-to-end microphone/upload/session + persisted data after container recreate.
+- PASS: persistent QWEN_MAY_HAVE_ACCEPTED and OPENAI_DISPATCHED fencing prevents unbounded duplicate real external requests; explicit HTTP 409 when reconciliation is required.
+- PASS: separate intake sharing consent: revoked source private summary is redacted from subsequent CMO API payload; user can withdraw future OpenAI analysis consent, without claiming to undo already-dispatched calls.
+- PASS: first durable WAL file creation fsyncs directory; transcript commit and generated PNG use atomic file/rename metadata durability precautions.
+- PASS: final internal APK built with current Expo code, v2 signed, reinstalled/relaunched in Android 15 ARM emulator and expected Capture screen observed. SHA-256: 534851ee38b6f475e33132d1ed40f02b3e05c025c3f751799bc55d005eca7234. The APK lives only in ignored local build output.
+- BLOCKED / NOT VERIFIED: no actual InnoSage OpenAI API Key, org credits verification or real model execution; no physical Android client connected to the Mac Studio, and no founder-confirmed XHS post. Preserve OPEN Master and necessary child issues.

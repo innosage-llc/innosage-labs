@@ -46,4 +46,23 @@ def render_cover(target: Path, title: str, lines: list[str]) -> None:
             y += 83
     draw.text((72, 1370), "Source-aware draft • Human review required",
               font=_font(24), fill=grey)
-    image.save(target, format="PNG")
+    # Make the generated media durable and complete before its metadata can be
+    # journal-acknowledged; never expose a partially written final PNG path.
+    import os
+    import uuid
+    temporary = target.with_name(target.name + ".tmp-" + uuid.uuid4().hex)
+    try:
+        image.save(temporary, format="PNG")
+        fd = os.open(temporary, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(temporary, target)
+        directory_fd = os.open(target.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        temporary.unlink(missing_ok=True)

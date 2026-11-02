@@ -15,3 +15,7 @@ One OpenAI Agents SDK runtime on the single Python state owner.
 - `StateStore` is a single-process **in-memory authoritative projection** with a durable append-only journal (no separate DB process), not a cluster or general database system.
 
 The product is **not connected to GitHub at runtime**, and never sends raw audio to OpenAI; permitted transcript excerpts do leave the Mac for API analysis after explicit consent.
+
+Uncertain external operation: after a Qwen POST or OpenAI call may have begun without verified result, subsequent /process returns HTTP 409 until operator reconciliation. A saved valid transcript can be reused without another Qwen call; never retry ambiguous external side effects blindly.
+
+Consent revocation: POST /api/recordings/{id}/consent toggles only future OpenAI analysis. CMO must recheck recording consent before selecting any private summary, replacing redacted summaries with metadata-only blocked/unknown signals. A previously completed API call cannot be withdrawn. Approved public claims remain separately scoped; private source summaries are never automatically promoted.

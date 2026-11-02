@@ -258,6 +258,18 @@ export default function App() {
     }catch(e){setNotice('处理未启动：'+getMessage(e))}
     finally{setBusy(false)}
   };
+  const revokeConsent=async(id:string)=>{
+    try{
+      await request('/api/recordings/'+encodeURIComponent(id)+'/consent',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({allow_openai_analysis:false})
+      });
+      setAllowOpenAI(false);
+      await savedSet('allow_openai_analysis','no');
+      setNotice('已撤销后续 OpenAI 分析授权；此前已经发送的请求不能撤回。');
+      await refresh();
+    }catch(e){setNotice('撤销授权失败：'+getMessage(e))}
+  };
   const runCMO=async()=>{
     try {
       setBusy(true);
@@ -419,6 +431,8 @@ export default function App() {
                 <View style={styles.itemHead}><Text style={styles.itemTitle}>{r.id}</Text><Tag text={r.status}/></View>
                 <Text style={styles.muted}>{r.recipe} · {Math.round(r.bytes/1024)} KB</Text>
                 <Action quiet label="▷ Web 回放" onPress={()=>void listenRemote(r.id)}/>
+                {r.llm_consent?
+                  <Action quiet label="撤销后续 OpenAI 分析授权" onPress={()=>void revokeConsent(r.id)}/>:null}
                 {r.status!=='ANALYZED_CANDIDATE'?<Action quiet label="执行／重试 Intake" onPress={()=>processExisting(r.id)} disabled={busy}/>:null}
               </View>
             )}

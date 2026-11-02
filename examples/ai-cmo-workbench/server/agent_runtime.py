@@ -128,7 +128,8 @@ async def decide_next_action(objective: str, sources: list[dict]):
         ),
     )
     evidence = "\n\n".join(
-        f"INTAKE {s['id']} (status={s['status']}; visibility={s['visibility']}): "
+        f"INTAKE {s['id']} (status={s['status']}; visibility={s['visibility']}; "
+        f"llm_consent={s.get('source_llm_consent',False)}): "
         f"INTERNAL SUMMARY (NOT A PUBLIC FACT): {s['summary'][:1800]} | "
         f"APPROVED PUBLIC CLAIMS (ONLY IF NONEMPTY): {s.get('approved_public_claims',[])}"
         for s in sources[:12]
