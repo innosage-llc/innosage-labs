@@ -73,6 +73,33 @@ Docker network-denied deterministic test gate.
    Physical Android true microphone+LAN acceptance remains a Founder
    final device check, not a simulated pass.
 
+## Founder-approved physical Android test device
+
+The **Sony BRAVIA 4K VH21** is an authorized **real Android device** for
+Master [#11](https://github.com/innosage-llc/innosage-labs/issues/11)
+and real-device capture subissue
+[#23](https://github.com/innosage-llc/innosage-labs/issues/23).
+It uses Android 12 (API 31) and 32-bit ARM (`armeabi-v7a`), supported by
+the existing internal APK. Use the already-authorized private-LAN ADB
+connection to select it; do **not** hardcode a device IP or serial, or
+enable new ADB/network exposure in the repository.
+
+**Preflight PASS:** physical device connected; system audio policy
+reports built-in microphone input, microphone is not muted, the signed
+APK was installed, and the main Android activity launched. The system
+does not advertise the standard `android.hardware.microphone` package
+feature, so behavior must be confirmed using actual audio rather than
+the feature list. The `RECORD_AUDIO` permission is currently granted.
+
+**Still NOT VERIFIED:** Founder-spoken voice recorded by this APK,
+non-silent saved file, replay, authenticated upload and container-restart
+readback. Those are explicit checkpoints in #23; installed/authorized
+device status alone does not pass them. The BRAVIA can validate real
+Android audio capture, but **does not replace a phone-specific portrait
+layout/interaction acceptance**. Use only a short consented test phrase,
+keep actual audio and tokens private, and continue fixture-driven
+Mock mode without billable API calls.
+
 ## Reproducibility and third-party boundaries
 
 The Python backend has pinned resolved dependencies in server/requirements.lock
