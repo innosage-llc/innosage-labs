@@ -4,6 +4,7 @@ This is an **index**, not a mirror. The original project README, code, versions,
 
 | Project | What you can try | Canonical source | Notes |
 | --- | --- | --- | --- |
+| **OpenAI-first Agent Foundation (#27)** | Isolated Mac Studio Web AI Team, two-round synthetic learning loop and SDK harness tests | [Runnable example](openai-agent-foundation/README.md) | Independent of previous demo; offline fixtures do not prove real model reasoning |
 | **AI CMO Workbench (private-LAN lab)** | Expo Web/Android + Python single-process WAL + local Qwen + OpenAI CMO | [Isolated runnable example](ai-cmo-workbench/README.md) | Mac Studio/LAN only; APK first, iOS TODO; never commit real recordings/secrets |
 | **Tibo Reset Post Generator** | From Tibo post evidence to a real Chinese poster and caption | [Project and Web quick start](tibo-reset-post-generator/README.md) | Checks reset claims, timestamps and image-output limitations; no bundled third-party assets |
 | **Draft Skills** | Install agent skills for Draft CLI page workflows | [Repository + installation](https://github.com/innosage-llc/draft-skills#readme) | Check the current skill version and CLI compatibility; a skill update does not automatically upgrade your runtime |

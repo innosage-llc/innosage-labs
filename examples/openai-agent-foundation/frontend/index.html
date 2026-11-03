@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>InnoSage · Agent Foundation</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brandmark">I<span>.</span></div>
+      <div><strong>InnoSage</strong><small>Agent Foundation</small></div></div>
+    <div class="side-meta">WORKSPACE <span class="tag">LABS · #27</span></div>
+    <nav class="side-nav" aria-label="sections">
+      <a href="#overview" class="active"><span class="navicon">⌂</span> Overview</a>
+      <a href="#bots"><span class="navicon">♙</span> AI Team</a>
+      <a href="#timeline"><span class="navicon">▤</span> Tasks & decisions</a>
+      <a href="#learning"><span class="navicon">↻</span> Learning loop</a>
+      <a href="#harness"><span class="navicon">⌘</span> Harness checks</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="avatar">I</div><div><strong>InnoSage</strong><small>Private Mac Studio</small></div>
+    </div>
+  </aside>
+  <main class="content" id="overview">
+    <div class="topline"><span>Labs / Agent Foundation / <strong>Overview</strong></span>
+      <div class="top-actions"><span class="connection" id="connection">Connecting…</span><span class="pill pill-muted">SYNTHETIC ONLY</span></div></div>
+    <div class="page">
+      <div class="eyebrow">TECHNICAL SPIKE · ISSUE #27</div>
+      <h1>Agent Workbench</h1>
+      <p class="lede">A small, transparent workspace for CMO decisions, Editor handoffs, and evidence-based learning.</p>
+      <div class="warning"><span class="warning-icon">i</span><div>
+        <strong>Evaluation mode, not a live social account.</strong>
+        <p>当前默认执行确定性合成数据流程。模拟决策不能证明 LLM 推理或真实增长。真实 OpenAI SDK 调用必须另外配置授权与预算。</p>
+      </div></div>
+      <section class="metrics" aria-label="summary">
+        <div class="metric"><div class="metric-label">Growth loop runs</div><div class="metric-value" id="m-runs">—</div><div class="metric-foot">Synthetic executions</div></div>
+        <div class="metric"><div class="metric-label">Agent tasks</div><div class="metric-value" id="m-tasks">—</div><div class="metric-foot">CMO and Editor</div></div>
+        <div class="metric"><div class="metric-label">Audience evidence</div><div class="metric-value" id="m-feedback">—</div><div class="metric-foot">Fixture imports</div></div>
+        <div class="metric"><div class="metric-label">Model requests</div><div class="metric-value" id="m-model">0</div><div class="metric-foot">Until explicitly authorized</div></div>
+      </section>
+      <div class="section-title"><div><div class="eyebrow">GUIDED VALIDATION</div><h2>Two-round Social Growth Loop</h2><p>Complete seven steps to prove the feedback can affect the next decision.</p></div><span class="section-chip">READ → REASON → ACT → VERIFY → LEARN</span></div>
+      <div id="steps" class="step-grid"></div>
+      <div class="main-grid">
+        <div class="main-column">
+          <section class="panel" id="bots">
+            <div class="panel-head"><div><div class="eyebrow">YOUR AI TEAM</div><h3>Persistent bot identities</h3></div><span class="subtle">2 BOT ROLES</span></div>
+            <div id="bots-list" class="bot-row"></div>
+          </section>
+          <section class="panel" id="timeline">
+            <div class="panel-head"><div><div class="eyebrow">EVIDENCE → DECISION</div><h3>Decision cards</h3></div><span class="subtle">ONE ACTION PER RUN</span></div>
+            <div id="round-list" class="rounds"><div class="empty">Load the sample scenario to begin.</div></div>
+          </section>
+          <section class="panel" id="learning">
+            <div class="panel-head"><div><div class="eyebrow">NEXT ACTION</div><h3>Learning & strategy</h3></div><span class="subtle">APPROVAL REQUIRED</span></div>
+            <div id="learning-content" class="learning"><div class="empty">Feedback and proposed learnings will appear here.</div></div>
+          </section>
+          <section class="panel" id="harness">
+            <div class="panel-head"><div><div class="eyebrow">ENGINEERING RECEIPTS</div><h3>Harness & recovery</h3></div></div>
+            <div id="diagnostics" class="diag"></div>
+            <div class="toolbar">
+              <button class="btn btn-outline" data-action="counterfactual">Inspect evidence counterfactual</button>
+              <button class="btn btn-outline" data-action="projection">Check durable state projection</button>
+            </div>
+            <pre class="debug" id="inspect-output" hidden></pre>
+            <p class="mini-note">These offline inspections do not run SDK compaction or use provider tokens. Live SDK verification remains a separate gate.</p>
+          </section>
+        </div>
+        <aside class="right-column">
+          <section class="panel" id="inbox">
+            <div class="panel-head"><div><div class="eyebrow">HUMAN-IN-THE-LOOP</div><h3>Decision inbox</h3></div></div>
+            <div id="inbox-list"><div class="empty">No pending decisions.</div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><div class="eyebrow">SOURCE TRANSPARENCY</div><h3>Evidence registry</h3></div></div>
+            <div id="source-list"><div class="empty">No synthetic sources loaded.</div></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><div class="eyebrow">RUN RECEIPT</div><h3>Recent activity</h3></div></div>
+            <div id="events-list" class="events"><div class="empty">No activity.</div></div>
+          </section>
+          <section class="panel footbox">
+            <div class="eyebrow">SANDBOX CONTROLS</div>
+            <p class="mini-note">This button clears only this Example's synthetic SQLite records. It does not touch #11, Edge Speech, other containers or OpenClaw.</p>
+            <button class="btn btn-text" data-action="reset">Reset synthetic demo</button>
+          </section>
+        </aside>
+      </div>
+      <footer>InnoSage Labs · OpenAI-first Agent Foundation · #27 · Not a production social publishing system.</footer>
+    </div>
+  </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="login" class="modal hidden">
+  <div class="login-card">
+    <div class="brandmark">I<span>.</span></div>
+    <h2>Connect to your workspace</h2>
+    <p>Enter the private workbench token stored on the Mac Studio. The token remains in this browser tab only.</p>
+    <input id="token" type="password" placeholder="Workbench access token" autocomplete="off" spellcheck="false" />
+    <button class="btn btn-primary wide" id="login-submit">Connect securely</button>
+    <small id="login-error"></small>
+  </div>
+</div>
+</body>
+</html>
