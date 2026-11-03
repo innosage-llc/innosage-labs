@@ -28,6 +28,37 @@ class HttpContractTests(unittest.TestCase):
         cls.client.__exit__(None,None,None)
         cls.tmp.cleanup()
 
+    def test_private_mock_demo_allows_no_token_but_refuses_unsafe_modes(self):
+        from unittest.mock import patch
+        from server.main import validate_execution_modes
+        base={
+            "WORKSPACE_AUTH_MODE":"lan_demo",
+            "AI_CMO_EXECUTION_MODE":"mock",
+            "ASR_EXECUTION_MODE":"mock",
+            "BIND_IP":"192.168.1.42",
+            "TLS_CERT_PATH":"/data/tls/server.crt",
+            "TLS_KEY_PATH":"/data/tls/server.key",
+            "WORKSPACE_TOKEN":"",
+        }
+        with patch.dict(os.environ,base):
+            validate_execution_modes()
+            self.assertEqual(self.client.get("/health").json()["auth_mode"],"lan_demo")
+            self.assertEqual(self.client.get("/api/status").status_code,200)
+            self.assertEqual(self.client.get("/api/workspace").status_code,200)
+        for extra in (
+            {"AI_CMO_EXECUTION_MODE":"live"},
+            {"ASR_EXECUTION_MODE":"local_qwen"},
+            {"BIND_IP":"0.0.0.0"},
+            {"BIND_IP":"8.8.8.8"},
+            {"TLS_CERT_PATH":""},
+        ):
+            with self.subTest(extra=extra),patch.dict(os.environ,{**base,**extra}):
+                with self.assertRaises(RuntimeError):
+                    validate_execution_modes()
+        with patch.dict(os.environ,{"WORKSPACE_AUTH_MODE":"token",
+                                  "WORKSPACE_TOKEN":""}):
+            self.assertEqual(self.client.get("/api/recordings").status_code,503)
+
     def test_health_auth_and_upload_conflict(self):
         self.assertEqual(self.client.get("/health").status_code, 200)
         self.assertEqual(self.client.get("/api/recordings").status_code, 401)

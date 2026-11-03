@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -39,7 +40,27 @@ def execution_mode() -> str:
 def asr_mode() -> str:
     return os.getenv("ASR_EXECUTION_MODE", "local_qwen").strip().lower()
 
+def workspace_auth_mode() -> str:
+    return os.getenv("WORKSPACE_AUTH_MODE", "token").strip().lower()
+
 def validate_execution_modes() -> None:
+    auth = workspace_auth_mode()
+    if auth not in ("token", "lan_demo"):
+        raise RuntimeError("Invalid WORKSPACE_AUTH_MODE")
+    if auth == "lan_demo":
+        if execution_mode() != "mock" or asr_mode() != "mock":
+            raise RuntimeError("Token-free LAN demo requires fully mocked ASR and CMO")
+        try:
+            bind = ipaddress.ip_address(os.getenv("BIND_IP", ""))
+        except ValueError as exc:
+            raise RuntimeError("Token-free demo requires an explicit private bind IP") from exc
+        if (bind.version != 4 or not (bind.is_private or bind.is_loopback)
+                or bind.is_unspecified or bind.is_multicast):
+            raise RuntimeError("Token-free demo cannot bind publicly")
+        if not bind.is_loopback and not (
+            os.getenv("TLS_CERT_PATH") and os.getenv("TLS_KEY_PATH")
+        ):
+            raise RuntimeError("Token-free LAN demo requires HTTPS")
     if execution_mode() not in ("mock", "live"):
         raise RuntimeError("Invalid AI_CMO_EXECUTION_MODE; expected mock or live")
     if asr_mode() not in ("mock", "local_qwen"):
@@ -58,6 +79,8 @@ def store() -> StateStore:
     return STATE
 
 def access(x_workspace_key: str | None = Header(default=None)):
+    if workspace_auth_mode() == "lan_demo":
+        return WORKSPACE
     secret = os.getenv("WORKSPACE_TOKEN", "")
     if len(secret) < 32:
         raise HTTPException(503, "server_auth_unconfigured")
@@ -100,11 +123,13 @@ async def lifespan(app):
 app = FastAPI(title="InnoSage AI CMO Workbench", lifespan=lifespan)
 @app.get("/health")
 def health():
-    return {"status":"ok", "mode":"private-lan-only"}
+    return {"status":"ok", "mode":"private-lan-only",
+            "auth_mode":workspace_auth_mode()}
 
 @app.get("/api/status")
 def status(workspace=Depends(access)):
     return {"workspace":workspace, "recipes": RECIPES,
+            "auth_mode":workspace_auth_mode(),
             "execution_mode":execution_mode(), "transcription_mode":asr_mode(),
             "mock_no_external_ai":execution_mode()=="mock",
             "openai_configured":ready(), "edge_configured":speech_configured(),

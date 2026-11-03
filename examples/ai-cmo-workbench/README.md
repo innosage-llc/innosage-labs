@@ -48,10 +48,12 @@ Docker network-denied deterministic test gate.
 
 ## Start and run the current Demo on Mac Studio
 
-1. Copy .env.example to a private .env and generate a random WORKSPACE_TOKEN
-   of 32+ bytes. **Leave OPENAI_API_KEY and EDGE_SPEECH_SERVICE_TOKEN empty
-   for the mock milestone**. Keep all three mock settings listed above.
-   Never commit .env, keys, recordings or internal screenshots.
+1. Copy .env.example to a private .env. For the **trusted-LAN Mock Demo**,
+   use `WORKSPACE_AUTH_MODE=lan_demo`; **no Workspace Token is required**.
+   Keep mock ASR/CMO mode and use only synthetic or authorized test audio.
+   Anyone able to reach the private-LAN port can read the demo recordings.
+   Before real data, real Qwen or OpenAI, switch to `WORKSPACE_AUTH_MODE=token`
+   and configure a strong `WORKSPACE_TOKEN`. Never commit .env or recordings.
 2. Build/start with bash scripts/start-local.sh. From Mac localhost-only
    access keep BIND_IP=127.0.0.1 and open http://127.0.0.1:8433.
 3. For Android/private-LAN access set BIND_IP to the authorized Mac private
@@ -66,7 +68,8 @@ Docker network-denied deterministic test gate.
    bash scripts/build-android.sh; install the resulting ignored
    app/android/app/build/outputs/apk/release/app-release.apk onto an
    authorized Android device. Android localhost is NOT Mac Studio.
-5. Authenticate to the private Workspace in APK or Web. Record a
+5. For LAN Demo simply enter Mac Studio's private HTTPS address in the APK
+   or open Web and click Connect — **no token/login field**. Record a
    consented sample, stop and save, select a Recipe, upload, and check the
    visible MOCK label. The transcript is a known fixture, not the recording.
 6. Trigger Run Mock Growth Loop, verify it considered the new Intake,

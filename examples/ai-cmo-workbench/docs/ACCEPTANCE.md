@@ -21,6 +21,21 @@ Public-safe status; NOT a Founder acceptance receipt.
   Web replay and restart/idempotence evidence exist. No test audio, secret,
   private device address or certificate key enters the public repository.
 
+## LAN Demo authentication simplification — Founder decision, 2026-11-03
+
+- The **private LAN Mock demonstration no longer needs a Workspace Token**:
+  `WORKSPACE_AUTH_MODE=lan_demo` bypasses the product's login header for the
+  one workspace. Web/Android connect using the existing private HTTPS URL.
+- **Scope bound:** requires explicit private/local IPv4 bind, HTTPS for any
+  non-loopback address, and both ASR/CMO in Mock mode. Refuse no-token startup
+  when configured for real Qwen/OpenAI or publicly bound interfaces.
+- Token authentication remains supported for subsequent real-data testing.
+  No sensitive meeting recordings should be used while tokenless; any device
+  with reachability to the internal Demo service can inspect its test data.
+- Verify 401/503 for the token path, anonymous 200 for LAN Mock, 29+ regression
+  tests, browser no-token E2E, and BRAVIA native no-token upload as separate
+  evidence before closing #23. Master #11 stays OPEN.
+
 ## Current acceptance authority and physical device — 2026-11-03
 
 **Master [#11](https://github.com/innosage-llc/innosage-labs/issues/11)
