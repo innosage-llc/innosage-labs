@@ -80,7 +80,7 @@ function render(){
     {num:"07",name:"Strategy gate",help:"只有 Founder 可批准对正式策略的修订",
      done:!!proposal&&proposal.status!=="PENDING",
      active:!!proposal&&proposal.status==="PENDING",
-     action:"strategyApprove",id:proposal?.id||"",label:"Review proposal",
+     action:"scrollInbox",id:proposal?.id||"",label:"Review proposal",
      enabled:!!proposal&&proposal.status==="PENDING"},
   ];
   $("steps").innerHTML=steps.map(s=>
@@ -197,6 +197,7 @@ async function action(name,id=""){
       case "reject":await api("/api/approvals/"+encodeURIComponent(id)+"/review","POST",{approve:false});break;
       case "publish":await api("/api/publications/"+encodeURIComponent(id)+"/simulate","POST");break;
       case "feedback":await api("/api/feedback/import","POST",{run_id:"run-01",fixture:"weak"});break;
+      case "scrollInbox":$("inbox").scrollIntoView({behavior:"smooth",block:"start"});return;
       case "strategyApprove":await api("/api/revisions/"+encodeURIComponent(id)+"/review","POST",{approve:true});break;
       case "strategyReject":await api("/api/revisions/"+encodeURIComponent(id)+"/review","POST",{approve:false});break;
       case "counterfactual":showInspection(await api("/api/counterfactual"));break;

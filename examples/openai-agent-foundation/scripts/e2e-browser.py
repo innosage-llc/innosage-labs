@@ -46,7 +46,11 @@ def run():
         assert "ADJUST" in page.locator("#round-list .round-card").nth(1).inner_text()
         assert "feedback-run-01" in page.locator("#learning-content").inner_text()
         print("PASS: Run 2 consumes synthetic audience evidence and adjusts")
-        page.locator('[data-action="strategyApprove"]').first.click()
+        page.locator('#steps [data-action="scrollInbox"]').click()
+        expect(page.locator("#inbox-list")).to_contain_text("Strategy proposal",timeout=10000)
+        before_approval=page.request.get(URL+"api/dashboard",headers={"Authorization":"Bearer "+TOKEN}).json()
+        assert before_approval["strategy"]["version"]==1
+        page.locator('#inbox-list [data-action="strategyApprove"]').click()
         expect(page.locator("#learning-content")).to_contain_text("Version 2",timeout=10000)
         page.locator('[data-action="counterfactual"]').click()
         expect(page.locator("#inspect-output")).to_contain_text("changes_with_counterfactual",timeout=10000)
