@@ -4,7 +4,7 @@
 
 ## PASS (actually verified on Mac Studio)
 
-- [x] 21 Python automated offline tests, no real provider dispatch.
+- [x] 23 Python automated offline tests, no real provider dispatch.
 - [x] Genuine OpenAI Agents SDK Runner exercised with *fake* scripted
       model: read tool, Editor as tool, persisted official SQLiteSession,
       HITL interruption, serialized RunState, approve/resume and reject gate.
@@ -21,6 +21,8 @@
 - [x] Real provider endpoint returns 409 without explicit spend gate.
 - [x] Private localhost server on port 8434, token-protected API.
 - [x] Old #11 container remains on its separate port 8433.
+- [x] Private model configuration parser requires mode 600 and rejects
+      unexpected directives; no user API key was installed.
 - [x] Headless Chrome Web E2E: login, Bot list, Run 1, Editor approval,
       synthetic publication, Feedback, Run 2, revised Strategy,
       counterfactual, context projection and refresh.

@@ -120,6 +120,13 @@ explicit authorization switch and a narrow project billing cap.
     OPENAI_API_KEY=<PRIVATE_VALUE>
     OPENAI_MODEL=<APPROVED_MODEL>
 
+To configure only **after** approval, create a private owner-only file on the
+Mac Studio using a local editor: **.local-run/model.env** with the settings
+listed above and the actual key. Apply mode 600 to that file, then restart
+**only #27** using the lifecycle scripts. The server parses only an explicit
+allowlist of key=value settings; it does not execute model.env as shell code.
+Never send your API key into ChatGPT or put it in a GitHub issue.
+
 The probe allows only one admitted dispatch with no automatic retries;
 it caps turns and output tokens, but **not the entire dollar bill**.
 A provider-side project spend cap is required. Only synthetic material is

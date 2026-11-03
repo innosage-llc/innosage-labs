@@ -119,7 +119,8 @@ function render(){
   }).join(""):'<div class="empty">First load a synthetic scenario, then start a CMO run.</div>';
   const needs=asArray(d.approvals).filter(a=>a.status==="PENDING");
   const needsStrategy=asArray(d.revisions).filter(r=>r.status==="PENDING");
-  $("inbox-list").innerHTML=(!needs.length&&!needsStrategy.length)?
+  const pendingSdk=probes.find(p=>p.status==="WAITING_FOR_HUMAN");
+  $("inbox-list").innerHTML=(!needs.length&&!needsStrategy.length&&!pendingSdk)?
     '<div class="empty">No pending decisions. Approved choices are preserved in SQLite.</div>':
     needs.map(a=>
       '<div class="inbox-item"><div class="inbox-title">Editor · '+esc(a.run_id)+'</div>'+
@@ -130,7 +131,11 @@ function render(){
       '<div class="inbox-item"><div class="inbox-title">CMO · Strategy proposal</div>'+
       '<p class="inbox-text">'+esc(p.proposal)+'</p><div class="button-row">'+
       button("Accept","strategyApprove",p.id,"btn-success")+
-      button("Reject","strategyReject",p.id,"btn-decline")+'</div></div>').join("");
+      button("Reject","strategyReject",p.id,"btn-decline")+'</div></div>').join("")+
+    (pendingSdk?'<div class="inbox-item"><div class="inbox-title">LIVE SDK · Delegated Editor</div>'+
+      '<p class="inbox-text">Real model only uses synthetic data. Approving runs the gated Editor tool, not a social action.</p><div class="button-row">'+
+      button("Approve SDK tool","sdkApprove",pendingSdk.id,"btn-success")+
+      button("Reject SDK tool","sdkReject",pendingSdk.id,"btn-decline")+'</div></div>':"");
   $("source-list").innerHTML=!d.scenario?'<div class="empty">No sources loaded.</div>':
       '<div class="detailrow"><span>Experiment</span><strong>'+esc(d.scenario.active_experiment)+'</strong></div>'+
       '<div class="detailrow"><span>Strategy</span><strong>v'+esc(d.strategy.version)+' · Approved</strong></div>'+
@@ -176,7 +181,7 @@ function render(){
   ];
   $("diagnostics").innerHTML=diagnostics.map(([key,value])=>
     '<div class="diag-item"><span>'+esc(key)+'</span><strong>'+esc(value)+'</strong></div>').join("");
-  if(sdk.billable_probe_enabled&&sdk.model_key_configured&&!$("live-probe-button")){
+  if(sdk.billable_probe_enabled&&sdk.model_key_configured&&!probes.length&&!$("live-probe-button")){
     $("diagnostics").insertAdjacentHTML("afterend",
       '<div class="toolbar" id="live-probe-button">'+button("Run one authorized SDK probe","probe","","btn-outline")+'</div>');
   }
@@ -199,7 +204,9 @@ async function action(name,id=""){
       case "reset":
         if(!confirm("Reset ONLY the #27 synthetic data? All synthetic runs/approvals will be cleared."))return;
         await api("/api/scenario/reset","POST",{confirmation:"RESET_SYNTHETIC"});break;
-      case "probe":showInspection(await api("/api/harness/probe","POST"));break;
+      case "probe":showInspection(await api("/api/harness/probe","POST"));await refresh();break;
+      case "sdkApprove":await api("/api/harness/probe/"+encodeURIComponent(id)+"/review","POST",{approve:true});break;
+      case "sdkReject":await api("/api/harness/probe/"+encodeURIComponent(id)+"/review","POST",{approve:false});break;
       default:throw Error("Unknown action: "+name);
     }
     if(name!=="counterfactual"&&name!=="projection"&&name!=="probe"){
