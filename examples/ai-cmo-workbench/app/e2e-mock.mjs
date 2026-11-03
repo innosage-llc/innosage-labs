@@ -8,8 +8,9 @@ const env=Object.fromEntries(
     .filter(x=>x && !x.startsWith('#') && x.includes('='))
     .map(x=>[x.slice(0,x.indexOf('=')),x.slice(x.indexOf('=')+1)])
 );
-const token=env.WORKSPACE_TOKEN;
-if(!token || token.length<32) throw new Error('Private workspace token missing');
+const lanDemo=env.WORKSPACE_AUTH_MODE==='lan_demo';
+const token=env.WORKSPACE_TOKEN || '';
+if(!lanDemo && token.length<32) throw new Error('Token-mode workspace secret missing');
 const base=process.env.AI_CMO_TEST_BASE_URL || 'https://'+(env.BIND_IP||'127.0.0.1')+':8433';
 const browser=await chromium.launch({
   headless:true,
@@ -26,7 +27,7 @@ const pageErrors=[];
 page.on('pageerror',err=>pageErrors.push(err.name));
 async function api(route,method='GET',data){
   const res=await page.request.fetch(base+route,{
-    method,headers:{'X-Workspace-Key':token},
+    method,headers:lanDemo?{}:{'X-Workspace-Key':token},
     ...(data?{data}:{})
   });
   return {status:res.status(),body:await res.json()};
@@ -42,12 +43,19 @@ async function awaitJob(id){
 try{
   const health=await page.request.get(base+'/health');
   if(health.status()!==200)throw new Error('unhealthy private service');
+  if((await health.json()).auth_mode!==(lanDemo?'lan_demo':'token'))
+    throw new Error('Server auth mode does not match fixture test configuration');
   await page.goto(base,{waitUntil:'domcontentloaded',timeout:20000});
   await page.getByText('Capture. Learn. Grow.').waitFor();
   const inputs=page.locator('input');
   await inputs.nth(0).fill(base);
-  await inputs.nth(1).fill(token);
   await page.getByRole('button',{name:'连接工作区'}).click();
+  if(!lanDemo){
+    await page.getByPlaceholder('32+ chars secret').fill(token);
+    await page.getByRole('button',{name:'连接工作区'}).click();
+  }else if(await page.getByPlaceholder('32+ chars secret').count()){
+    throw new Error('LAN Demo must not display a workspace-token field');
+  }
   await page.getByText('MOCK 演示模式',{exact:false}).waitFor({timeout:12000});
   const mode=await api('/api/status');
   if(mode.body.execution_mode!=='mock'||mode.body.transcription_mode!=='mock')

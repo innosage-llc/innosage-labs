@@ -78,6 +78,7 @@ export default function App() {
       : ''
   );
   const [token,setToken] = useState('');
+  const [authMode,setAuthMode] = useState<'unknown'|'lan_demo'|'token'>('unknown');
   const [authorized,setAuthorized] = useState(false);
   const [tab,setTab] = useState<'capture'|'knowledge'|'cmo'>('capture');
   const [recipe,setRecipe] = useState('cmo_business_intake');
@@ -102,14 +103,19 @@ export default function App() {
   const [coverUri,setCoverUri] = useState('');
 
   const base = server.trim().replace(/\/+$/,'');
-  const request = async (path:string,options?:RequestInit): Promise<any> => {
-    if (!token.trim()) throw new Error('请输入工作区密钥');
+  const authHeaders = (mode: 'unknown'|'lan_demo'|'token' = authMode): Record<string,string> =>
+    mode === 'lan_demo' ? {} : {'X-Workspace-Key':token.trim()};
+  const request = async (
+    path:string,options?:RequestInit,
+    mode: 'unknown'|'lan_demo'|'token' = authMode
+  ): Promise<any> => {
+    if(mode !== 'lan_demo' && !token.trim()) throw new Error('请输入工作区密钥');
     if(Platform.OS !== 'web' && (!base.startsWith('https://') || base.includes('127.0.0.1'))) {
       throw new Error('Android 请填写 Mac Studio 的局域网 HTTPS 地址，而不是手机 localhost');
     }
     const response = await fetch(base+path,{
       ...options,
-      headers:{'X-Workspace-Key':token.trim(),...(options?.headers||{})},
+      headers:{...authHeaders(mode),...(options?.headers||{})},
     });
     let data:any;
     try { data = await response.json(); }
@@ -117,12 +123,14 @@ export default function App() {
     if(!response.ok) throw new Error('HTTP '+response.status+': '+JSON.stringify(data.detail||data));
     return data;
   };
-  const refresh = async () => {
-    if (!token.trim()) return;
+  const refresh = async (mode: 'unknown'|'lan_demo'|'token' = authMode) => {
+    if(mode !== 'lan_demo' && !token.trim()) return;
     try {
       const [r,i,d,p] = await Promise.all([
-        request('/api/recordings'),request('/api/intakes'),
-        request('/api/decisions'),request('/api/packages')
+        request('/api/recordings',undefined,mode),
+        request('/api/intakes',undefined,mode),
+        request('/api/decisions',undefined,mode),
+        request('/api/packages',undefined,mode)
       ]);
       setRecordings(r);setIntakes(i);setDecisions(d);setPackages(p);
       setAuthorized(true);
@@ -143,9 +151,9 @@ export default function App() {
     return ()=>{mounted=false};
   },[]);
   useEffect(()=>{
-    if(!token.trim()) return;
+    if(!authorized || authMode==='unknown') return;
     refresh().catch(()=>{});
-  },[authorized,token,server]);
+  },[authorized,token,server,authMode]);
   useEffect(()=>{
     if (!job || !['QUEUED','RUNNING'].includes(job.status)) return;
     const interval=setInterval(async()=>{
@@ -164,16 +172,29 @@ export default function App() {
   const connect = async() => {
     try{
       setBusy(true);
-      const serverState=await request('/api/status');
+      if(Platform.OS !== 'web' && !base.startsWith('https://'))
+        throw new Error('Android 仅支持 Mac Studio 私有局域网 HTTPS 地址');
+      const check=await fetch(base+'/health');
+      if(!check.ok) throw new Error('工作区未就绪：HTTP '+check.status);
+      const health=await check.json();
+      const mode: 'lan_demo'|'token' = health.auth_mode==='lan_demo'?'lan_demo':'token';
+      setAuthMode(mode);
+      if(mode==='token' && !token.trim()){
+        setNotice('此服务要求工作区密钥，请输入后再连接。');
+        return;
+      }
+      const serverState=await request('/api/status',undefined,mode);
       setExecutionMode(serverState.execution_mode==='mock'?'mock':'live');
       setTranscriptionMode(serverState.transcription_mode || 'unknown');
       if(serverState.execution_mode==='mock'){
         setAllowOpenAI(false);
         await savedSet('allow_openai_analysis','no');
       }
-      await Promise.all([savedSet('server',base),savedSet('token',token)]);
-      setAuthorized(true);setNotice('已连接 InnoSage 内部工作区');
-      await refresh();
+      await savedSet('server',base);
+      if(mode==='token') await savedSet('token',token);
+      setAuthorized(true);
+      setNotice(mode==='lan_demo'?'已连接内部 LAN Demo（无需密钥）':'已连接 InnoSage 工作区');
+      await refresh(mode);
     }catch(e){setNotice('连接失败：'+getMessage(e))}
     finally{setBusy(false)}
   };
@@ -220,7 +241,7 @@ export default function App() {
     }
     try {
       const resp=await fetch(base+'/api/recordings/'+encodeURIComponent(id)+'/audio',{
-        headers:{'X-Workspace-Key':token.trim()}
+        headers:authHeaders()
       });
       if(!resp.ok) throw new Error('HTTP '+resp.status);
       const url=URL.createObjectURL(await resp.blob());
@@ -257,7 +278,7 @@ export default function App() {
             client_id:clientId,recipe,consent:'true',
             llm_consent:!mockMode&&allowOpenAI?'true':'false',
           },
-          headers:{'X-Workspace-Key':token.trim()}
+          headers:authHeaders()
         });
         let parsed:any;
         try {parsed=JSON.parse(response.body);}
@@ -332,7 +353,7 @@ export default function App() {
     if(Platform.OS==='web'){
       try{
         const r=await fetch(base+'/api/packages/'+p.id+'/cover',{
-          headers:{'X-Workspace-Key':token.trim()}
+          headers:authHeaders()
         });
         if(r.ok) setCoverUri(URL.createObjectURL(await r.blob()));
       }catch{ /* cover remains downloadable via authenticated API */ }
@@ -353,7 +374,7 @@ export default function App() {
     try{
       const url=base+'/api/packages/'+encodeURIComponent(selected.id)+'/cover';
       if(Platform.OS==='web'){
-        const resp=await fetch(url,{headers:{'X-Workspace-Key':token.trim()}});
+        const resp=await fetch(url,{headers:authHeaders()});
         if(!resp.ok)throw new Error('Media HTTP '+resp.status);
         const blob=await resp.blob();
         const objectUrl=URL.createObjectURL(blob);
@@ -364,7 +385,7 @@ export default function App() {
         setNotice('已启动 PNG 下载，请使用浏览器下载记录确认实际保存。');
       }else{
         const file=await File.downloadFileAsync(url,new File(Paths.cache,selected.id+'.png'),{
-          headers:{'X-Workspace-Key':token.trim()}
+          headers:authHeaders()
         });
         if(!await Sharing.isAvailableAsync()){
           setNotice('手机系统分享不可用；图片已经下载在应用缓存，未确认导出。');
@@ -423,13 +444,18 @@ export default function App() {
               : '转录通过已授权的本地 Qwen 处理；'} Intake、CMO 决策和封面均为模拟，禁止直接用于公开发布。
           </Text>
         </View>}
-        <Panel title="工作区连接" sub="同一个 Mac Studio 后端；密钥不会打包进 APK。">
-          <Text style={styles.label}>服务地址（Mac 可以 localhost；手机请填 https://Mac的局域网地址:8433）</Text>
-          <TextInput style={styles.input} value={server} onChangeText={setServer}
+        <Panel title="工作区连接" sub={authMode==='token'
+          ?'此服务器要求工作区密钥。':'内部 LAN Demo · 无需 Workspace Token'}>
+          <Text style={styles.label}>Mac Studio 私有局域网地址（Android 请使用 HTTPS）</Text>
+          <TextInput style={styles.input} value={server} onChangeText={value=>{
+              setServer(value);setAuthorized(false);setAuthMode('unknown');
+            }}
             autoCapitalize="none" autoCorrect={false} placeholder="https://192.168.x.x:8433"/>
-          <Text style={styles.label}>工作区密钥</Text>
-          <TextInput style={styles.input} value={token} onChangeText={setToken}
-            autoCapitalize="none" autoCorrect={false} secureTextEntry placeholder="32+ chars secret"/>
+          {authMode==='token'?<>
+            <Text style={styles.label}>工作区密钥</Text>
+            <TextInput style={styles.input} value={token} onChangeText={setToken}
+              autoCapitalize="none" autoCorrect={false} secureTextEntry placeholder="32+ chars secret"/>
+          </>:<Text style={styles.small}>仅供可信局域网演示；同一局域网内能访问该服务的设备也可读取演示录音。</Text>}
           <View style={styles.actions}><Action label={authorized?'重新连接':'连接工作区'} onPress={connect} disabled={busy}/><Action label="刷新" quiet onPress={()=>void refresh()}/></View>
         </Panel>
         <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text>
@@ -539,7 +565,7 @@ export default function App() {
           </Panel>
           {selected&&<Panel title={'审核：'+selected.id}>
             <Text style={styles.muted}>1080 × 1440 PNG · 原创排版 · 需要人工确认事实来源</Text>
-            {coverUri?<Image source={{uri:coverUri,headers:Platform.OS==='web'?undefined:{'X-Workspace-Key':token}}}
+            {coverUri?<Image source={{uri:coverUri,...(Platform.OS==='web'||authMode==='lan_demo'?{}:{headers:authHeaders()})}}
                resizeMode="contain" style={styles.cover}/>:null}
             <TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle} multiline/>
             <TextInput style={[styles.input,{minHeight:130}]} value={editCaption} onChangeText={setEditCaption} multiline/>

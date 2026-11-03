@@ -9,7 +9,7 @@ One OpenAI Agents SDK runtime on the single Python state owner.
 - `POST /api/recordings/{id}/consent` — explicitly grant or revoke future OpenAI analysis of source transcript; cannot retract earlier provider processing. Authentic Qwen transcript can be reused without re-upload.
 - `GET /api/recordings/{id}/transcript`, `GET /api/intakes`, `POST /api/intakes/{id}/approve` — private source and explicit human promotion.
 - `POST /api/cmo/run`, `GET /api/decisions`, `GET /api/packages`, `POST /api/packages/{id}/edit`, `POST /api/packages/{id}/approve`, `POST /api/packages/{id}/receipt` — CMO decision and human-reviewed social handoff.
-- Every `/api/` request requires `X-Workspace-Key`; the secret lives in the private server `.env`, not in APK or static Web build. Single workspace for M0.
+- `WORKSPACE_AUTH_MODE=lan_demo` is intentionally **token-free** for the local Mock-only pilot; requires explicit private IPv4 bind and HTTPS for LAN. Anyone on that reachable LAN can read/write demo data — never store sensitive meeting content. `WORKSPACE_AUTH_MODE=token` retains the original required `X-Workspace-Key` for future real data/provider tests; no secrets in APK/Web.
 - Post acknowledgment states: `CAPTURED → TRANSCRIBED → ANALYZED_CANDIDATE → APPROVED_FOR_USE`; approval is a human action, not a prompt. External `founder_reported` links remain `UNVERIFIED`.
 - `recipes.json` is the stable, versioned expected-shape contract. Strict JSON/Pydantic output models are in `server/agent_runtime.py`; prompt bodies are implementation, not source instructions.
 - `StateStore` is a single-process **in-memory authoritative projection** with a durable append-only journal (no separate DB process), not a cluster or general database system.
