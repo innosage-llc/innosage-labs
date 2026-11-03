@@ -4,6 +4,7 @@ This is an **index**, not a mirror. The original project README, code, versions,
 
 | Project | What you can try | Canonical source | Notes |
 | --- | --- | --- | --- |
+| **Agent X-Ray — OpenClaw historical Run Inspector** | Read-only event timeline from a real Agent tool run, with private sanitization | [Self-contained Example](agent-run-inspector/README.md) | Local-only report; no model/API use or real social metrics |
 | **AI CMO Workbench (private-LAN lab)** | Expo Web/Android + Python single-process WAL + local Qwen + OpenAI CMO | [Isolated runnable example](ai-cmo-workbench/README.md) | Mac Studio/LAN only; APK first, iOS TODO; never commit real recordings/secrets |
 | **Tibo Reset Post Generator** | From Tibo post evidence to a real Chinese poster and caption | [Project and Web quick start](tibo-reset-post-generator/README.md) | Checks reset claims, timestamps and image-output limitations; no bundled third-party assets |
 | **Draft Skills** | Install agent skills for Draft CLI page workflows | [Repository + installation](https://github.com/innosage-llc/draft-skills#readme) | Check the current skill version and CLI compatibility; a skill update does not automatically upgrade your runtime |

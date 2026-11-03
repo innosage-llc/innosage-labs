@@ -1,0 +1,13 @@
+# Real source material and generated report are always PRIVATE.
+.local-run/
+.venv/
+__pycache__/
+*.pyc
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.jsonl
+*.log
+*.png
+*.html
+.DS_Store
