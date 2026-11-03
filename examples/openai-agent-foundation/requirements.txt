@@ -1,0 +1,8 @@
+fastapi>=0.115,<1
+uvicorn>=0.32,<1
+openai-agents>=0.24,<0.25
+httpx>=0.28,<1
+socksio>=1,<2
+cryptography>=43,<60
+pytest>=8,<10
+playwright>=1.56,<2

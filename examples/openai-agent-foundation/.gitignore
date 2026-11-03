@@ -1,0 +1,20 @@
+# Only source + synthetic fixtures are committed.
+.venv/
+.local-run/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.token
+screenshots/
+playwright-report/
+test-results/
+.DS_Store
