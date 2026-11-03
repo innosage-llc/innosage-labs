@@ -39,13 +39,18 @@ def main():
         if len(token)<32:
             raise SystemExit("Refuse weak access.token")
         os.environ["FOUNDATION_AUTH_TOKEN"]=token
+    from . import lan_security
     address=os.environ.get("FOUNDATION_BIND_IP","127.0.0.1")
     if address!="127.0.0.1":
-        raise SystemExit("Bind only loopback. Use an authenticated SSH tunnel.")
+        lan_security.validate_local_lan_ip(address)
+    tls=RUN_DIR/"tls"
+    if not (tls/"server.crt").is_file() or not (tls/"server.key").is_file():
+        raise SystemExit("Missing private TLS certificate. Run scripts/start-local.sh")
     port=int(os.environ.get("FOUNDATION_PORT","8434"))
     if port!=8434:
         raise SystemExit("This isolated example reserves port 8434 only")
     uvicorn.run("backend.app:app",host=address,port=port,
+                ssl_certfile=str(tls/"server.crt"),ssl_keyfile=str(tls/"server.key"),
                 workers=1,log_level="info",access_log=False)
 
 if __name__=="__main__":

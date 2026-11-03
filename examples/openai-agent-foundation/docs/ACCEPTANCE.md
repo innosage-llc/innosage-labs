@@ -4,7 +4,7 @@
 
 ## PASS (actually verified on Mac Studio)
 
-- [x] 23 Python automated offline tests, no real provider dispatch.
+- [x] 26 Python automated offline tests, no real provider dispatch.
 - [x] Genuine OpenAI Agents SDK Runner exercised with *fake* scripted
       model: read tool, Editor as tool, persisted official SQLiteSession,
       HITL interruption, serialized RunState, approve/resume and reject gate.
@@ -19,7 +19,13 @@
       Strategy after constructing a new Store.
 - [x] Duplicate feedback/publish event IDs do not repeat the action.
 - [x] Real provider endpoint returns 409 without explicit spend gate.
-- [x] Private localhost server on port 8434, token-protected API.
+- [x] Private LAN HTTPS server on Mac Studio's assigned RFC1918 IPv4,
+      port 8434; wildcard/public addresses rejected. Independent CA, correct
+      IP SAN, CA/leaf key identifiers, owner-only private keys.
+- [x] Strict TLS verification from both curl and Python httpx using the
+      independent public CA: HTTPS 200 without disabling verification.
+- [x] Unauthenticated LAN API HTTP 401; authorized bearer-token API HTTP 200.
+      Plain HTTP is not enabled.
 - [x] Old #11 container remains on its separate port 8433.
 - [x] Private model configuration parser requires mode 600 and rejects
       unexpected directives; no user API key was installed.
@@ -35,8 +41,10 @@
       No live API key configured and no separate small spend approval.
 - [ ] NOT RUN: Real model-backed Responses context compaction.
       SQLite state recovery is not the same operation.
-- [ ] NOT VERIFIED: MacBook-origin SSH tunnel & Founder browser acceptance.
-      Local Mac Studio Chrome and HTTP checks are not a second client.
+- [ ] NOT VERIFIED: MacBook-origin **direct LAN HTTPS browser** and Founder
+      acceptance (client needs one-time CA trust and private bearer token).
+      Mac Studio LAN-IP HTTP/TLS and Chrome tests do not prove another machine
+      can connect, including if Wi-Fi client isolation blocks access.
 - [ ] OUT OF SCOPE: Actual XHS posting, platform analytics,
       Android/ASR/Qwen, real audience growth, revenue.
 
@@ -46,13 +54,15 @@
     .venv/bin/python scripts/e2e-browser.py
     .venv/bin/python scripts/e2e-restart.py
 
-See main README for private SSH tunnel, token retrieval and restart.
+See main README for the LAN HTTPS URL, one-time public CA import, private
+bearer token retrieval and scoped restart.
 The E2E browser fixture resets only this Example's synthetic data and leaves
 the sample loaded for Founder inspection. It does not spend OpenAI credits.
 
 ## Founder walkthrough
 
-1. Open the verified private tunneled URL, enter local token.
+1. On the same LAN, trust the dedicated public CA once, then open the
+   private HTTPS URL directly on MacBook and enter its local token.
 2. See AI CMO + Editor and Load Sample Scenario.
 3. Run CMO 1; inspect reason, source IDs and Editor draft.
 4. Approve internal draft, Simulate Publication, Import Audience Feedback.

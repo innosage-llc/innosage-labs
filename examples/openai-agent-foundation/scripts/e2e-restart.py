@@ -6,12 +6,15 @@ from pathlib import Path
 import httpx
 
 ROOT=Path(__file__).resolve().parents[1]
-URL="http://127.0.0.1:8434"
+LAN_IP=subprocess.check_output([str(ROOT/".venv/bin/python"),str(ROOT/"scripts/lan-tls.py"),"discover"],text=True).strip()
+URL=f"https://{LAN_IP}:8434"
+CA=str(ROOT/".local-run/tls/ca.crt")
 TOKEN=(ROOT/".local-run/access.token").read_text(encoding="utf-8").strip()
 HEADERS={"Authorization":"Bearer "+TOKEN}
 
 def call(method,path,body=None):
-    with httpx.Client(base_url=URL,headers=HEADERS,trust_env=False,timeout=12) as c:
+    with httpx.Client(base_url=URL,headers=HEADERS,trust_env=False,
+                      verify=CA,timeout=12) as c:
         response=c.request(method,path,json=body)
         response.raise_for_status()
         return response.json()

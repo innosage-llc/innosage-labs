@@ -10,6 +10,7 @@ audio recordings, social-platform content or secrets are bundled.
 | FastAPI | https://github.com/fastapi/fastapi | MIT |
 | Uvicorn | https://github.com/encode/uvicorn | BSD-3-Clause |
 | Pydantic | https://github.com/pydantic/pydantic | MIT |
+| cryptography (LAN TLS certificate generation) | https://github.com/pyca/cryptography | Apache-2.0 / BSD-3-Clause |
 | pytest | https://github.com/pytest-dev/pytest | MIT |
 | Playwright Python | https://github.com/microsoft/playwright-python | Apache-2.0 |
 | Chrome Browser | System-installed; never redistributed | Upstream license |

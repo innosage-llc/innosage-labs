@@ -16,8 +16,13 @@ Foundation study. It is NOT a replacement for #11 acceptance.
 
 ## Critical invariants
 
-- Only example-specific port 8434, loopback binding. Authenticated SSH tunnel
-  required for remote browser. Never expose a public server.
+- Example-specific port 8434 on **only the Mac's assigned RFC1918 LAN IPv4**,
+  validated on startup. No wildcard, public listener or WAN exposure.
+- TLS mandatory, independent private CA and IP SAN leaf generated within
+  ignored #27 private files. Clients must explicitly trust **only the public
+  CA certificate**. Never transmit the CA/server private key.
+- A separate bearer token guards all business APIs even on the private LAN.
+  Direct same-LAN browser access needs no SSH tunnel after one-time CA trust.
 - Only example-owned .local-run for database, session history, token, receipts.
 - No imports from the older ai-cmo-workbench Example.
 - Synthetic candidate Intake never becomes an approved public claim.

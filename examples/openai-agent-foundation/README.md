@@ -44,31 +44,54 @@ From this directory:
     bash scripts/verify-local.sh
     bash scripts/start-local.sh
 
-The only listening endpoint is **http://127.0.0.1:8434/**.
-A random private access token is created once at **.local-run/access.token**.
-Never commit, paste into GitHub, or reveal it publicly. Only the local operator
-can read it. Local database and SDK Session files are also in .local-run.
-Check the health without leaking a token:
+The server detects Mac Studio's private LAN IPv4 and listens on
+**https://<MAC_STUDIO_LAN_IP>:8434/**, not on a public or wildcard interface.
+It rejects non-RFC1918 addresses and IPs not actually assigned to the Mac.
+Independent private CA + HTTPS server certificates are generated in
+**.local-run/tls/**. A random bearer token is stored in
+**.local-run/access.token**. Certificate private keys, token, SQLite and
+SDK Session records stay in this independent Example and are ignored by Git.
 
-    curl --noproxy '*' -fsS http://127.0.0.1:8434/health
+Discover the actual LAN IP and check strict HTTPS verification:
 
-### Remote browser from MacBook
+    .venv/bin/python scripts/lan-tls.py discover
+    curl --noproxy '*' --cacert .local-run/tls/ca.crt \
+      -fsS https://<MAC_STUDIO_LAN_IP>:8434/health
 
-Use the existing authorized Mac Studio SSH connection and forward local port
-8434 through SSH. On MacBook (replace the placeholder with your SSH host):
+### Direct browser access from MacBook (same LAN)
 
-    ssh -N -L 8434:127.0.0.1:8434 <MAC_STUDIO_SSH_HOST>
+**No SSH tunnel is required for normal Web use.** One-time private CA
+installation is required because a publicly trusted certificate cannot
+normally be issued for an RFC1918 IP. On an authorized MacBook:
 
-Open **http://127.0.0.1:8434/** in the MacBook browser and enter the
-workbench token. Read the private token from Mac Studio through your normal
-SSH mechanism:
+1. Copy **only the public CA certificate** from Mac Studio using existing
+   authenticated SSH/SCP (replace the two placeholders):
 
-    ssh <MAC_STUDIO_SSH_HOST> 'cat <ISSUE_27_WORKTREE>/examples/openai-agent-foundation/.local-run/access.token'
+       scp <MAC_STUDIO_SSH_HOST>:<ISSUE_27_WORKTREE>/examples/openai-agent-foundation/.local-run/tls/ca.crt \
+         ~/Downloads/innosage-agent-foundation-ca.crt
 
-SSH secures the loopback HTTP transport, and bearer token protects the
-workbench APIs independently. **Never bind the app to 0.0.0.0 or expose it
-to WAN.** A Mac Studio Chrome test does not prove MacBook access; Founder
-must confirm the tunnel and browser from the actual MacBook.
+2. Compare the SHA-256 certificate fingerprint with Mac Studio using
+   openssl x509 -fingerprint -sha256 -noout -in <FILE>.
+   In **Keychain Access** on MacBook, import the copied public CA into
+   the login keychain and explicitly set it to **Always Trust**.
+   Do not trust an unknown browser certificate warning instead.
+3. Open **https://<MAC_STUDIO_LAN_IP>:8434/** on MacBook while connected
+   to the same LAN. Chrome should show a trusted HTTPS connection.
+4. Enter the private bearer token from Mac Studio's
+   .local-run/access.token, transferred privately. Never post it in
+   public issues, PRs, screenshots or chats.
+
+**Never transfer private keys** (ca.key or server.key) from .local-run/tls.
+After evaluating this internal demo, remove the temporary CA trust from any
+client where it is no longer needed. Keep the CA private key on Mac Studio.
+This CA is independent of the old #11 Demo. On Mac Studio LAN IP changes,
+restart only #27 with stop-local.sh then start-local.sh; the server certificate
+is reissued for the new address under the same CA. Never bind to 0.0.0.0
+or enable public router forwarding. Same-Mac Chrome tests do not prove a
+separate MacBook can connect; Founder must perform that final verification.
+If access fails, check that both devices are on the same private LAN,
+that guest-Wi-Fi client isolation is disabled, and that macOS firewall rules
+permit only the required local port. Do not disable the system firewall.
 
 ## Repeatable verification
 
