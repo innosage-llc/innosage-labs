@@ -1,0 +1,23 @@
+{
+  "name": "innosage-ai-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/ui": "^58.0.27",
+    "expo": "58.0.23",
+    "expo-audio": "~58.0.11",
+    "expo-file-system": "~58.0.13",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.11.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}
