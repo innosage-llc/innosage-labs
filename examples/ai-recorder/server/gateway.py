@@ -3,6 +3,7 @@ from contextlib import closing
 import hashlib
 import hmac
 import os
+import secrets
 import sqlite3
 import time
 from pathlib import Path
@@ -21,13 +22,32 @@ operations = Lock()
 
 
 def identity(request):
-    token = os.environ["RECORDER_PILOT_TOKEN"]
-    if len(token) < 32:
-        raise RuntimeError("Configure a random pilot token of at least 32 characters")
-    supplied = request.headers.get("authorization", "").encode()
-    if not hmac.compare_digest(supplied, f"Bearer {token}".encode()):
+    supplied = request.headers.get("authorization", "")
+    if not supplied.startswith("Bearer ") or len(supplied) > 256:
         raise HTTPException(401, "Unauthorized")
-    return "recorder_free_v1_" + hashlib.sha256(token.encode()).hexdigest()
+    token = supplied[7:]
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    with closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+        db.execute("CREATE TABLE IF NOT EXISTS guests (digest TEXT PRIMARY KEY)")
+        registered = db.execute("SELECT 1 FROM guests WHERE digest=?", (digest,)).fetchone()
+    if registered is None:
+        pilot = os.environ.get("RECORDER_PILOT_TOKEN", "")
+        if len(pilot) < 32 or not hmac.compare_digest(token, pilot):
+            raise HTTPException(401, "Unauthorized")
+    return "recorder_free_v1_" + digest
+
+
+@app.post("/v1/guests")
+def create_guest():
+    token = secrets.token_urlsafe(32)
+    with closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+        db.execute("CREATE TABLE IF NOT EXISTS guests (digest TEXT PRIMARY KEY)")
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT COUNT(*) FROM guests").fetchone()[0] >= 1000:
+            raise HTTPException(503, "Guest registration capacity reached")
+        db.execute("INSERT INTO guests VALUES (?)", (hashlib.sha256(token.encode()).hexdigest(),))
+        db.commit()
+    return {"token": token}
 
 
 def router_client():

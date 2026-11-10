@@ -26,7 +26,7 @@ offers notification permission so Android can show the ongoing recording.
 
 Start each recording from the visible app. Stop the recording before force-stopping
 or uninstalling the app. Android app storage is removed on uninstall. This example
-covers Android capture and playback. It has no server dependency.
+covers Android capture and playback. Those features work offline without a server.
 
 Engineering verification used an Android API 36 emulator with no default
 network. The recording service remained active while the emulator was asleep
@@ -36,29 +36,35 @@ phone acceptance and spoken-marker continuity remain separate checks.
 
 ## Transcription milestone
 
-The Transcript action connects to a privately deployed AI Recorder Gateway.
-Enter its HTTPS origin and a provisioned pilot access token once. The app keeps
-that credential in Expo SecureStore. Use a separate random pilot token for each
-private workspace. It authorizes access to that workspace's saved transcripts.
+Build with `EXPO_PUBLIC_RECORDER_GATEWAY_URL` set to your HTTPS Gateway base URL.
+The acceptance build uses a public staging endpoint. Opening Transcript provisions
+a device guest credential and retains it in Expo SecureStore. The phone needs
+ordinary internet access. A VPN, service credential or manual token entry is not
+part of this journey. Without a build URL, the sample offers manual pilot setup.
 
-The gateway uses FastAPI with one worker, SQLite, and the Speech Router's
-Recorder-specific Free Guest profile. Set these private environment variables on
-the host:
+The single-worker FastAPI Gateway uses SQLite and the Speech Router's
+Recorder-specific Free Guest profile. Configure these server-only variables:
 
-- RECORDER_PILOT_TOKEN, a random string of at least 32 characters.
-- RECORDER_DB, the path to a private SQLite database.
-- RECORDER_ROUTER_URL, the staging Router HTTPS origin or a loopback forward.
-- RECORDER_ROUTER_TOKEN, the Router service credential.
+- `RECORDER_DB`, a private SQLite database path.
+- `RECORDER_ROUTER_URL`, the Router HTTPS origin or loopback forward.
+- `RECORDER_ROUTER_TOKEN`, the Router service credential.
+- Optional `RECORDER_PILOT_TOKEN`, a random credential for manual pilot setup.
 
-Install server/requirements.txt into a virtual environment, then run
+Install `server/requirements.txt` in a virtual environment, then run
 `uvicorn gateway:app --app-dir server --host 127.0.0.1 --port 8785 --workers 1 --no-access-log`
-behind your private authenticated HTTPS ingress.
+behind HTTPS. For this bounded staging milestone, the existing staging Router
+can forward its explicitly enabled `/recorder` paths to the private Gateway.
+Guest registration is capped at 1,000 identities per deployment. Production
+onboarding, account recovery and public distribution need a later milestone.
 
-The gateway buffers one bounded upload before passing it to the Router. The
-Router owns size, decoded duration and job admission. Repeated submissions for
-the same operation recover the same Router session. The gateway commits the
-original transcript before acknowledging completion and upstream cleanup.
-Original and edited transcripts are also retained separately on the phone.
+Each guest can retrieve only its own operations. The Gateway buffers an upload
+up to the existing Free limit before forwarding it. The Router owns decoded
+duration, size and admission limits. A saved operation ID recovers the same
+Router job after ambiguous network failure. An expired or terminal failed job
+requires an explicit new transcription. Global ASR concurrency remains one.
 
-The pilot gateway is one private workspace per deployment. It stores the original
-transcript on the server and the original plus current revision on the phone.
+The Gateway commits the original transcript before reporting completion and
+cleaning up the upstream artifact. Original and edited transcripts are also
+retained separately on the phone. Reopening a saved transcript works offline.
+The staging Gateway stores originals server-side. It does not provide server-side
+editing or cross-device synchronization in this milestone.

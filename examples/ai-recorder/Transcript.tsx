@@ -7,8 +7,13 @@ import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { useTheme } from './ui/theme';
 
-type Gateway = { url: string; token: string };
+import { connectGateway, type Gateway } from './GatewayConnection';
 type Job = { state: string; transcript?: string };
+const stateLabels: Record<string, string> = {
+  RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
+  QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
+  FAILED: 'Transcription failed', CANCELLED: 'Cancelled', CLEANED: 'Expired', EXPIRED: 'Expired',
+};
 const pending = new Set(['UPLOADING', 'STAGED', 'QUEUED', 'PROCESSING']);
 
 async function saveText(file: File, text: string) {
@@ -19,6 +24,7 @@ async function saveText(file: File, text: string) {
 
 export function Transcript({ recording, onClose }: { recording: File; onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
+  const [connecting, setConnecting] = useState(true);
   const [gateway, setGateway] = useState<Gateway>();
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
@@ -35,21 +41,28 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   useEffect(() => {
     let active = true;
     async function restore() {
-      const [savedGateway, savedOperation, originalText, revisedText] = await Promise.all([
-        SecureStore.getItemAsync('recorder.gateway'),
+      const [savedOperation, originalText, revisedText] = await Promise.all([
         SecureStore.getItemAsync(operationKey),
         original.exists ? original.text() : undefined,
         revision.exists ? revision.text() : undefined,
       ]);
       if (!active) return;
-      if (savedGateway) setGateway(JSON.parse(savedGateway));
+
       if (savedOperation) setOperation(savedOperation);
       if (originalText !== undefined) {
         setJob({ state: 'COMPLETED', transcript: originalText });
         setDraft(revisedText ?? originalText);
       }
+      if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
+        const config = await connectGateway();
+        if (active) setGateway(config);
+      } else {
+        const saved = await SecureStore.getItemAsync('recorder.gateway');
+        if (active && saved) setGateway(JSON.parse(saved));
+      }
     }
-    void restore().catch(() => { if (active) setMessage('Could not reopen the transcript.'); });
+    void restore().catch(() => { if (active) setMessage('Could not connect. Retry when online.'); })
+      .finally(() => { if (active) setConnecting(false); });
     return () => { active = false; };
   }, [operationKey]);
 
@@ -92,18 +105,27 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     return () => { controller.abort(); clearTimeout(timer); };
   }, [gateway, operation, busy, complete]);
 
+
   async function connect() {
+    setConnecting(true);
     try {
+      if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
+        setGateway(await connectGateway());
+        setMessage('');
+        return;
+      }
       const parsed = new URL(url.trim());
       if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search ||
-          parsed.hash || parsed.pathname !== '/' || token.trim().length < 32) throw new Error();
-      const config = { url: parsed.origin, token: token.trim() };
+          parsed.hash || !['/', '/recorder'].includes(parsed.pathname) || token.trim().length < 32) throw new Error();
+      const config = { url: parsed.origin + (parsed.pathname === '/' ? '' : parsed.pathname), token: token.trim() };
       await SecureStore.setItemAsync('recorder.gateway', JSON.stringify(config));
       setGateway(config);
       setToken('');
       setMessage('');
     } catch {
-      setMessage('Enter the private HTTPS gateway URL and pilot access token.');
+      setMessage('Could not connect. Check the gateway details and network.');
+    } finally {
+      setConnecting(false);
     }
   }
 
@@ -162,15 +184,17 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           ) : gateway ? (
             <>
               <Text style={{ color: palette.text }}>Transcription sends this recording to your private Edge Speech gateway.</Text>
-              {job ? <Text style={{ color: palette.text }}>Status: {job.state}</Text> : null}
+              {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
               <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy} onPress={submit} />
             </>
           ) : (
             <View style={{ gap: spacing.md }}>
+              {process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL ? null : <>
               <TextInput accessibilityLabel="Gateway URL" placeholder="https://…" autoCapitalize="none" value={url} onChangeText={setUrl} style={input} />
               <TextInput accessibilityLabel="Pilot access token" placeholder="Pilot access token" secureTextEntry autoCapitalize="none" value={token} onChangeText={setToken} style={input} />
-              <Button title="Connect" onPress={connect} />
+              </>}
+              <Button title={connecting ? "Connecting…" : "Connect"} disabled={connecting} onPress={connect} />
             </View>
           )}
           <Button title="Back to recordings" onPress={onClose} disabled={busy} />

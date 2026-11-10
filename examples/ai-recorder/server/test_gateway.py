@@ -62,6 +62,20 @@ class GatewayTest(unittest.TestCase):
         self.router.start()
         self.addCleanup(self.router.stop)
 
+    def test_guest_tokens_are_registered_and_isolated(self):
+        first = self.client.post("/v1/guests").json()["token"]
+        second = self.client.post("/v1/guests").json()["token"]
+        self.assertNotEqual(first, second)
+        path = "/v1/jobs/" + str(uuid4())
+        self.client.put(path, headers={**self.headers, "Authorization": "Bearer " + first}, content=b"synthetic-audio")
+        self.state = "COMPLETED"
+        self.client.get(path, headers={"Authorization": "Bearer " + first})
+        self.state = "RESERVED"
+        result = self.client.get(path, headers={"Authorization": "Bearer " + second})
+        self.assertEqual(result.json()["state"], "RESERVED")
+        self.assertNotIn("transcript", result.json())
+        self.assertEqual(self.client.get(path, headers={"Authorization": "Bearer " + "unknown" * 10}).status_code, 401)
+
     def test_auth_and_invalid_source_reject_before_provider(self):
         path = "/v1/jobs/" + str(uuid4())
         self.assertEqual(self.client.get(path).status_code, 401)
