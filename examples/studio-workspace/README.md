@@ -60,6 +60,8 @@ TabView owns its tab pages, and Expo Router Native Tabs owns the routed screens.
 existing navigation and back behavior to a route tree, which is outside the
 reference app's current navigation scope.
 
+System confirmation dialogs on iOS follow the system appearance.
+
 Standard screen actions use the Expo UI button adapter where it fits.
 The snapshot button remains for actions needing distinct visible and
 accessible labels or layout styles the adapter does not expose.

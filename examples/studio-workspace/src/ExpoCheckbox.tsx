@@ -1,4 +1,5 @@
 import { Host, Checkbox as NativeCheckbox } from '@expo/ui';
+import { useTheme } from '../ui';
 
 export interface ExpoCheckboxProps {
   value: boolean;
@@ -8,5 +9,6 @@ export interface ExpoCheckboxProps {
 }
 
 export function ExpoCheckbox({ value, label, onValueChange, testID }: ExpoCheckboxProps) {
-  return <Host matchContents><NativeCheckbox value={value} label={label} onValueChange={onValueChange} testID={testID} /></Host>;
+  const { mode } = useTheme();
+  return <Host colorScheme={mode} matchContents><NativeCheckbox value={value} label={label} onValueChange={onValueChange} testID={testID} /></Host>;
 }

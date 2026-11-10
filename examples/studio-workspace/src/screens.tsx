@@ -182,13 +182,13 @@ export function InboxScreen({
         <Surface testID="inbox-batch-bar" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
           <UiText variant="body">{selectedIds.size} task(s) selected</UiText>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button
+            <WorkspaceButton
               label={`Batch Complete (${selectedIds.size})`}
               onPress={handleBatch}
               testID="inbox-batch-complete-btn"
               disabled={busy}
             />
-            <Button
+            <WorkspaceButton
               label="Clear"
               variant="secondary"
               onPress={() => setSelectedIds(new Set())}
@@ -331,7 +331,7 @@ export function ProjectsScreen({
                       {subtitle}
                     </UiText>
                   </View>
-                  <Button
+                  <WorkspaceButton
                     label="View Project"
                     variant="secondary"
                     onPress={() => onSelectProject(project.id)}
@@ -625,13 +625,13 @@ export function TasksScreen({
         <Surface testID="tasks-batch-bar" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
           <UiText variant="body">{selectedIds.size} task(s) selected</UiText>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button
+            <WorkspaceButton
               label={`Batch Complete (${selectedIds.size})`}
               onPress={handleBatch}
               testID="tasks-batch-complete-btn"
               disabled={busy}
             />
-            <Button
+            <WorkspaceButton
               label="Clear"
               variant="secondary"
               onPress={() => setSelectedIds(new Set())}
@@ -1344,7 +1344,7 @@ export function SettingsScreen({
                     </UiText>
                   </View>
                   <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-                    <Button
+                    <WorkspaceButton
                       label="Rename"
                       variant="secondary"
                       onPress={() => handleStartRename(tag)}
@@ -1514,13 +1514,13 @@ export function TaskForm({
             disabled={busy}
           />
         ) : null}
-        <Button
+        <WorkspaceButton
           label="Cancel"
           variant="secondary"
           onPress={onCancel}
           testID="task-cancel-btn"
         />
-        <Button
+        <WorkspaceButton
           label="Save Task"
           onPress={handleSave}
           testID="task-save-btn"
