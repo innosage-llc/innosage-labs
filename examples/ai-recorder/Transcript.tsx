@@ -116,6 +116,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       const id = terminal ? randomUUID() : operation ?? randomUUID();
       await SecureStore.setItemAsync(operationKey, id);
       setOperation(id);
+      setJob({ state: 'RESERVED' });
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60_000);
       try {
