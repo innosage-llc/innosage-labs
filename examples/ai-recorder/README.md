@@ -27,3 +27,9 @@ offers notification permission so Android can show the ongoing recording.
 Start each recording from the visible app. Stop the recording before force-stopping
 or uninstalling the app. Android app storage is removed on uninstall. This example
 covers Android capture and playback. It has no server dependency.
+
+Engineering verification used an Android API 36 emulator with no default
+network. The recording service remained active while the emulator was asleep
+and while Settings was foregrounded. Stopping added a playable 19-second AAC
+M4A to the list immediately. Playback started after a cold relaunch. Physical
+phone acceptance and spoken-marker continuity remain separate checks.

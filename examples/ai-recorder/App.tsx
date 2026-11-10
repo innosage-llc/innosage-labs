@@ -29,14 +29,14 @@ function RecorderScreen() {
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   const [playingFile, setPlayingFile] = useState<string>();
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, async (status) => {
     if (!status.isFinished) return;
     try {
       if (status.hasError || !status.url) throw new Error('Recording did not finish.');
       const source = new File(status.url);
       if (!source.exists || !source.size) throw new Error('Recording file is empty.');
       recordings.create({ idempotent: true });
-      source.move(new File(recordings, `Recording-${Date.now()}-${source.name}`));
+      await source.move(new File(recordings, `Recording-${Date.now()}-${source.name}`));
       setFiles(listRecordings());
       setMessage('Recording saved on this device.');
     } catch {
