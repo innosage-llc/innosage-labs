@@ -68,3 +68,17 @@ cleaning up the upstream artifact. Original and edited transcripts are also
 retained separately on the phone. Reopening a saved transcript works offline.
 The staging Gateway stores originals server-side. It does not provide server-side
 editing or cross-device synchronization in this milestone.
+
+### Identify speakers
+
+Before a new transcription, optionally turn on **Identify speakers**. The default
+is off. The selection belongs to the saved operation and stays fixed during
+retry/recovery. Existing recordings and plain-mode operations remain readable.
+The staging Router must already support speaker attribution; unavailable
+admission offers an explicit new transcription with the switch off.
+
+Attributed editable text uses Speaker 1 / Speaker 2 and Unknown speaker labels.
+These labels distinguish voices within the recording. The plain original,
+speaker attribution and saved revision are retained independently on the phone.
+An attribution failure leaves the plain transcript available with a visible
+message. Speaker processing may take longer than plain transcription.

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { Host, Switch } from '@expo/ui/jetpack-compose';
+import { semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
@@ -8,7 +10,8 @@ import * as SecureStore from 'expo-secure-store';
 import { useTheme } from './ui/theme';
 
 import { connectGateway, type Gateway } from './GatewayConnection';
-type Job = { state: string; transcript?: string };
+type SpeakerResult = { requested: boolean; status: string; transcript?: string };
+type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
   QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
@@ -29,6 +32,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
   const [operation, setOperation] = useState<string>();
+  const [identifySpeakers, setIdentifySpeakers] = useState(false);
   const [job, setJob] = useState<Job>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,22 +40,31 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [showOriginal, setShowOriginal] = useState(false);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
+  const speakerFile = new File(recording.parentDirectory, recording.name + '.speakers.json');
   const operationKey = 'transcription.' + recording.name;
 
   useEffect(() => {
     let active = true;
     async function restore() {
-      const [savedOperation, originalText, revisedText] = await Promise.all([
+      const [savedOperation, originalText, revisedText, speakerText] = await Promise.all([
         SecureStore.getItemAsync(operationKey),
         original.exists ? original.text() : undefined,
         revision.exists ? revision.text() : undefined,
+        speakerFile.exists ? speakerFile.text() : undefined,
       ]);
       if (!active) return;
 
-      if (savedOperation) setOperation(savedOperation);
+      if (savedOperation) {
+        // Prior APKs stored a plain UUID. Their jobs keep speaker identification off.
+        const saved = savedOperation.startsWith('{') ? JSON.parse(savedOperation)
+          : { id: savedOperation, identifySpeakers: false };
+        setIdentifySpeakers(saved.identifySpeakers);
+        setOperation(saved.id);
+      }
+      const speakers: SpeakerResult | undefined = speakerText ? JSON.parse(speakerText) : undefined;
       if (originalText !== undefined) {
-        setJob({ state: 'COMPLETED', transcript: originalText });
-        setDraft(revisedText ?? originalText);
+        setJob({ state: 'COMPLETED', transcript: originalText, speakerLabeling: speakers });
+        setDraft(revisedText ?? speakers?.transcript ?? originalText);
       }
       if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
         const config = await connectGateway();
@@ -71,18 +84,26 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       method: upload ? 'PUT' : 'GET',
       headers: {
         Authorization: `Bearer ${config.token}`,
-        ...(upload ? { 'Content-Type': 'audio/mp4' } : {}),
+        ...(upload ? { 'Content-Type': 'audio/mp4', 'X-Identify-Speakers': String(identifySpeakers) } : {}),
       },
       body: upload ? recording : undefined,
       signal,
     });
+    if (response.status === 422) {
+      const failure = await response.json();
+      if (failure.detail?.code === 'SPEAKER_UNAVAILABLE') setJob({ state: 'FAILED' });
+      throw new Error(typeof failure.detail === 'string' ? failure.detail
+        : failure.detail?.message ?? 'This recording could not be transcribed.');
+    }
     if (!response.ok) throw new Error(response.status === 413
       ? 'This recording exceeds the Free upload limit.'
       : 'Could not reach or complete the transcription. Check the connection and retry.');
     const result: Job = await response.json();
     if (result.state === 'COMPLETED' && result.transcript) {
+      if (result.speakerLabeling) await saveText(speakerFile, JSON.stringify(result.speakerLabeling));
+      // The original is the local completion marker. Keep it last so recovery can finish metadata writes.
       if (!original.exists) await saveText(original, result.transcript);
-      setDraft(revision.exists ? await revision.text() : result.transcript);
+      setDraft(revision.exists ? await revision.text() : result.speakerLabeling?.transcript ?? result.transcript);
     }
     setJob(result);
     return result;
@@ -136,7 +157,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     try {
       const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
       const id = terminal ? randomUUID() : operation ?? randomUUID();
-      await SecureStore.setItemAsync(operationKey, id);
+      await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers }));
       setOperation(id);
       setJob({ state: 'RESERVED' });
       const controller = new AbortController();
@@ -165,6 +186,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     }
   }
 
+  const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
     <Modal onRequestClose={onClose}>
@@ -175,6 +197,11 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           {complete ? (
             <>
               <Text style={{ color: palette.muted }}>Edge Speech · {showOriginal ? 'Original' : 'Editable revision'}</Text>
+              {job?.speakerLabeling?.requested ? <Text style={{ color: palette.muted }}>
+                {job.speakerLabeling.status === 'completed'
+                  ? 'Speakers identified. Labels distinguish voices, not people’s names.'
+                  : 'Speaker identification could not be completed. The transcript is available.'}
+              </Text> : null}
               <TextInput accessibilityLabel="Transcript text" multiline editable={!showOriginal}
                 value={showOriginal ? job?.transcript : draft} onChangeText={setDraft}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
@@ -184,6 +211,14 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           ) : gateway ? (
             <>
               <Text style={{ color: palette.text }}>Transcription sends this recording to your private Edge Speech gateway.</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ color: palette.text }}>Identify speakers</Text>
+                <Host matchContents style={{ minWidth: 60 }}>
+                  <Switch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
+                    modifiers={[semantics({ contentDescription: 'Identify speakers' })]} />
+                </Host>
+              </View>
+              <Text style={{ color: palette.muted }}>Add speaker labels to this transcript. May take longer.</Text>
               {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
               <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy} onPress={submit} />
