@@ -175,7 +175,7 @@ export function InboxScreen({
     <View testID="inbox-screen" style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm }}>
         <UiText variant="heading">Inbox ({inboxTasks.length})</UiText>
-        <Button label="New Task" onPress={onNewTask} testID="inbox-new-task-btn" disabled={busy} />
+        <WorkspaceButton label="New Task" onPress={onNewTask} testID="inbox-new-task-btn" disabled={busy} />
       </View>
 
       {selectedIds.size > 0 ? (
@@ -299,7 +299,7 @@ export function ProjectsScreen({
     <View testID="projects-screen" style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm }}>
         <UiText variant="heading">Projects ({workspace.projects.length})</UiText>
-        <Button label="New Project" onPress={onNewProject} testID="projects-new-btn" disabled={busy} />
+        <WorkspaceButton label="New Project" onPress={onNewProject} testID="projects-new-btn" disabled={busy} />
       </View>
 
       {workspace.projects.length === 0 ? (
@@ -391,9 +391,9 @@ export function ProjectDetailScreen({
     <View testID="project-detail-screen" style={{ gap: spacing.lg }}>
       <Surface testID="project-detail-header-card">
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }}>
-          {onBack ? <Button label="Back to Projects" variant="secondary" onPress={onBack} testID="project-detail-back-btn" /> : null}
+          {onBack ? <WorkspaceButton label="Back to Projects" variant="secondary" onPress={onBack} testID="project-detail-back-btn" /> : null}
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button label="Edit Project" variant="secondary" onPress={() => onEditProject(project)} testID="project-detail-edit-btn" disabled={busy} />
+            <WorkspaceButton label="Edit Project" variant="secondary" onPress={() => onEditProject(project)} testID="project-detail-edit-btn" disabled={busy} />
             <Button label="Delete Project" variant="danger" onPress={() => onDeleteProject(project)} testID="project-detail-delete-btn" disabled={busy} />
           </View>
         </View>
@@ -406,10 +406,10 @@ export function ProjectDetailScreen({
       </Surface>
 
       {/* Related Tasks */}
-      <Surface testID="project-tasks-section">
+      <View testID="project-tasks-section">
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
           <UiText variant="heading">Tasks ({projectTasks.length})</UiText>
-          <Button label="Add Task" onPress={() => onNewTask(project.id)} testID="project-add-task-btn" disabled={busy} />
+          <WorkspaceButton label="Add Task" onPress={() => onNewTask(project.id)} testID="project-add-task-btn" disabled={busy} />
         </View>
         {projectTasks.length === 0 ? (
           <EmptyState
@@ -421,7 +421,7 @@ export function ProjectDetailScreen({
         ) : (
           <View style={{ gap: spacing.sm }}>
             {projectTasks.map((task) => (
-              <Surface key={task.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
+              <View key={task.id} style={{ borderTopWidth: 1, borderColor: palette.border, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm }}>
                 <View style={{ flex: 1, minWidth: 160 }}>
                   <Button
                     label={task.title}
@@ -442,17 +442,17 @@ export function ProjectDetailScreen({
                   />
                   <Button label="Delete" accessibilityLabel={`Delete ${task.title}`} variant="danger" onPress={() => onDeleteTask(task)} disabled={busy} />
                 </View>
-              </Surface>
+              </View>
             ))}
           </View>
         )}
-      </Surface>
+      </View>
 
       {/* Related Notes */}
-      <Surface testID="project-notes-section">
+      <View testID="project-notes-section">
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
           <UiText variant="heading">Notes ({projectNotes.length})</UiText>
-          <Button label="Add Note" onPress={() => onNewNote(project.id)} testID="project-add-note-btn" disabled={busy} />
+          <WorkspaceButton label="Add Note" onPress={() => onNewNote(project.id)} testID="project-add-note-btn" disabled={busy} />
         </View>
         {projectNotes.length === 0 ? (
           <EmptyState
@@ -464,7 +464,7 @@ export function ProjectDetailScreen({
         ) : (
           <View style={{ gap: spacing.sm }}>
             {projectNotes.map((note) => (
-              <Surface key={note.id} style={{ gap: spacing.xs }}>
+              <View key={note.id} style={{ borderTopWidth: 1, borderColor: palette.border, paddingVertical: spacing.sm, gap: spacing.xs }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Button
                     label={note.title}
@@ -478,11 +478,11 @@ export function ProjectDetailScreen({
                 <UiText variant="body" numberOfLines={2} style={{ color: palette.muted }}>
                   {note.body}
                 </UiText>
-              </Surface>
+              </View>
             ))}
           </View>
         )}
-      </Surface>
+      </View>
     </View>
   );
 }
@@ -560,9 +560,9 @@ export function TasksScreen({
           value={viewMode}
           onChange={setViewMode}
         />
-        <Button label={showFilters ? "Hide filters" : "Filters & sort"} variant="secondary" onPress={() => setShowFilters(!showFilters)} />
+        <WorkspaceButton label={showFilters ? "Hide filters" : "Filters & sort"} variant="secondary" onPress={() => setShowFilters(!showFilters)} />
         {Platform.OS === 'android' && viewMode === 'list' && (
-          <Button label={selecting ? 'Done selecting' : 'Select tasks'} variant="secondary" onPress={() => {
+          <WorkspaceButton label={selecting ? 'Done selecting' : 'Select tasks'} variant="secondary" onPress={() => {
             setSelecting(!selecting);
             setSelectedIds(new Set());
           }} />
@@ -891,7 +891,7 @@ export function NotesScreen({
     <View testID="notes-screen" style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm }}>
         <UiText variant="heading">Notes ({workspace.notes.length})</UiText>
-        <Button label="New Note" onPress={onNewNote} testID="notes-new-btn" disabled={busy} />
+        <WorkspaceButton label="New Note" onPress={onNewNote} testID="notes-new-btn" disabled={busy} />
       </View>
 
       {/* Filter Chips */}
@@ -1329,7 +1329,7 @@ export function SettingsScreen({
                     />
                     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm }}>
                       <WorkspaceButton label="Cancel" variant="secondary" onPress={() => setRenamingTagId(null)} />
-                      <Button label="Save" onPress={() => handleSaveRename(tag.id)} disabled={busy} />
+                      <WorkspaceButton label="Save" onPress={() => handleSaveRename(tag.id)} disabled={busy} />
                     </View>
                   </Surface>
                 );

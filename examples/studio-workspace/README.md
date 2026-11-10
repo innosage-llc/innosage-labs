@@ -50,9 +50,19 @@ with an empty workspace. Changes report success only after a local write succeed
 Project deletion keeps tasks/notes and unassigns them. Tag deletion removes its
 references. No operation uploads content.
 
-Implementation and platform validation are in progress; this README does not
-claim a finished runtime acceptance until the accompanying verification record
-is complete.
+## Platform choices
+
+Android uses Expo UI's Compose top app bar and navigation bar. iOS uses the
+Expo UI SwiftUI top bar. The iOS bottom bar uses React Native tabs with Expo
+icons and explicit selected state, equal-width targets, and safe-area padding.
+The earlier SwiftUI bar compressed the labels on iPhone. Expo UI's SwiftUI
+TabView owns its tab pages, and Expo Router Native Tabs owns the routed screens. Adopting it would require moving the
+existing navigation and back behavior to a route tree, which is outside the
+reference app's current navigation scope.
+
+Standard screen actions use the Expo UI button adapter where it fits.
+The snapshot button remains for actions needing distinct visible and
+accessible labels or layout styles the adapter does not expose.
 
 ## Preview small UI changes
 
