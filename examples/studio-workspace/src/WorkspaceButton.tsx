@@ -56,11 +56,11 @@ export function WorkspaceButton({
   style,
   textStyle,
 }: WorkspaceButtonProps) {
+  const { mode, palette } = useTheme();
   if (accessibilityLabel && accessibilityLabel !== label) {
     return <ExistingButton {...{ label, onPress, variant, disabled, testID, accessibilityLabel, style, textStyle }} />;
   }
 
-  const { palette } = useTheme();
   const expoVariant = variant === 'primary' ? 'filled' : 'outlined';
   const baseStyle = toUniversalStyle(style) ?? {};
   const baseTextStyle = toUniversalTextStyle(textStyle) ?? {};
@@ -76,7 +76,7 @@ export function WorkspaceButton({
     : baseTextStyle;
 
   return (
-    <Host matchContents>
+    <Host colorScheme={mode} matchContents>
       <ExpoButton
         label={label}
         onPress={onPress}

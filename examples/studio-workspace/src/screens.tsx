@@ -873,6 +873,12 @@ export function NotesScreen({
   const { spacing, palette } = useTheme();
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const hasActiveFilters = projectFilter !== 'all' || tagFilter !== 'all';
+
+  const clearFilters = () => {
+    setProjectFilter('all');
+    setTagFilter('all');
+  };
 
   const filteredNotes = workspace.notes.filter((note) => {
     if (projectFilter === 'unassigned' && note.projectId !== null) return false;
@@ -915,6 +921,15 @@ export function NotesScreen({
                 { value: 'all', label: 'All Tags' },
                 ...workspace.tags.map((tag) => ({ value: tag.id, label: tag.title })),
               ]}
+            />
+          ) : null}
+
+          {hasActiveFilters ? (
+            <WorkspaceButton
+              label="Clear filters"
+              variant="secondary"
+              onPress={clearFilters}
+              testID="notes-clear-filters-btn"
             />
           ) : null}
         </Surface>

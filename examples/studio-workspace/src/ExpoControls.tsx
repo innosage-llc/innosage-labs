@@ -72,11 +72,12 @@ export interface ExpoPickerProps {
 }
 
 export function ExpoPicker({ label, value, options, onValueChange, testID }: ExpoPickerProps) {
+  const { mode } = useTheme();
   return (
     <View style={{ gap: 4 }}>
       <UiText variant="caption" style={{ fontWeight: '600' }}>{label}</UiText>
       <View testID={testID}>
-        <Host matchContents={{ vertical: true }} style={{ width: '100%' }}>
+        <Host colorScheme={mode} matchContents={{ vertical: true }} style={{ width: '100%' }}>
         <NativePicker
           selectedValue={value}
           onValueChange={(nextValue) => onValueChange(String(nextValue))}

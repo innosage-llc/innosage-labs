@@ -12,18 +12,19 @@ function BarIcon({ label, onPress, testID: id, source, enabled = true }: TopBarA
   source: ImageSourcePropType;
   enabled?: boolean;
 }) {
+  const { palette } = useTheme();
   return (
     <IconButton onClick={onPress} enabled={enabled} modifiers={[testID(id)]}>
-      <Icon source={source} contentDescription={label} />
+      <Icon source={source} contentDescription={label} tint={palette.text} />
     </IconButton>
   );
 }
 
 export function WorkspaceTopBar({ title, busy, primaryAction, onBack, onSearch, onSettings }: WorkspaceTopBarProps) {
-  const { palette } = useTheme();
+  const { mode, palette } = useTheme();
 
   return (
-    <Host matchContents={{ vertical: true }} style={{ width: '100%' }}>
+    <Host colorScheme={mode} matchContents={{ vertical: true }} style={{ width: '100%' }}>
       <TopAppBar
         key={onBack ? 'with-back' : 'root'}
         windowInsets={{}}
