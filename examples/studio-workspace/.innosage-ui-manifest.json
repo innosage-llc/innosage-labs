@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/innosage-llc/innosage-design",
+  "systemVersion": "0.1.0",
+  "designCommit": "99071ac12d4918cd817b6f66f735bffdf54534ec",
+  "releaseCommit": "969111505509b0d5e58d669dc8982e90613316f5",
+  "releaseSha256": "da82d2c2e3f62b0b8798bcb1d6318f2577d1721c5397f19dfbb7e262511e0174",
+  "registrySha256": "8f2a84bb8914eca0c12a07e9434869c5c0f44e58caaef321943ca0378aab2914",
+  "license": "MIT",
+  "dependencyVersions": {
+    "@expo/metro-runtime": "58.0.17",
+    "@expo/ui": "58.0.27",
+    "expo": "58.0.23",
+    "expo-status-bar": "58.0.4",
+    "expo-system-ui": "58.0.7",
+    "nativewind": "4.2.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "5.11.1",
+    "react-native-web": "0.21.4",
+    "react-native-worklets": "0.13.0"
+  },
+  "components": [
+    {
+      "id": "innosage/ui-text",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/surface",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/button",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/field",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/chip",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/segmented-control",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/list-row",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/empty-state",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/feedback",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/app-shell",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/confirm-dialog",
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "id": "innosage/theme-provider",
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    },
+    {
+      "id": "innosage/use-theme",
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    }
+  ],
+  "files": [
+    {
+      "canonicalPath": "ui-system/source/LICENSE",
+      "targetPath": "ui/LICENSE",
+      "sourceHash": "db4672ff5a0dd39b1ef38aa7b4ff99c0fc00d24ed719964fa30fd8c4f95c171e",
+      "localHash": "db4672ff5a0dd39b1ef38aa7b4ff99c0fc00d24ed719964fa30fd8c4f95c171e",
+      "localModifications": []
+    },
+    {
+      "canonicalPath": "ui-system/source/components.tsx",
+      "targetPath": "ui/components.tsx",
+      "sourceHash": "77a02d006dd13982a2b563a2b630a9edb8cf47fd7719bfd0915450212db680a7",
+      "localHash": "e3bfb5ace8d303f495eb55649f8f717a1566d65350d9b4f114413e75680f7cc7",
+      "localModifications": [
+        "AppShell accepts a header slot so the Android consumer can render the Expo UI TopAppBar."
+      ]
+    },
+    {
+      "canonicalPath": "ui-system/source/index.ts",
+      "targetPath": "ui/index.ts",
+      "sourceHash": "62ca2fc443b78112ed72e962cae2f878d8b7ca09ae786026df8b7b11e971904e",
+      "localHash": "62ca2fc443b78112ed72e962cae2f878d8b7ca09ae786026df8b7b11e971904e",
+      "localModifications": []
+    },
+    {
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    }
+  ]
+}
