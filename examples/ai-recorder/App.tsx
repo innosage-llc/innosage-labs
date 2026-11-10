@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -11,6 +11,8 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
+import { Host, Slider } from '@expo/ui/jetpack-compose';
+import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { Directory, File, Paths } from 'expo-file-system';
 
 const recordings = new Directory(Paths.document, 'recordings');
@@ -22,6 +24,11 @@ function listRecordings() {
     .sort((a, b) => b.name.localeCompare(a.name));
 }
 
+function formatTime(time: number) {
+  const seconds = Math.floor(time);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 function RecorderScreen() {
   const [files, setFiles] = useState(listRecordings);
   const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving'>('idle');
@@ -29,6 +36,9 @@ function RecorderScreen() {
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   const [playingFile, setPlayingFile] = useState<string>();
+  const [seekPosition, setSeekPosition] = useState<number>();
+  const pendingSeek = useRef<number>(undefined);
+  const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, async (status) => {
     if (!status.isFinished) return;
     try {
@@ -46,7 +56,7 @@ function RecorderScreen() {
     }
   });
   const { durationMillis } = useAudioRecorderState(recorder, 500);
-  const seconds = Math.floor(durationMillis / 1000);
+
 
   async function start() {
     setPhase('starting');
@@ -59,7 +69,7 @@ function RecorderScreen() {
       }
       await requestNotificationPermissionsAsync();
       player.pause();
-      await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true });
+      await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setPhase('recording');
@@ -79,14 +89,40 @@ function RecorderScreen() {
     }
   }
 
-  function play(file: File) {
-    if (playingFile === file.uri && playback.playing) {
-      player.pause();
-      return;
+  async function togglePlayback(file: File) {
+    try {
+      if (playingFile === file.uri) {
+        if (player.playing) {
+          player.pause();
+          return;
+        }
+        if (player.duration > 0 && player.currentTime >= player.duration) {
+          await player.seekTo(0);
+        }
+      } else {
+        player.pause();
+        pendingSeek.current = undefined;
+        setSeekPosition(undefined);
+        player.replace(file.uri);
+        setPlayingFile(file.uri);
+      }
+      player.play();
+    } catch {
+      setMessage('Could not play the recording.');
     }
-    player.replace(file.uri);
-    setPlayingFile(file.uri);
-    player.play();
+  }
+
+  async function finishSeek() {
+    const target = pendingSeek.current;
+    if (target === undefined) return;
+    pendingSeek.current = undefined;
+    try {
+      await player.seekTo(target);
+    } catch {
+      setMessage('Could not seek in the recording.');
+    } finally {
+      if (pendingSeek.current === undefined) setSeekPosition(undefined);
+    }
   }
 
   return (
@@ -94,7 +130,7 @@ function RecorderScreen() {
       <Text accessibilityRole="header" style={styles.title}>AI Recorder</Text>
       <Text style={styles.copy}>
         {phase === 'recording'
-          ? `Recording · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+          ? `Recording · ${formatTime(durationMillis / 1000)}`
           : 'Record and play audio saved on this device.'}
       </Text>
       <Button
@@ -108,17 +144,46 @@ function RecorderScreen() {
         data={files}
         keyExtractor={(file) => file.uri}
         ListEmptyComponent={<Text style={styles.copy}>No recordings yet.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.filename}>{new Date(Number(item.name.split('-')[1])).toLocaleString()} · M4A</Text>
-            <Button
-              title={playingFile === item.uri && playback.playing ? 'Pause' : 'Play'}
-              accessibilityLabel={`${playingFile === item.uri && playback.playing ? 'Pause' : 'Play'} recording from ${new Date(Number(item.name.split('-')[1])).toLocaleString()}`}
-              disabled={phase !== 'idle'}
-              onPress={() => play(item)}
-            />
-          </View>
-        )}
+        extraData={playback}
+        renderItem={({ item }) => {
+          const selected = playingFile === item.uri;
+          const action = selected && playback.playing ? 'Pause' : 'Play';
+          const date = new Date(Number(item.name.split('-')[1])).toLocaleString();
+          return (
+            <View style={styles.recording}>
+              <View style={styles.row}>
+                <Text style={styles.filename}>{date} · M4A</Text>
+                <Button
+                  title={action}
+                  accessibilityLabel={`${action} recording from ${date}`}
+                  disabled={phase !== 'idle'}
+                  onPress={() => togglePlayback(item)}
+                />
+              </View>
+              {selected && playback.isLoaded && playback.duration > 0 ? (
+                <>
+                  <Host matchContents={{ vertical: true }} style={styles.slider}>
+                    <Slider
+                      max={playback.duration}
+                      value={position}
+                      enabled={phase === 'idle'}
+                      modifiers={[fillMaxWidth(), semantics({ contentDescription: 'Playback position' })]}
+                      onValueChange={(value) => {
+                        pendingSeek.current = value;
+                        setSeekPosition(value);
+                      }}
+                      onValueChangeFinished={finishSeek}
+                    />
+                  </Host>
+                  <View style={styles.times}>
+                    <Text style={styles.filename}>{formatTime(position)}</Text>
+                    <Text style={styles.copy}>{formatTime(playback.duration)}</Text>
+                  </View>
+                </>
+              ) : null}
+            </View>
+          );
+        }}
       />
     </SafeAreaView>
   );
@@ -134,5 +199,8 @@ const styles = StyleSheet.create({
   heading: { fontSize: 19, fontWeight: '600', color: '#111827', marginTop: 12 },
   copy: { fontSize: 16, color: '#374151' },
   filename: { flex: 1, fontSize: 15, color: '#111827' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d1d5db' },
+  recording: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d1d5db' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  slider: { width: '100%' },
+  times: { flexDirection: 'row', justifyContent: 'space-between' },
 });
