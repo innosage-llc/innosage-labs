@@ -9,6 +9,7 @@ import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { useTheme } from './ui/theme';
 
+import { readableSpeakerTranscript } from './speakerTranscript';
 import { connectGateway, type Gateway } from './GatewayConnection';
 type SpeakerResult = { requested: boolean; status: string; transcript?: string };
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
@@ -64,7 +65,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       const speakers: SpeakerResult | undefined = speakerText ? JSON.parse(speakerText) : undefined;
       if (originalText !== undefined) {
         setJob({ state: 'COMPLETED', transcript: originalText, speakerLabeling: speakers });
-        setDraft(revisedText ?? speakers?.transcript ?? originalText);
+        setDraft(revisedText !== undefined && revisedText !== speakers?.transcript
+          ? revisedText : readableSpeakerTranscript(originalText, speakers?.transcript));
       }
       if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
         const config = await connectGateway();
@@ -103,7 +105,9 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       if (result.speakerLabeling) await saveText(speakerFile, JSON.stringify(result.speakerLabeling));
       // The original is the local completion marker. Keep it last so recovery can finish metadata writes.
       if (!original.exists) await saveText(original, result.transcript);
-      setDraft(revision.exists ? await revision.text() : result.speakerLabeling?.transcript ?? result.transcript);
+      const savedRevision = revision.exists ? await revision.text() : undefined;
+      setDraft(savedRevision !== undefined && savedRevision !== result.speakerLabeling?.transcript
+        ? savedRevision : readableSpeakerTranscript(result.transcript, result.speakerLabeling?.transcript));
     }
     setJob(result);
     return result;

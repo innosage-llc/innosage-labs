@@ -82,3 +82,9 @@ These labels distinguish voices within the recording. The plain original,
 speaker attribution and saved revision are retained independently on the phone.
 An attribution failure leaves the plain transcript available with a visible
 message. Speaker processing may take longer than plain transcription.
+
+Saved word-level speaker timelines are presented as readable same-speaker
+paragraphs using the original transcript's punctuation and spacing. Reopening
+an existing result applies the presentation fix without another transcription.
+Custom saved revisions remain editable as saved. If source words do not align,
+the existing attributed text is retained rather than guessing missing words.
