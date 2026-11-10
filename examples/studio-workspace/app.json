@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Studio Workspace",
+    "slug": "studio-workspace",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "co.innosage.studioworkspace"
+    },
+    "android": {
+      "allowBackup": false,
+      "package": "co.innosage.studioworkspace"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
