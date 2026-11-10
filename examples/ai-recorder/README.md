@@ -33,3 +33,32 @@ network. The recording service remained active while the emulator was asleep
 and while Settings was foregrounded. Stopping added a playable 19-second AAC
 M4A to the list immediately. Playback started after a cold relaunch. Physical
 phone acceptance and spoken-marker continuity remain separate checks.
+
+## Transcription milestone
+
+The Transcript action connects to a privately deployed AI Recorder Gateway.
+Enter its HTTPS origin and a provisioned pilot access token once. The app keeps
+that credential in Expo SecureStore. Use a separate random pilot token for each
+private workspace. It authorizes access to that workspace's saved transcripts.
+
+The gateway uses FastAPI with one worker, SQLite, and the Speech Router's
+Recorder-specific Free Guest profile. Set these private environment variables on
+the host:
+
+- RECORDER_PILOT_TOKEN, a random string of at least 32 characters.
+- RECORDER_DB, the path to a private SQLite database.
+- RECORDER_ROUTER_URL, the staging Router HTTPS origin or a loopback forward.
+- RECORDER_ROUTER_TOKEN, the Router service credential.
+
+Install server/requirements.txt into a virtual environment, then run
+`uvicorn gateway:app --app-dir server --host 127.0.0.1 --port 8785 --workers 1 --no-access-log`
+behind your private authenticated HTTPS ingress.
+
+The gateway buffers one bounded upload before passing it to the Router. The
+Router owns size, decoded duration and job admission. Repeated submissions for
+the same operation recover the same Router session. The gateway commits the
+original transcript before acknowledging completion and upstream cleanup.
+Original and edited transcripts are also retained separately on the phone.
+
+The pilot gateway is one private workspace per deployment. It stores the original
+transcript on the server and the original plus current revision on the phone.

@@ -3,13 +3,22 @@
     "name": "AI Recorder",
     "slug": "ai-recorder",
     "version": "0.1.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "co.innosage.labs.airecorder",
       "allowBackup": false
     },
     "plugins": [
-      ["expo-audio", { "enableBackgroundRecording": true, "enableBackgroundPlayback": false }]
+      [
+        "expo-audio",
+        {
+          "enableBackgroundRecording": true,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-secure-store"
     ]
   }
 }
