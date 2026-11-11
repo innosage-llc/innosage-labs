@@ -1,6 +1,6 @@
 node_modules/
 .expo/
-android/
+/android/
 __pycache__/
 .venv/
 *.sqlite3*

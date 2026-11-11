@@ -14,6 +14,7 @@ import {
 import { Host, Slider } from '@expo/ui/jetpack-compose';
 import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { Transcript } from './Transcript';
+import { ProSettings } from './ProSettings';
 import { ThemeProvider } from './ui/theme';
 import { Directory, File, Paths } from 'expo-file-system';
 
@@ -32,6 +33,7 @@ function formatTime(time: number) {
 }
 
 function RecorderScreen() {
+  const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
   const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving'>('idle');
   const [message, setMessage] = useState('');
@@ -141,6 +143,8 @@ function RecorderScreen() {
         disabled={phase === 'starting' || phase === 'saving'}
         onPress={phase === 'recording' ? stop : start}
       />
+      <Button title="InnoSage Pro" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+      {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
       <Text accessibilityRole="header" style={styles.heading}>Recordings</Text>
       {transcriptRecording ? <Transcript recording={transcriptRecording} onClose={() => setTranscriptRecording(undefined)} /> : null}

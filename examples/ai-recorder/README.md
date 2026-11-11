@@ -88,3 +88,34 @@ paragraphs using the original transcript's punctuation and spacing. Reopening
 an existing result applies the presentation fix without another transcription.
 Custom saved revisions remain editable as saved. If source words do not align,
 the existing attributed text is retained rather than guessing missing words.
+
+## InnoSage Pro access
+
+Open **InnoSage Pro**, enter the API key for the build's environment, then choose
+**Verify and save key**. Validation uses Draft's maintained paid transcription
+identity endpoint and canonical Gateway entitlement. The masked field clears
+after saving. The retained key is encrypted in Expo SecureStore and can be
+removed from this screen. New premium operations require canonical authorization.
+
+With verified Pro access, new recording transcriptions default to Pro. The user
+can explicitly choose Free before starting. A submitted operation retains its
+account, environment, speaker mode and source size through recovery. Existing
+Free recordings continue through their original Gateway connection.
+
+The Android build needs `EXPO_PUBLIC_PRO_WORKER_URL` and
+`EXPO_PUBLIC_PRO_ROUTER_URL`, both fixed HTTPS origins for the same environment.
+A staging key is required for staging. Worker receives the personal key and
+returns scoped Router capabilities. The phone sends only the scoped upload or
+control capability to Router. API keys remain on-device and in the canonical
+authorization request.
+
+Paid transcription follows the existing four-hour decoded-duration policy.
+This sample enforces the effective512MiB source limit. Router's larger source
+advertisement is tracked separately in Infra #205. Audio hashing reads1MiB at a
+time; the Android Expo module uploads the app-private file in64KiB chunks using
+fixed-length HTTPS, redirect refusal and cancellation. Originals and attributed
+text are saved before remote cleanup. Retained capabilities allow same-operation
+cleanup recovery. This Android milestone's real Pro and long-audio acceptance is
+recorded separately from deterministic protocol tests.
+
+Run `npm run test:transcript` and `npm run typecheck` for local protocol checks.
