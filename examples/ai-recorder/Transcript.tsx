@@ -1,3 +1,4 @@
+import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { Host, Switch } from '@expo/ui/jetpack-compose';
@@ -54,6 +55,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [draft, setDraft] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
+  const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
   const speakerFile = new File(recording.parentDirectory, recording.name + '.speakers.json');
   const operationKey = 'transcription.' + recording.name;
@@ -291,6 +293,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
               <Button title={showOriginal ? 'Show revision' : 'Show original'} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal ? <Button title="Save revision" disabled={busy} onPress={save} /> : null}
+              <TranscriptSummary original={original} revision={revision} output={summaryFile} save={saveText} />
             </>
           ) : isOpenAI ? (
             <>
