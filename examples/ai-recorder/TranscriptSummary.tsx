@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Linking, Switch, Text, TextInput, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
-import { File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
+import * as SecureStore from 'expo-secure-store';
 import { meetingEssentials, thinkingBudgets, type ThinkingEffort, type SummaryCitation } from './OpenAIClient';
 import { openAIAccess } from './OpenAIAccess';
 import { useTheme } from './ui/theme';
@@ -22,7 +23,7 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
   const [effort, setEffort] = useState<ThinkingEffort>('medium');
   const [instructions, setInstructions] = useState('');
   const [webSearch, setWebSearch] = useState(false);
-  const recipeFile = new File(Paths.document, 'custom-summary-recipe.json');
+  const customLoaded = useRef(false);
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState('');
   const [choosing, setChoosing] = useState(false);
@@ -91,10 +92,14 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
         <Button title={recipe === meetingEssentials.id ? '✓ Meeting Essentials' : 'Meeting Essentials'} disabled={busy || recipe === meetingEssentials.id} onPress={() => setRecipe(meetingEssentials.id)} />
         <Button title={recipe === 'custom' ? '✓ Custom recipe' : 'Custom recipe'} disabled={busy || recipe === 'custom'} onPress={() => {
           setRecipe('custom');
-          if (recipeFile.exists) void run(async () => {
-            const saved = JSON.parse(await recipeFile.text());
-            if (typeof saved.instructions === 'string') setInstructions(saved.instructions);
-            setWebSearch(saved.webSearch === true);
+          if (!customLoaded.current) void run(async () => {
+            const value = await SecureStore.getItemAsync('recorder.custom-summary-recipe');
+            if (value) {
+              const saved = JSON.parse(value);
+              if (typeof saved.instructions === 'string') setInstructions(saved.instructions);
+              setWebSearch(saved.webSearch === true);
+            }
+            customLoaded.current = true;
           });
         }} />
         {recipe === 'custom' ? <>
@@ -107,7 +112,8 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
           </View>
           <Button title="Save custom recipe" disabled={busy || !instructions.trim()}
             onPress={() => void run(async () => {
-              await save(recipeFile, JSON.stringify({ instructions: instructions.trim(), webSearch }));
+              await SecureStore.setItemAsync('recorder.custom-summary-recipe', JSON.stringify({ instructions: instructions.trim(), webSearch }));
+              customLoaded.current = true;
               setMessage('Custom recipe saved on this device.');
             })} />
         </> : null}
@@ -131,7 +137,8 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
         )) : null}
         {revision.exists ? <Button title={source === 'original' ? 'Source: Original · Switch to saved revision' : 'Source: Saved revision · Switch to original'}
           disabled={busy} onPress={() => setSource(source === 'original' ? 'revision' : 'original')} /> : null}
-        <Text style={{ color: palette.muted }}>Generate sends the selected transcript text to OpenAI.</Text>
+        <Text style={{ color: palette.muted }}>Generate sends the selected transcript text to OpenAI.
+          {recipe === 'custom' && webSearch ? ' OpenAI may use details from the text to form web queries.' : ''}</Text>
         <Button title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'}
           disabled={busy || (!unsaved && (!recipe || !model || (recipe === 'custom' && !instructions.trim())))} onPress={() => void run(async signal => {
             if (unsaved) { await persist(unsaved); return; }
@@ -167,7 +174,10 @@ function CitedSummary({ summary }: { summary: Summary }) {
     .sort((a, b) => a.end - b.end);
   let start = 0;
   const parts = citations.map((citation, index) => {
-    const fragment = characters.slice(start, citation.end).join('');
+    const span = citation.start !== undefined && citation.start >= start && citation.start < citation.end
+      ? characters.slice(citation.start, citation.end).join('') : '';
+    const existingLink = /^(?:\[[^\]]+\]\(https?:\/\/.+\)|https?:\/\/\S+)$/i.test(span.trim());
+    const fragment = characters.slice(start, existingLink ? citation.start : citation.end).join('');
     start = citation.end;
     return <Text key={index}>{fragment}<Text accessibilityRole="link" accessibilityLabel={citation.title}
       style={{ textDecorationLine: 'underline', color: palette.text }}

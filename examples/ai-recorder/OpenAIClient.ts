@@ -86,7 +86,7 @@ export const thinkingBudgets = [
 ] as const;
 export type ThinkingEffort = (typeof thinkingBudgets)[number]['effort'];
 export type SummaryOptions = { effort: ThinkingEffort; instructions?: string; webSearch?: boolean };
-export type SummaryCitation = { end: number; url: string; title: string };
+export type SummaryCitation = { start?: number; end: number; url: string; title: string };
 
 export async function listSummaryModels(http: Http, key: string, signal: AbortSignal): Promise<string[]> {
   const response = await request(http, '/models', key, {
@@ -133,7 +133,10 @@ export async function summarizeOpenAI(http: Http, key: string, selectedModel: st
       if (annotation?.type === 'url_citation' && typeof annotation.url === 'string' &&
           /^https?:\/\//i.test(annotation.url) && Number.isInteger(annotation.end_index) &&
           annotation.end_index > 0 && annotation.end_index <= size) {
-        citations.push({ end: length + annotation.end_index, url: annotation.url,
+        const start = annotation.start_index;
+        citations.push({
+          ...(Number.isInteger(start) && start >= 0 && start < annotation.end_index ? { start: length + start } : {}),
+          end: length + annotation.end_index, url: annotation.url,
           title: typeof annotation.title === 'string' ? annotation.title : annotation.url });
       }
     }
