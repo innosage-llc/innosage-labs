@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/innosage-llc/innosage-design",
+  "systemVersion": "0.1.0",
+  "designCommit": "99071ac12d4918cd817b6f66f735bffdf54534ec",
+  "releaseCommit": "969111505509b0d5e58d669dc8982e90613316f5",
+  "releaseSha256": "da82d2c2e3f62b0b8798bcb1d6318f2577d1721c5397f19dfbb7e262511e0174",
+  "registrySha256": "8f2a84bb8914eca0c12a07e9434869c5c0f44e58caaef321943ca0378aab2914",
+  "license": "MIT",
+  "dependencyVersions": {
+    "@expo/ui": "58.0.27",
+    "expo": "58.0.23",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.11.1"
+  },
+  "components": [
+    {
+      "id": "innosage/theme-provider",
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    },
+    {
+      "id": "innosage/use-theme",
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    }
+  ],
+  "files": [
+    {
+      "canonicalPath": "ui-system/source/LICENSE",
+      "targetPath": "ui/LICENSE",
+      "sourceHash": "db4672ff5a0dd39b1ef38aa7b4ff99c0fc00d24ed719964fa30fd8c4f95c171e",
+      "localHash": "db4672ff5a0dd39b1ef38aa7b4ff99c0fc00d24ed719964fa30fd8c4f95c171e",
+      "localModifications": []
+    },
+    {
+      "canonicalPath": "ui-system/source/theme.tsx",
+      "targetPath": "ui/theme.tsx",
+      "sourceHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localHash": "2c5d4d6b38d758eeab495de59020b46514767f30858feea97b2c50bbdc4a9337",
+      "localModifications": []
+    }
+  ]
+}
