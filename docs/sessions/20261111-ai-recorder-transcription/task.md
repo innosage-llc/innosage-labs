@@ -31,3 +31,13 @@ Read-only diagnosis matched the phone's current attributed text by its hash to t
 Based on accepted c4d5fab. Added environment-bound SecureStore key configuration and canonical Draft paid identity/reserve reuse. Native direct upload uses a small Android Expo file-streaming module because installed Expo fetch buffers Blob and ReadableStream bodies. The upload bridge uses64KiB chunks, fixed length, standard TLS, redirect refusal, cancellation and app-private file scope. Source hashing uses1MiB reads. Original and speaker metadata persist before cleanup.
 
 Read-only Sol review identified five blockers; repairs isolate sessions per operation, remove an implicit paid default from Free restart, expose immutable operation expiry, recover cleanup with same-account authorization, and replace buffered fetch upload. Ten protocol/paragraph checks, TypeScript and a128MiB hash cross-check pass. Positive Pro and four-hour native acceptance remain NOT RUN, awaiting founder staging-key entry. Existing five moderate dependency advisories are retained; no new backend or production service operation occurred.
+
+
+## Pro v0.1.4 ready for founder staging verification
+
+- PR #39: https://github.com/innosage-llc/innosage-labs/pull/39, source 3d21f08, stacked on accepted baseline PR #37.
+- PASS: 11 deterministic protocol/paragraph tests, TypeScript, bounded 128 MiB hash cross-check, independent Sol HIGH source review, native Android release build, emulator masked key entry and live staging invalid-key rejection (synthetic invalid input only; no inference).
+- APK v0.1.4/versionCode 5 SHA-256: 715dce3c78c911b8c7d742ff284de52d4f37b6bd4ea06ec8d864a65d3945a934.
+- PASS: in-place installation and launch on Samsung RFCY310NA7M; package manager confirms v0.1.4/versionCode 5. Native Pro settings is open for founder key entry. Existing app data preserved.
+- NOT RUN: real paid key positive authorization, real paid audio upload/inference, four-hour device qualification. Founder will enter the staging key only on the phone. Agent must not retrieve it.
+- Production deployment remains NOT AUTHORIZED. Issue #38 stays open pending founder acceptance.
