@@ -47,7 +47,7 @@ test('summary model selection uses the project list and excludes audio and embed
     assert.equal(init.method, 'GET');
     return Response.json({ data: ['gpt-5.6-luna', 'gpt-transcribe', 'gpt-6.1-sol', 'text-embedding-3-small', 'gpt-5.6-luna', 'gpt-4.1-mini'].map(id => ({ id })) });
   }, 'sk-proj-synthetic-key', new AbortController().signal);
-  assert.deepEqual(models, ['gpt-4.1-mini', 'gpt-5.6-luna', 'gpt-6.1-sol']);
+  assert.deepEqual(models, ['gpt-5.6-luna', 'gpt-6.1-sol']);
 });
 
 test('summary sends the exact selected model and text, and extracts assistant output', async () => {
@@ -55,14 +55,17 @@ test('summary sends the exact selected model and text, and extracts assistant ou
     assert.equal(url, 'https://api.openai.com/v1/responses');
     assert.equal(init.headers['Content-Type'], 'application/json');
     const body = JSON.parse(init.body);
-    assert.equal(body.model, 'gpt-4.1-mini');
+    assert.equal(body.model, 'gpt-5.6-luna');
+    assert.deepEqual(body.reasoning, { effort: 'xhigh' });
+    assert.deepEqual(body.tools, [{ type: 'web_search' }]);
+    assert.equal(body.tool_choice, 'required');
     assert.equal(body.input, 'Kim agreed to ship Tuesday.');
     assert.equal(body.store, false);
-    assert.match(body.instructions, /Action items/);
+    assert.match(body.instructions, /Fact check/);
     return Response.json({ status: 'completed', output: [
       { type: 'reasoning' },
-      { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Kim will ship Tuesday.' }] },
+      { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Kim will ship Tuesday.', annotations: [{ type: 'url_citation', end_index: 4, url: 'https://example.com/source', title: 'Source' }] }] },
     ] });
-  }, 'sk-proj-synthetic-key', 'gpt-4.1-mini', 'Kim agreed to ship Tuesday.', new AbortController().signal);
-  assert.equal(result, 'Kim will ship Tuesday.');
+  }, 'sk-proj-synthetic-key', 'gpt-5.6-luna', 'Kim agreed to ship Tuesday.', { effort: 'xhigh', instructions: 'Fact check', webSearch: true }, new AbortController().signal);
+  assert.deepEqual(result, { text: 'Kim will ship Tuesday.', citations: [{ end: 4, url: 'https://example.com/source', title: 'Source' }] });
 });
