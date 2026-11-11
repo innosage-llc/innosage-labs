@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Modal, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, TextInput, useNativeState } from "@expo/ui";
 import { Host, RadioButton } from "@expo/ui/jetpack-compose";
@@ -7,6 +7,7 @@ import { clientForService, selectedService, selectService } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
 import { semantics } from "@expo/ui/jetpack-compose/modifiers";
+import { AppHeader } from "./ui/AppChrome";
 import { useTheme } from "./ui/theme";
 
 function accessFor(id: ServiceId) {
@@ -85,16 +86,12 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
       }}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+        <AppHeader title="Transcription service" onBack={onClose} backLabel="Back to settings" backDisabled={busy} />
+        <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
         >
-          <Text
-            accessibilityRole="header"
-            style={[typography.heading, { color: palette.text }]}
-          >
-            Transcription service
-          </Text>
           <Text style={{ color: palette.muted }}>Choose the service for new transcriptions.</Text>
           {(['production', 'staging', 'openai'] as const).map(id => (
             <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -160,15 +157,9 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               {message}
             </Text>
           ) : null}
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
-            <Button
-              label="Back to recordings"
-              variant="text"
-              disabled={busy}
-              onPress={onClose}
-            />
-          </Host>
+
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );

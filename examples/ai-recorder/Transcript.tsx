@@ -1,6 +1,6 @@
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { Host, Switch } from '@expo/ui/jetpack-compose';
 import { semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
+import { AppHeader } from './ui/AppChrome';
+import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
@@ -32,7 +34,7 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-export function Transcript({ recording, onClose }: { recording: File; onClose: () => void }) {
+export function Transcript({ recording, recordingTitle, onClose }: { recording: File; recordingTitle: string; onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
   const [gateway, setGateway] = useState<Gateway>();
@@ -54,6 +56,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [busy, setBusy] = useState(false);
   const [summaryLocked, setSummaryLocked] = useState(false);
   const [draft, setDraft] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
@@ -263,6 +266,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     setBusy(true);
     try {
       await saveText(revision, draft);
+      setDirty(false);
       setMessage('Revision saved on this device.');
     } catch {
       setMessage('Could not save the revision.');
@@ -271,13 +275,27 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     }
   }
 
+  const canGoBack = canLeaveTranscript(busy, summaryLocked, !!unsavedOpenAI);
+  function requestClose() {
+    if (!canGoBack) return;
+    if (dirty) {
+      Alert.alert('Discard unsaved revision?', 'Your saved transcript will not change.', [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ]);
+    } else onClose();
+  }
+
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
-    <Modal onRequestClose={() => { if (!summaryLocked && (!isOpenAI || !busy)) onClose(); }}>
+    <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+        <AppHeader title="Transcript" onBack={requestClose} backLabel="Back to library" backDisabled={!canGoBack} />
+        <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-          <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Transcript</Text>
+          <Text style={{ color: palette.text }}>{recordingTitle}</Text>
+          {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
           <Text style={{ color: palette.muted }}>{services[service].label}</Text>
           {!complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
@@ -289,10 +307,10 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
                   ? 'Speakers identified. Labels distinguish voices, not people’s names.'
                   : 'Speaker identification could not be completed. The transcript is available.'}
               </Text> : null}
-              <TextInput accessibilityLabel="Transcript text" multiline editable={!showOriginal}
-                value={showOriginal ? job?.transcript : draft} onChangeText={setDraft}
+              <TextInput accessibilityLabel="Transcript text" multiline editable={canEditTranscript(showOriginal, busy)}
+                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
-              <Button title={showOriginal ? 'Show revision' : 'Show original'} onPress={() => setShowOriginal(!showOriginal)} />
+              <Button title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal ? <Button title="Save revision" disabled={busy} onPress={save} /> : null}
               <TranscriptSummary original={original} revision={revision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
             </>
@@ -340,8 +358,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
               <Button title={connecting ? "Connecting…" : "Connect"} disabled={connecting} onPress={connect} />
             </View>
           )}
-          <Button title="Back to recordings" onPress={onClose} disabled={busy || summaryLocked} />
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
