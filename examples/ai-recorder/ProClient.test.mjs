@@ -54,6 +54,8 @@ function fixture() {
 
 test('canonical validation retains a saved key when a candidate is rejected', async () => {
   const f = fixture();
+  await assert.rejects(f.client.configure('sk-proj-synthetic-key'), /Choose OpenAI/);
+  assert.equal(f.calls.length, 0);
   await f.client.configure('synthetic-pro-key');
   f.state.authorized = false;
   await assert.rejects(f.client.configure('synthetic-pro-key'));

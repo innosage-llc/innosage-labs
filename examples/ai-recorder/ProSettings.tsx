@@ -4,15 +4,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, TextInput, useNativeState } from "@expo/ui";
 import { Host, RadioButton } from "@expo/ui/jetpack-compose";
 import { clientForService, selectedService, selectService } from "./ProAccess";
+import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
 import { semantics } from "@expo/ui/jetpack-compose/modifiers";
 import { useTheme } from "./ui/theme";
+
+function accessFor(id: ServiceId) {
+  return id === 'openai' ? openAIAccess : clientForService(id);
+}
 
 export function ProSettings({ onClose }: { onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
   const key = useNativeState("");
   const [service, setService] = useState<ServiceId>("staging");
-  const proClient = clientForService(service);
+  const access = accessFor(service);
+  const isOpenAI = service === "openai";
   const [hasKey, setHasKey] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -20,7 +26,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let active = true;
     void selectedService().then(async id => {
-      const profile = await clientForService(id).profile();
+      const profile = await accessFor(id).profile();
       if (active) { setService(id); setConfigured(!!profile); }
     }).catch(() => { if (active) setMessage("Could not read the transcription settings."); })
       .finally(() => { if (active) setBusy(false); });
@@ -32,7 +38,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     key.set("");
     setHasKey(false);
     try {
-      const profile = await clientForService(id).profile();
+      const profile = await accessFor(id).profile();
       await selectService(id);
       setService(id);
       setConfigured(!!profile);
@@ -45,16 +51,16 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setMessage("");
     try {
-      await proClient!.configure(key.get());
+      await access.configure(key.get());
       key.set("");
       setHasKey(false);
       setConfigured(true);
-      setMessage("Pro transcription access verified.");
+      setMessage(isOpenAI ? "OpenAI model access verified. Your first transcription checks quota and billing." : "Pro transcription access verified.");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Could not validate Pro access.",
+          : "Could not validate transcription access.",
       );
     } finally {
       setBusy(false);
@@ -63,9 +69,9 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   async function remove() {
     setBusy(true);
     try {
-      await proClient!.remove();
+      await access.remove();
       setConfigured(false);
-      setMessage("Pro key removed from this device.");
+      setMessage("Key removed from this device.");
     } catch {
       setMessage("Could not remove the saved key.");
     } finally {
@@ -90,7 +96,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
             Transcription service
           </Text>
           <Text style={{ color: palette.muted }}>Choose the service for new transcriptions.</Text>
-          {(['production', 'staging'] as const).map(id => (
+          {(['production', 'staging', 'openai'] as const).map(id => (
             <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
               <Host matchContents style={{ minWidth: 48 }}>
                 <RadioButton selected={service === id} enabled={!busy} onClick={() => void changeService(id)}
@@ -99,27 +105,21 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               <Text onPress={busy ? undefined : () => void changeService(id)} style={{ color: palette.text }}>{services[id].label}</Text>
             </View>
           ))}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Host matchContents style={{ minWidth: 48 }}><RadioButton selected={false} enabled={false}
-              modifiers={[semantics({ contentDescription: 'OpenAI audio transcription, coming soon' })]} /></Host>
-            <Text style={{ color: palette.muted }}>OpenAI audio · Coming soon</Text>
-          </View>
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services[service].label}</Text>
           <Text style={{ color: palette.muted }}>
-            {service === 'production' ? 'Requires a production Pro key. Free transcription is currently available only on staging.' : 'Use a staging Pro key, or transcribe with Free access.'}
+            {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.' : service === 'production' ? 'Requires a production Pro key. Free transcription is currently available only on staging.' : 'Use a staging Pro key, or transcribe with Free access.'}
             {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
           </Text>
           <Text style={{ color: palette.text }}>
-            {configured ? "Pro key saved" : "No Pro key saved for this service"}
+            {configured ? "Key saved" : "No key saved for this service"}
           </Text>
           <Text style={{ color: palette.text }}>
-            Pro transcription supports recordings up to 4 hours and 512 MiB.
-            Access is verified when you submit a new job.
+            {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}
           </Text>
           <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
             <TextInput
-              accessibilityLabel={`${service} InnoSage Pro API key`}
-              placeholder={`${service === "production" ? "Production" : "Staging"} Pro API key`}
+              accessibilityLabel={isOpenAI ? "OpenAI API key" : `${service} InnoSage Pro API key`}
+              placeholder={isOpenAI ? "OpenAI API key" : `${service === "production" ? "Production" : "Staging"} Pro API key`}
               value={key}
               onChangeText={(text) => setHasKey(!!text.trim())}
               secureTextEntry
@@ -138,14 +138,14 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
             <Button
               label={busy ? "Checking…" : "Verify and save key"}
-              disabled={busy || !hasKey || !proClient}
+              disabled={busy || !hasKey}
               onPress={save}
             />
           </Host>
           {configured ? (
             <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
               <Button
-                label="Remove Pro key"
+                label="Remove key"
                 variant="outlined"
                 disabled={busy}
                 onPress={remove}

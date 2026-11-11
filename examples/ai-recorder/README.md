@@ -112,9 +112,13 @@ The Recorder Free gateway is staging-only; production requires a production Pro
 key and never silently falls back to staging. New staging jobs can choose Free.
 Existing Free jobs retain their legacy Gateway connection and recovery identity.
 
-**OpenAI audio · Coming soon** is intentionally disabled. This increment does
-not collect an OpenAI key or make OpenAI calls. Implementation, entitlement,
-format adaptation and provider-specific behavior remain a later milestone.
+For the personal Android OpenAI pilot, choose **OpenAI** in **Transcription
+service**, then verify and save your OpenAI Platform project key. The project
+needs access to GPT-Transcribe and sufficient API quota. The key is stored
+in device SecureStore. Recorder sends a new M4A under 25 MB directly to OpenAI
+over HTTPS. The first transcription verifies actual access and uses your
+project quota. The result and any revisions are stored locally. Reopen the
+recording to read or manually play the original audio.
 
 Paid transcription follows the existing four-hour decoded-duration policy.
 This sample enforces the effective512MiB source limit. Router's larger source

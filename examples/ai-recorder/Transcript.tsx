@@ -10,6 +10,8 @@ import * as SecureStore from 'expo-secure-store';
 import { useTheme } from './ui/theme';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
+import { openAIAccess } from './OpenAIAccess';
+import { openAIMaxBytes } from './OpenAIClient';
 import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
@@ -38,7 +40,10 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [operation, setOperation] = useState<string>();
   const [paidOperation, setPaidOperation] = useState<ProOperation>();
   const [service, setService] = useState<ServiceId>('staging');
-  const proClient = clientForService(service);
+  const isOpenAI = service === 'openai';
+  const proClient = isOpenAI ? undefined : clientForService(service);
+  const [unsavedOpenAI, setUnsavedOpenAI] = useState<string>();
+  const [openAIConfigured, setOpenAIConfigured] = useState(false);
   const [usePro, setUsePro] = useState(false);
   const [proAvailable, setProAvailable] = useState(false);
   const submission = useRef<AbortController | null>(null);
@@ -65,10 +70,10 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation ? (savedOperation.startsWith('{') ? JSON.parse(savedOperation)
         : { id: savedOperation, identifySpeakers: false }) : undefined;
-      const restoredService = saved ? (saved.lane === 'pro' ? serviceForWorker(saved.workerURL) : 'staging')
+      const restoredService = saved ? (saved.lane === 'openai' ? 'openai' : saved.lane === 'pro' ? serviceForWorker(saved.workerURL) : 'staging')
         : await selectedService();
       const paid: ProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
-      const profile = await clientForService(restoredService).profile();
+      const profile = restoredService === 'openai' ? undefined : await clientForService(restoredService).profile();
       if (!active) return;
       if (saved) {
         setIdentifySpeakers(saved.identifySpeakers);
@@ -84,6 +89,11 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         setDraft(revisedText !== undefined && revisedText !== speakers?.transcript
           ? revisedText : readableSpeakerTranscript(originalText, speakers?.transcript));
         if (paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
+        return;
+      }
+      if (restoredService === 'openai') {
+        const configured = await openAIAccess.profile();
+        if (active) setOpenAIConfigured(configured);
         return;
       }
       if (restoredService === 'production' || paid || (!savedOperation && profile)) return;
@@ -129,6 +139,14 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         : 'Could not reach or complete the transcription. Check the connection and retry.');
       result = await response.json();
     }
+    await persistResult(result);
+    if (paid && result.state === 'COMPLETED') {
+      await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
+    }
+    return result;
+  }
+
+  async function persistResult(result: Job) {
     if (result.state === 'COMPLETED' && result.transcript) {
       if (result.speakerLabeling) await saveText(speakerFile, JSON.stringify(result.speakerLabeling));
       // The original is the local completion marker. Keep it last so recovery can finish metadata writes.
@@ -138,10 +156,6 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         ? savedRevision : readableSpeakerTranscript(result.transcript, result.speakerLabeling?.transcript));
     }
     setJob(result);
-    if (paid && result.state === 'COMPLETED') {
-      await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
-    }
-    return result;
   }
 
   const complete = job?.state === 'COMPLETED';
@@ -187,12 +201,29 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   }
 
   async function submit() {
-    if ((!gateway && !usePro) || busy) return;
+    if (connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
     try {
+      if (isOpenAI) {
+        if (recording.size <= 0 || recording.size >= openAIMaxBytes) {
+          throw new Error('Choose a non-empty M4A recording smaller than 25 MB.');
+        }
+        const id = operation ?? randomUUID();
+        await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
+        setOperation(id);
+        const transcript = unsavedOpenAI ?? await openAIAccess.transcribe(recording, controller.signal);
+        setUnsavedOpenAI(transcript);
+        try {
+          await persistResult({ state: 'COMPLETED', transcript });
+        } catch {
+          throw new Error('Transcription is ready. Retry saving before closing this screen.');
+        }
+        setUnsavedOpenAI(undefined);
+        return;
+      }
       const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
       let paid = terminal ? undefined : paidOperation;
       if ((!operation || terminal) && usePro) {
@@ -240,7 +271,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
-    <Modal onRequestClose={onClose}>
+    <Modal onRequestClose={() => { if (!isOpenAI || !busy) onClose(); }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Transcript</Text>
@@ -249,7 +280,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {complete ? (
             <>
-              <Text style={{ color: palette.muted }}>Edge Speech · {showOriginal ? 'Original' : 'Editable revision'}</Text>
+              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Original' : 'Editable revision'}</Text>
               {job?.speakerLabeling?.requested ? <Text style={{ color: palette.muted }}>
                 {job.speakerLabeling.status === 'completed'
                   ? 'Speakers identified. Labels distinguish voices, not people’s names.'
@@ -260,6 +291,15 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
               <Button title={showOriginal ? 'Show revision' : 'Show original'} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal ? <Button title="Save revision" disabled={busy} onPress={save} /> : null}
+            </>
+          ) : isOpenAI ? (
+            <>
+              <Text style={{ color: palette.text }}>OpenAI · M4A under 25 MB</Text>
+              {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
+                <Button title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} onPress={submit} />
+              ) : (
+                <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
+              )}
             </>
           ) : gateway || usePro ? (
             <>

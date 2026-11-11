@@ -1,6 +1,8 @@
-export type ServiceId = 'staging' | 'production';
+export type InnoSageServiceId = 'staging' | 'production';
+export type ServiceId = InnoSageServiceId | 'openai';
 export const SERVICE_KEY = 'recorder.transcription.service';
 export const services = {
+  openai: { label: 'OpenAI' },
   staging: {
     label: 'InnoSage · Staging',
     workerURL: 'https://api-staging.draft.innosage.co',
@@ -14,10 +16,10 @@ export const services = {
 } as const;
 export function serviceId(value: string | null): ServiceId {
   if (value === null) return 'staging'; // Preserve the existing APK's default.
-  if (value === 'staging' || value === 'production') return value;
+  if (value === 'staging' || value === 'production' || value === 'openai') return value;
   throw new Error('Unknown transcription service. Choose a service in Settings.');
 }
-export function serviceForWorker(workerURL: string): ServiceId {
+export function serviceForWorker(workerURL: string): InnoSageServiceId {
   for (const id of ['staging', 'production'] as const) {
     if (services[id].workerURL === workerURL) return id;
   }
