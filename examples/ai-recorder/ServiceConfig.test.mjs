@@ -6,7 +6,8 @@ import { ProClient } from './ProClient.ts';
 test('new-job default preserves staging; saved jobs resolve their own environment', () => {
   assert.equal(serviceId(null), 'staging');
   assert.equal(serviceId('production'), 'production');
-  assert.throws(() => serviceId('openai'));
+  assert.equal(serviceId('openai'), 'openai');
+  assert.throws(() => serviceId('unknown'));
   assert.equal(serviceForWorker(services.staging.workerURL), 'staging');
   assert.equal(serviceForWorker(services.production.workerURL), 'production');
   assert.throws(() => serviceForWorker('https://untrusted.test'));
@@ -18,7 +19,7 @@ test('service profiles remain isolated through save, wrong-environment validatio
     setItemAsync: async (key, value) => { values.set(key, value); },
     deleteItemAsync: async key => { values.delete(key); } };
   const calls = [];
-  const clients = Object.fromEntries(Object.entries(services).map(([id, config]) => [id,
+  const clients = Object.fromEntries(Object.entries({ staging: services.staging, production: services.production }).map(([id, config]) => [id,
     new ProClient(config.workerURL, config.routerURL, async (url, init) => {
       calls.push({ id, url });
       assert.equal(url, config.workerURL + '/api/transcriptions/identity');

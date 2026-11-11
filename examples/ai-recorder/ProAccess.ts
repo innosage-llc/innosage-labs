@@ -4,10 +4,10 @@ import { File, FileMode } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProClient } from "./ProClient";
 import { uploadRecording } from "./NativeUpload";
-import { services, serviceForWorker, SERVICE_KEY, serviceId, type ServiceId } from "./ServiceConfig";
+import { services, serviceForWorker, SERVICE_KEY, serviceId, type ServiceId, type InnoSageServiceId } from "./ServiceConfig";
 
-const clients = new Map<ServiceId, ProClient>();
-export function clientForService(id: ServiceId) {
+const clients = new Map<InnoSageServiceId, ProClient>();
+export function clientForService(id: InnoSageServiceId) {
   let client = clients.get(id);
   if (!client) {
     const config = services[id];
