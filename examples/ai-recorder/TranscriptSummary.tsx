@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
+import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { meetingEssentials } from './OpenAIClient';
 import { openAIAccess } from './OpenAIAccess';
@@ -11,9 +12,10 @@ type Props = {
   revision: File;
   output: File;
   save: (file: File, text: string) => Promise<void>;
+  onLockChange: (locked: boolean) => void;
 };
 
-export function TranscriptSummary({ original, revision, output, save }: Props) {
+export function TranscriptSummary({ original, revision, output, save, onLockChange }: Props) {
   const { palette, spacing } = useTheme();
   const [open, setOpen] = useState(false);
   const [recipe, setRecipe] = useState<string>();
@@ -27,6 +29,13 @@ export function TranscriptSummary({ original, revision, output, save }: Props) {
   const [message, setMessage] = useState('');
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => { onLockChange(busy || !!unsaved); }, [busy, unsaved, onLockChange]);
+
+  function savedFiles() {
+    return output.parentDirectory.list()
+      .filter((entry): entry is File => entry instanceof File && entry.name.startsWith(output.name + '.') && entry.name.endsWith('.json'))
+      .sort((a, b) => b.name.localeCompare(a.name));
+  }
 
   async function run(action: (signal: AbortSignal) => Promise<void>) {
     if (active.current) return;
@@ -46,7 +55,13 @@ export function TranscriptSummary({ original, revision, output, save }: Props) {
 
   async function persist(result: Summary) {
     try {
-      await save(output, JSON.stringify(result));
+      const previous = savedFiles();
+      const next = new File(output.parentDirectory, `${output.name}.${Date.now()}-${randomUUID()}.json`);
+      await save(next, JSON.stringify(result));
+      for (const file of previous) {
+        try { file.delete(); } catch { /* The new summary has already been saved. */ }
+      }
+      try { if (output.exists) output.delete(); } catch { /* Legacy copy. */ }
       setSummary(result);
       setUnsaved(undefined);
     } catch {
@@ -57,10 +72,12 @@ export function TranscriptSummary({ original, revision, output, save }: Props) {
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <Button title={open ? 'Hide summary' : 'Summarize'} disabled={busy} onPress={() => {
+      <Button title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
         setOpen(!open);
-        if (!open && output.exists && !summary) void run(async () => {
-          const saved = JSON.parse(await output.text()) as Summary;
+        if (!open && !summary) void run(async () => {
+          const file = savedFiles()[0] ?? output;
+          if (!file.exists) return;
+          const saved = JSON.parse(await file.text()) as Summary;
           if (typeof saved.text !== 'string' || typeof saved.model !== 'string') throw new Error('Could not read the saved summary.');
           setSummary(saved);
         });
@@ -93,6 +110,7 @@ export function TranscriptSummary({ original, revision, output, save }: Props) {
             signal.throwIfAborted();
             await persist({ recipe: meetingEssentials.id, model, source, text });
           })} />
+        {unsaved ? <Button title="Discard unsaved summary" disabled={busy} onPress={() => { setUnsaved(undefined); setMessage(''); }} /> : null}
         {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
         {unsaved || summary ? <>
           <Text accessibilityRole="header" style={{ color: palette.text }}>Meeting Essentials</Text>

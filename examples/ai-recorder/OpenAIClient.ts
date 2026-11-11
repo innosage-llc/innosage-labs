@@ -75,7 +75,7 @@ export async function transcribeOpenAI(http: Http, key: string, file: Blob, sign
 
 // The model list contains IDs, not capability metadata. Include known Responses
 // text families and their dated snapshots, excluding specialized variants.
-const textModel = /^(?:gpt-5(?:\.\d+)?(?:-(?:mini|nano|pro|sol|terra|luna|astra))?|gpt-4\.1(?:-mini|-nano)?|gpt-4o(?:-mini)?|o[134](?:-mini|-pro)?)(?:-\d{4}-\d{2}-\d{2})?$/;
+const textModel = /^(?:gpt-[56](?:\.\d+)?(?:-(?:mini|nano|pro|sol|terra|luna|astra))?|gpt-4\.1(?:-mini|-nano)?|gpt-4o(?:-mini)?|o[134](?:-mini|-pro)?)(?:-\d{4}-\d{2}-\d{2})?$/;
 
 export async function listSummaryModels(http: Http, key: string, signal: AbortSignal): Promise<string[]> {
   const response = await request(http, '/models', key, {

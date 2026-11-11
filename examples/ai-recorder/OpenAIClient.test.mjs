@@ -45,9 +45,9 @@ test('summary model selection uses the project list and excludes audio and embed
   const models = await listSummaryModels(async (url, init) => {
     assert.equal(url, 'https://api.openai.com/v1/models');
     assert.equal(init.method, 'GET');
-    return Response.json({ data: ['gpt-5.6-luna', 'gpt-transcribe', 'text-embedding-3-small', 'gpt-5.6-luna', 'gpt-4.1-mini'].map(id => ({ id })) });
+    return Response.json({ data: ['gpt-5.6-luna', 'gpt-transcribe', 'gpt-6.1-sol', 'text-embedding-3-small', 'gpt-5.6-luna', 'gpt-4.1-mini'].map(id => ({ id })) });
   }, 'sk-proj-synthetic-key', new AbortController().signal);
-  assert.deepEqual(models, ['gpt-4.1-mini', 'gpt-5.6-luna']);
+  assert.deepEqual(models, ['gpt-4.1-mini', 'gpt-5.6-luna', 'gpt-6.1-sol']);
 });
 
 test('summary sends the exact selected model and text, and extracts assistant output', async () => {
