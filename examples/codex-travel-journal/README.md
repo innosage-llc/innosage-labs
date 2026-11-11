@@ -40,7 +40,7 @@ Legacy Diffusion examples may use older syntax. Installed version docs are the i
 
 ## Status
 
-Initial private film in verification. Reusable executable example and final acceptance evidence follow the first human review; no final quality claim yet.
+Five private alternatives passed the approved director-review method (91/91/93/92/92); see RESULTS.md for dimensions, limitations and evidence summary. Founder review and publication clearance remain pending. Reusable helpers below are tested with synthetic inputs.
 
 ## Reproduce the review evidence
 
