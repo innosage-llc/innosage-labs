@@ -91,23 +91,30 @@ the existing attributed text is retained rather than guessing missing words.
 
 ## InnoSage Pro access
 
-Open **InnoSage Pro**, enter the API key for the build's environment, then choose
-**Verify and save key**. Validation uses Draft's maintained paid transcription
-identity endpoint and canonical Gateway entitlement. The masked field clears
-after saving. The retained key is encrypted in Expo SecureStore and can be
-removed from this screen. New premium operations require canonical authorization.
+Open **Transcription service** and choose **InnoSage · Staging** or
+**InnoSage · Production**. The default remains Staging on upgrade. Changes apply
+only to new transcriptions; saved and in-flight jobs keep their original service.
+The transcript screen shows that actual service, even if the default has changed.
 
-With verified Pro access, new recording transcriptions default to Pro. The user
-can explicitly choose Free before starting. A submitted operation retains its
-account, environment, speaker mode and source size through recovery. Existing
-Free recordings continue through their original Gateway connection.
+Enter the matching environment's Pro key and choose **Verify and save key**.
+The masked field clears after saving and when switching services. Each service
+has a separate encrypted SecureStore profile; removing one key leaves the other
+untouched. Validation and new paid admissions use the canonical paid API.
+Keys are never migrated, silently retried against another service, or sent to
+Router/Edge. A staging key is not a production key.
 
-The Android build needs `EXPO_PUBLIC_PRO_WORKER_URL` and
-`EXPO_PUBLIC_PRO_ROUTER_URL`, both fixed HTTPS origins for the same environment.
-A staging key is required for staging. Worker receives the personal key and
-returns scoped Router capabilities. The phone sends only the scoped upload or
-control capability to Router. API keys remain on-device and in the canonical
-authorization request.
+Production uses the existing paid Draft Worker at `https://api.draft.innosage.co`
+and Router at `https://speech-router.innosage.co:8443`. Staging uses
+`https://api-staging.draft.innosage.co` and `https://rd.innosage.co:8443`.
+These origins are fixed in `ServiceConfig.ts`; the old Pro build environment
+variables no longer control runtime routing. No backend deployment is required.
+The Recorder Free gateway is staging-only; production requires a production Pro
+key and never silently falls back to staging. New staging jobs can choose Free.
+Existing Free jobs retain their legacy Gateway connection and recovery identity.
+
+**OpenAI audio · Coming soon** is intentionally disabled. This increment does
+not collect an OpenAI key or make OpenAI calls. Implementation, entitlement,
+format adaptation and provider-specific behavior remain a later milestone.
 
 Paid transcription follows the existing four-hour decoded-duration policy.
 This sample enforces the effective512MiB source limit. Router's larger source

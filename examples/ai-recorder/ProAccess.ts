@@ -4,19 +4,28 @@ import { File, FileMode } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProClient } from "./ProClient";
 import { uploadRecording } from "./NativeUpload";
+import { services, serviceForWorker, SERVICE_KEY, serviceId, type ServiceId } from "./ServiceConfig";
 
-const worker = process.env.EXPO_PUBLIC_PRO_WORKER_URL;
-const router = process.env.EXPO_PUBLIC_PRO_ROUTER_URL;
-export const proClient =
-  worker && router
-    ? new ProClient(
-        worker,
-        router,
-        (url, init) => fetch(url, init),
-        SecureStore,
-        uploadRecording,
-      )
-    : undefined;
+const clients = new Map<ServiceId, ProClient>();
+export function clientForService(id: ServiceId) {
+  let client = clients.get(id);
+  if (!client) {
+    const config = services[id];
+    client = new ProClient(config.workerURL, config.routerURL,
+      (url, init) => fetch(url, init), SecureStore, uploadRecording);
+    clients.set(id, client);
+  }
+  return client;
+}
+export function clientForOperation(operation: { workerURL: string }) {
+  return clientForService(serviceForWorker(operation.workerURL));
+}
+export async function selectedService() {
+  return serviceId(await SecureStore.getItemAsync(SERVICE_KEY));
+}
+export async function selectService(id: ServiceId) {
+  await SecureStore.setItemAsync(SERVICE_KEY, id);
+}
 
 export async function hashRecording(file: File, signal?: AbortSignal) {
   const digest = sha256.create();

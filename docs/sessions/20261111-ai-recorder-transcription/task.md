@@ -41,3 +41,8 @@ Read-only Sol review identified five blockers; repairs isolate sessions per oper
 - PASS: in-place installation and launch on Samsung RFCY310NA7M; package manager confirms v0.1.4/versionCode 5. Native Pro settings is open for founder key entry. Existing app data preserved.
 - NOT RUN: real paid key positive authorization, real paid audio upload/inference, four-hour device qualification. Founder will enter the staging key only on the phone. Agent must not retrieve it.
 - Production deployment remains NOT AUTHORIZED. Issue #38 stays open pending founder acceptance.
+
+
+Founder accepted v0.1.4 Pro positive flow. Service-selector child #40 adds official Expo Material radio options for InnoSage staging/production, separate encrypted key profiles, preserved original job routing and a disabled future OpenAI entry. Existing paid production HTTP identity endpoint returned401 without credentials (reachable/auth protected); no authorized paid production request or inference executed. 13 offline tests and TypeScript PASS. No backend deployment. Production Free remains unavailable in Recorder; explicit Pro requirement. Android v0.1.5/versionCode6 is building for native UI verification and phone installation. First build lacked ANDROID_HOME; corrected to the existing local Android SDK without changing source.
+
+Service-selector independent Sol HIGH read-only source review returned no source-level blockers. 13 local checks and TypeScript pass, git diff whitespace check passes. Native build and device UX checks pending; no real paid production invocation performed.

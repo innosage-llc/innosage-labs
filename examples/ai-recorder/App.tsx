@@ -143,7 +143,7 @@ function RecorderScreen() {
         disabled={phase === 'starting' || phase === 'saving'}
         onPress={phase === 'recording' ? stop : start}
       />
-      <Button title="InnoSage Pro" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+      <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
       <Text accessibilityRole="header" style={styles.heading}>Recordings</Text>

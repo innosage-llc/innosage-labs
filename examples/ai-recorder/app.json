@@ -2,14 +2,14 @@
   "expo": {
     "name": "AI Recorder",
     "slug": "ai-recorder",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "platforms": [
       "android"
     ],
     "android": {
       "package": "co.innosage.labs.airecorder",
       "allowBackup": false,
-      "versionCode": 5
+      "versionCode": 6
     },
     "plugins": [
       [

@@ -9,7 +9,8 @@ import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { useTheme } from './ui/theme';
 
-import { proClient, hashRecording } from './ProAccess';
+import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
+import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { connectGateway, type Gateway } from './GatewayConnection';
@@ -36,6 +37,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [token, setToken] = useState('');
   const [operation, setOperation] = useState<string>();
   const [paidOperation, setPaidOperation] = useState<ProOperation>();
+  const [service, setService] = useState<ServiceId>('staging');
+  const proClient = clientForService(service);
   const [usePro, setUsePro] = useState(false);
   const [proAvailable, setProAvailable] = useState(false);
   const submission = useRef<AbortController | null>(null);
@@ -59,28 +62,31 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         revision.exists ? revision.text() : undefined,
         speakerFile.exists ? speakerFile.text() : undefined,
       ]);
-      const profile = await proClient?.profile();
+      // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
+      const saved = savedOperation ? (savedOperation.startsWith('{') ? JSON.parse(savedOperation)
+        : { id: savedOperation, identifySpeakers: false }) : undefined;
+      const restoredService = saved ? (saved.lane === 'pro' ? serviceForWorker(saved.workerURL) : 'staging')
+        : await selectedService();
+      const paid: ProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
+      const profile = await clientForService(restoredService).profile();
       if (!active) return;
-      setProAvailable(!!profile);
-      let paid: ProOperation | undefined;
-      setUsePro(!savedOperation && !!profile);
-      if (savedOperation) {
-        // Prior APKs stored a plain UUID. Their jobs keep speaker identification off.
-        const saved = savedOperation.startsWith('{') ? JSON.parse(savedOperation)
-          : { id: savedOperation, identifySpeakers: false };
+      if (saved) {
         setIdentifySpeakers(saved.identifySpeakers);
         setOperation(saved.id);
-        if (saved.lane === 'pro') { paid = saved; setPaidOperation(saved); setUsePro(true); }
       }
+      setService(restoredService);
+      setPaidOperation(paid);
+      setProAvailable(!!profile);
+      setUsePro(!!paid || (!savedOperation && !!profile));
       const speakers: SpeakerResult | undefined = speakerText ? JSON.parse(speakerText) : undefined;
       if (originalText !== undefined) {
         setJob({ state: 'COMPLETED', transcript: originalText, speakerLabeling: speakers });
         setDraft(revisedText !== undefined && revisedText !== speakers?.transcript
           ? revisedText : readableSpeakerTranscript(originalText, speakers?.transcript));
-        if (paid) await proClient?.cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
+        if (paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
         return;
       }
-      if (paid || (!savedOperation && profile)) return;
+      if (restoredService === 'production' || paid || (!savedOperation && profile)) return;
       if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
         const config = await connectGateway();
         if (active) setGateway(config);
@@ -97,10 +103,10 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   async function request(config: Gateway | undefined, id: string, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined) {
     let result: Job;
     if (paid) {
-      if (!proClient) throw new Error('Pro is not configured for this build.');
+      const operationClient = clientForOperation(paid);
       result = upload
-        ? await proClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal)
-        : await proClient.read(paid, recording.name, signal);
+        ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal)
+        : await operationClient.read(paid, recording.name, signal);
     } else {
       if (!config) throw new Error('Connect to the transcription service.');
       const response = await fetch(`${config.url}/v1/jobs/${id}`, {
@@ -133,7 +139,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     }
     setJob(result);
     if (paid && result.state === 'COMPLETED') {
-      await proClient?.cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
+      await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
     }
     return result;
   }
@@ -157,6 +163,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
 
 
   async function connect() {
+    if (service !== 'staging') return;
     setConnecting(true);
     try {
       if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
@@ -198,7 +205,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size };
       }
       const id = paid?.id ?? (terminal ? randomUUID() : operation ?? randomUUID());
-      await SecureStore.setItemAsync(operationKey, JSON.stringify(paid ?? { id, identifySpeakers, lane: 'free' }));
+      await SecureStore.setItemAsync(operationKey, JSON.stringify(paid ?? { id, identifySpeakers, lane: 'free', service: 'staging' }));
       setPaidOperation(paid);
       setOperation(id);
       setJob({ state: 'RESERVED' });
@@ -237,6 +244,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Transcript</Text>
+          <Text style={{ color: palette.muted }}>{services[service].label}</Text>
+          {!complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {complete ? (
             <>
@@ -258,7 +267,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
               {proAvailable ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Use InnoSage Pro</Text>
                 <Host matchContents style={{ minWidth: 60 }}>
-                  <Switch value={usePro} enabled={canChooseSpeakers} onCheckedChange={value => {
+                  <Switch value={usePro} enabled={canChooseSpeakers && service === 'staging'} onCheckedChange={value => {
                     setUsePro(value);
                     if (!value && !gateway) void connect();
                   }} modifiers={[semantics({ contentDescription: 'Use InnoSage Pro' })]} />
@@ -276,6 +285,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
               <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy} onPress={submit} />
             </>
+          ) : service === 'production' ? (
+            <Text style={{ color: palette.text }}>Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.</Text>
           ) : (
             <View style={{ gap: spacing.md }}>
               {process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL ? null : <>
