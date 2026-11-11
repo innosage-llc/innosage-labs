@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Button, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
@@ -11,8 +11,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { Host, Slider } from '@expo/ui/jetpack-compose';
-import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { PlaybackSeek } from './PlaybackSeek';
 import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { ThemeProvider } from './ui/theme';
@@ -126,7 +125,7 @@ function RecorderScreen() {
         setPhase('idle');
         return;
       }
-      await requestNotificationPermissionsAsync();
+      if (Platform.OS === 'android') await requestNotificationPermissionsAsync();
       player.pause();
       await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
@@ -227,19 +226,16 @@ function RecorderScreen() {
                 disabled={phase !== 'idle'} onPress={() => { player.pause(); setTranscriptRecording(item); }} />
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
-                  <Host matchContents={{ vertical: true }} style={styles.slider}>
-                    <Slider
-                      max={playback.duration}
-                      value={position}
-                      enabled={phase === 'idle'}
-                      modifiers={[fillMaxWidth(), semantics({ contentDescription: 'Playback position' })]}
-                      onValueChange={(value) => {
-                        pendingSeek.current = value;
-                        setSeekPosition(value);
-                      }}
-                      onValueChangeFinished={finishSeek}
-                    />
-                  </Host>
+                  <PlaybackSeek
+                    max={playback.duration}
+                    value={position}
+                    enabled={phase === 'idle'}
+                    onValueChange={(value) => {
+                      pendingSeek.current = value;
+                      setSeekPosition(value);
+                    }}
+                    onValueChangeFinished={finishSeek}
+                  />
                   <View style={styles.times}>
                     <Text style={styles.filename}>{formatTime(position)}</Text>
                     <Text style={styles.copy}>{formatTime(playback.duration)}</Text>

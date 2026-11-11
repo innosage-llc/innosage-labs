@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
-import { Modal, ScrollView, Text, View } from "react-native";
+import { Button, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, TextInput, useNativeState } from "@expo/ui";
-import { Host, RadioButton } from "@expo/ui/jetpack-compose";
 import { clientForService, selectedService, selectService } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
-import { semantics } from "@expo/ui/jetpack-compose/modifiers";
 import { useTheme } from "./ui/theme";
 
 function accessFor(id: ServiceId) {
@@ -15,7 +12,7 @@ function accessFor(id: ServiceId) {
 
 export function ProSettings({ onClose }: { onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
-  const key = useNativeState("");
+  const [key, setKey] = useState("");
   const [service, setService] = useState<ServiceId>("staging");
   const access = accessFor(service);
   const isOpenAI = service === "openai";
@@ -35,7 +32,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   async function changeService(id: ServiceId) {
     setBusy(true);
     setMessage("");
-    key.set("");
+    setKey("");
     setHasKey(false);
     try {
       const profile = await accessFor(id).profile();
@@ -51,8 +48,8 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setMessage("");
     try {
-      await access.configure(key.get());
-      key.set("");
+      await access.configure(key);
+      setKey("");
       setHasKey(false);
       setConfigured(true);
       setMessage(isOpenAI ? "OpenAI model access verified. Your first transcription checks quota and billing." : "Pro transcription access verified.");
@@ -96,12 +93,14 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
             Transcription service
           </Text>
           <Text style={{ color: palette.muted }}>Choose the service for new transcriptions.</Text>
+          {!isOpenAI ? <Text style={{ color: palette.muted }}>InnoSage Pro uploads are Android-only. On iOS, choose OpenAI direct, or use staging Free access with your authorized gateway.</Text> : null}
           {(['production', 'staging', 'openai'] as const).map(id => (
             <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Host matchContents style={{ minWidth: 48 }}>
-                <RadioButton selected={service === id} enabled={!busy} onClick={() => void changeService(id)}
-                  modifiers={[semantics({ contentDescription: services[id].label })]} />
-              </Host>
+              <Pressable accessibilityRole="radio" accessibilityLabel={services[id].label}
+                accessibilityState={{ checked: service === id, disabled: busy }} disabled={busy}
+                onPress={() => void changeService(id)} style={{ minWidth: 48, minHeight: 48, justifyContent: 'center' }}>
+                <Text style={{ color: palette.text, fontSize: 24 }}>{service === id ? '◉' : '○'}</Text>
+              </Pressable>
               <Text onPress={busy ? undefined : () => void changeService(id)} style={{ color: palette.text }}>{services[id].label}</Text>
             </View>
           ))}
@@ -116,41 +115,40 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           <Text style={{ color: palette.text }}>
             {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}
           </Text>
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
+          <View style={{ width: "100%" }}>
             <TextInput
               accessibilityLabel={isOpenAI ? "OpenAI API key" : `${service} InnoSage Pro API key`}
               placeholder={isOpenAI ? "OpenAI API key" : `${service === "production" ? "Production" : "Staging"} Pro API key`}
               value={key}
-              onChangeText={(text) => setHasKey(!!text.trim())}
+              onChangeText={(text) => { setKey(text); setHasKey(!!text.trim()); }}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               editable={!busy}
-              textStyle={{ color: palette.text }}
               style={{
+                color: palette.text,
                 width: "100%",
                 borderColor: palette.border,
                 borderWidth: 1,
                 padding: spacing.md,
               }}
             />
-          </Host>
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
+          </View>
+          <View style={{ width: "100%" }}>
             <Button
-              label={busy ? "Checking…" : "Verify and save key"}
-              disabled={busy || !hasKey}
+              title={busy ? "Checking…" : "Verify and save key"}
+              disabled={busy || !hasKey || !isOpenAI}
               onPress={save}
             />
-          </Host>
+          </View>
           {configured ? (
-            <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
+            <View style={{ width: "100%" }}>
               <Button
-                label="Remove key"
-                variant="outlined"
+                title="Remove key"
                 disabled={busy}
                 onPress={remove}
               />
-            </Host>
+            </View>
           ) : null}
           {message ? (
             <Text
@@ -160,14 +158,13 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               {message}
             </Text>
           ) : null}
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
+          <View style={{ width: "100%" }}>
             <Button
-              label="Back to recordings"
-              variant="text"
+              title="Back to recordings"
               disabled={busy}
               onPress={onClose}
             />
-          </Host>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>
