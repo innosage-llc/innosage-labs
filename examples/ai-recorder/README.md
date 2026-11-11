@@ -130,3 +130,11 @@ cleanup recovery. This Android milestone's real Pro and long-audio acceptance is
 recorded separately from deterministic protocol tests.
 
 Run `npm run test:transcript` and `npm run typecheck` for local protocol checks.
+
+### Import an existing Android recording
+
+Tap **Import audio** and select an M4A from Android Files. Recorder keeps a local
+copy and shows its original filename in Recordings. Use **Play** to listen or
+**Transcript** to transcribe with the selected service. That service's limits
+apply when submitting. Reopening the app keeps the imported audio and any
+saved transcript.

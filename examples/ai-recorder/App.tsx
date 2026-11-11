@@ -17,6 +17,8 @@ import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { ThemeProvider } from './ui/theme';
 import { Directory, File, Paths } from 'expo-file-system';
+import { getDocumentAsync } from 'expo-document-picker';
+import { randomUUID } from 'expo-crypto';
 
 const recordings = new Directory(Paths.document, 'recordings');
 
@@ -24,7 +26,18 @@ function listRecordings() {
   if (!recordings.exists) return [];
   return recordings.list()
     .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.m4a'))
-    .sort((a, b) => b.name.localeCompare(a.name));
+    .sort((a, b) => Number(b.name.split('-')[1]) - Number(a.name.split('-')[1]));
+}
+
+function recordingLabel(file: File) {
+  if (file.name.startsWith('Import-')) {
+    try {
+      return new File(file.parentDirectory, file.name + '.name').textSync();
+    } catch {
+      return 'Imported audio';
+    }
+  }
+  return new Date(Number(file.name.split('-')[1])).toLocaleString();
 }
 
 function formatTime(time: number) {
@@ -35,7 +48,7 @@ function formatTime(time: number) {
 function RecorderScreen() {
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
-  const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving' | 'importing'>('idle');
   const [message, setMessage] = useState('');
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
@@ -62,6 +75,47 @@ function RecorderScreen() {
   });
   const { durationMillis } = useAudioRecorderState(recorder, 500);
 
+
+  async function importAudio() {
+    setPhase('importing');
+    setMessage('');
+    let cached: File | undefined;
+    let label: File | undefined;
+    let imported = false;
+    try {
+      const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (selection.canceled) return;
+      const asset = selection.assets[0];
+      cached = new File(asset.uri);
+      if (!asset.name.toLowerCase().endsWith('.m4a')) {
+        setMessage('Choose an M4A audio file.');
+        return;
+      }
+      if (!cached.exists || !cached.size) {
+        setMessage('The selected audio file is empty or unavailable.');
+        return;
+      }
+      recordings.create({ idempotent: true });
+      const name = `Import-${Date.now()}-${randomUUID()}.m4a`;
+      label = new File(recordings, name + '.name');
+      await label.write(asset.name);
+      await cached.move(new File(recordings, name));
+      cached = undefined;
+      imported = true;
+      setFiles(listRecordings());
+      setMessage('Audio imported to this device.');
+    } catch {
+      setMessage('Could not import the audio. Check available storage and try again.');
+    } finally {
+      try {
+        if (cached?.exists) cached.delete();
+        if (!imported && label?.exists) label.delete();
+      } catch {
+        // A cache cleanup failure must not leave the import controls disabled.
+      }
+      setPhase('idle');
+    }
+  }
 
   async function start() {
     setPhase('starting');
@@ -139,10 +193,11 @@ function RecorderScreen() {
           : 'Record and play audio saved on this device.'}
       </Text>
       <Button
-        title={{ idle: 'Start recording', starting: 'Starting…', recording: 'Stop recording', saving: 'Saving…' }[phase]}
-        disabled={phase === 'starting' || phase === 'saving'}
+        title={{ idle: 'Start recording', starting: 'Starting…', recording: 'Stop recording', saving: 'Saving…', importing: 'Start recording' }[phase]}
+        disabled={phase !== 'idle' && phase !== 'recording'}
         onPress={phase === 'recording' ? stop : start}
       />
+      <Button title={phase === 'importing' ? 'Importing…' : 'Import audio'} disabled={phase !== 'idle'} onPress={importAudio} />
       <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
@@ -156,19 +211,19 @@ function RecorderScreen() {
         renderItem={({ item }) => {
           const selected = playingFile === item.uri;
           const action = selected && playback.playing ? 'Pause' : 'Play';
-          const date = new Date(Number(item.name.split('-')[1])).toLocaleString();
+          const label = recordingLabel(item);
           return (
             <View style={styles.recording}>
               <View style={styles.row}>
-                <Text style={styles.filename}>{date} · M4A</Text>
+                <Text style={styles.filename}>{label} · M4A</Text>
                 <Button
                   title={action}
-                  accessibilityLabel={`${action} recording from ${date}`}
+                  accessibilityLabel={`${action} ${label}`}
                   disabled={phase !== 'idle'}
                   onPress={() => togglePlayback(item)}
                 />
               </View>
-              <Button title="Transcript" accessibilityLabel={`Transcript for recording from ${date}`}
+              <Button title="Transcript" accessibilityLabel={`Transcript for ${label}`}
                 disabled={phase !== 'idle'} onPress={() => { player.pause(); setTranscriptRecording(item); }} />
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
