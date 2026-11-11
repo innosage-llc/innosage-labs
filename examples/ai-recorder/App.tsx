@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { BackHandler, Button, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
@@ -15,7 +15,9 @@ import { Host, Slider } from '@expo/ui/jetpack-compose';
 import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
-import { ThemeProvider } from './ui/theme';
+import { AppHeader, RootNavigation } from './ui/AppChrome';
+import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
+import { ThemeProvider, useTheme } from './ui/theme';
 import { Directory, File, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
@@ -46,9 +48,11 @@ function formatTime(time: number) {
 }
 
 function RecorderScreen() {
+  const { palette, spacing, typography } = useTheme();
+  const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
-  const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving' | 'importing'>('idle');
+  const [phase, setPhase] = useState<CapturePhase>('idle');
   const [message, setMessage] = useState('');
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
@@ -184,9 +188,29 @@ function RecorderScreen() {
     }
   }
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!canSwitchDestination(phase)) return true;
+      if (destination === 'record') return false;
+      setDestination('record');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [destination, phase]);
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <Text accessibilityRole="header" style={styles.title}>AI Recorder</Text>
+    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: palette.background }}>
+      <AppHeader title={{ record: 'Record', library: 'Library', settings: 'Settings' }[destination]} />
+      {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
+      {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)} onClose={() => setTranscriptRecording(undefined)} /> : null}
+      {phase === 'recording' && destination !== 'record' ? <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>Recording · {formatTime(durationMillis / 1000)}</Text>
+        <Button title="Return to recording" onPress={() => setDestination('record')} />
+      </View> : null}
+      {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text, padding: spacing.lg }}>{message}</Text> : null}
+      {destination === 'record' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+
+      <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>{phase === 'recording' ? 'Recording in progress' : 'Ready when you are'}</Text>
       <Text style={styles.copy}>
         {phase === 'recording'
           ? `Recording · ${formatTime(durationMillis / 1000)}`
@@ -197,12 +221,12 @@ function RecorderScreen() {
         disabled={phase !== 'idle' && phase !== 'recording'}
         onPress={phase === 'recording' ? stop : start}
       />
+      <Text style={styles.copy}>Recording works offline. You can keep recording with the screen locked.</Text>
+      </ScrollView> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+        <Text style={styles.copy}>Choose and configure the service used for new transcriptions. Existing jobs keep their service.</Text>
+        <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+      </ScrollView> : <View style={{ flex: 1, paddingHorizontal: spacing.lg, gap: spacing.md }}>
       <Button title={phase === 'importing' ? 'Importing…' : 'Import audio'} disabled={phase !== 'idle'} onPress={importAudio} />
-      <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
-      {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
-      {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
-      <Text accessibilityRole="header" style={styles.heading}>Recordings</Text>
-      {transcriptRecording ? <Transcript recording={transcriptRecording} onClose={() => setTranscriptRecording(undefined)} /> : null}
       <FlatList
         data={files}
         keyExtractor={(file) => file.uri}
@@ -250,6 +274,8 @@ function RecorderScreen() {
           );
         }}
       />
+      </View>}
+      <RootNavigation selected={destination} onSelect={setDestination} enabled={canSwitchDestination(phase)} />
     </SafeAreaView>
   );
 }
@@ -259,9 +285,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 20, paddingTop: 16, gap: 12 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  heading: { fontSize: 19, fontWeight: '600', color: '#111827', marginTop: 12 },
   copy: { fontSize: 16, color: '#374151' },
   filename: { flex: 1, fontSize: 15, color: '#111827' },
   recording: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d1d5db' },

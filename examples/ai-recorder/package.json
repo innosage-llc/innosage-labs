@@ -6,9 +6,11 @@
   "scripts": {
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
-    "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs"
+    "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs",
+    "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs"
   },
   "dependencies": {
+    "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "^58.0.27",
     "@noble/hashes": "2.0.1",
     "expo": "58.0.23",

@@ -153,3 +153,37 @@ visible to the configured OpenAI project. Choose Light, Medium, High, or Extra
 high thinking. Use **Custom recipe** to enter and save reusable instructions.
 Enable **Search the web** for a custom recipe to require an OpenAI web search
 during generation. Source links appear inline and persist with the summary.
+
+## Android app shell
+
+The bounded Android shell uses the installed Expo UI Material 3 `NavigationBar`,
+`NavigationBarItem`, `TopAppBar`, and `IconButton`, plus official
+`@expo/material-symbols` assets. The three roots are **Record**, **Library**, and
+**Settings**. Import is a Library action, not a destination. Transcription service
+is a Settings detail; a recording's Transcript is a Library detail. These detail
+screens retain the existing modal lifecycle and now have a fixed native top bar.
+This is not an Expo Router migration or an iOS navigation implementation.
+
+The recorder/player controller stays mounted above root content changes. During
+recording, other roots show a return-to-recording action. Starting, saving, and
+importing temporarily lock root controls. Android system Back from a secondary
+root returns to Record; from a detail it uses the same guard as the top Back
+button. Transcript Back waits for submission/save/summary operations and unsaved
+OpenAI results, and confirms before discarding an edited revision. A background
+remote job retains its existing recovery identity. No navigation action submits
+new audio or verifies a key.
+
+Safe area ownership is explicit: React Native owns top/side insets; the native
+bottom bar owns bottom system insets. Detail content scrolls below its fixed
+header. Status-bar icons follow the existing application theme. Library remains
+virtualized. This compact Android baseline does not invent a phone drawer,
+expanded rail, or new product destinations. Future larger-screen or iOS support
+needs its platform-native adapter and runtime verification.
+
+Run `npm run test:navigation` alongside typecheck and the transcript tests.
+For future apps, first inventory their installed native controls and navigator,
+write a destination/action and state-ownership contract, and reuse those controls.
+Do not copy this bounded modal controller into a deeper route hierarchy: evaluate
+the SDK-compatible Expo Router native stack/tabs and preserve long-lived audio
+state above route mounts. See [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
+and [Expo native tabs](https://docs.expo.dev/router/advanced/native-tabs/).
