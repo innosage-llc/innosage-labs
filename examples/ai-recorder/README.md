@@ -138,3 +138,12 @@ copy and shows its original filename in Recordings. Use **Play** to listen or
 **Transcript** to transcribe with the selected service. That service's limits
 apply when submitting. Reopening the app keeps the imported audio and any
 saved transcript.
+
+### Meeting Essentials
+
+Save an OpenAI Platform key in **Transcription service** settings. Open any
+completed transcript and tap **Summarize**. Select **Meeting Essentials** and a
+compatible model from the OpenAI project's model list. Choose the original or
+a saved revision, then tap **Generate summary** to send that text to OpenAI.
+The latest summary is saved locally alongside its model and source. Reopen
+the transcript and tap **Summarize** to read the saved result.

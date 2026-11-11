@@ -1,3 +1,4 @@
+import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { Host, Switch } from '@expo/ui/jetpack-compose';
@@ -51,9 +52,11 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [job, setJob] = useState<Job>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [summaryLocked, setSummaryLocked] = useState(false);
   const [draft, setDraft] = useState('');
   const [showOriginal, setShowOriginal] = useState(false);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
+  const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
   const speakerFile = new File(recording.parentDirectory, recording.name + '.speakers.json');
   const operationKey = 'transcription.' + recording.name;
@@ -271,7 +274,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
-    <Modal onRequestClose={() => { if (!isOpenAI || !busy) onClose(); }}>
+    <Modal onRequestClose={() => { if (!summaryLocked && (!isOpenAI || !busy)) onClose(); }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Transcript</Text>
@@ -291,6 +294,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
               <Button title={showOriginal ? 'Show revision' : 'Show original'} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal ? <Button title="Save revision" disabled={busy} onPress={save} /> : null}
+              <TranscriptSummary original={original} revision={revision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
             </>
           ) : isOpenAI ? (
             <>
@@ -336,7 +340,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
               <Button title={connecting ? "Connecting…" : "Connect"} disabled={connecting} onPress={connect} />
             </View>
           )}
-          <Button title="Back to recordings" onPress={onClose} disabled={busy} />
+          <Button title="Back to recordings" onPress={onClose} disabled={busy || summaryLocked} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
