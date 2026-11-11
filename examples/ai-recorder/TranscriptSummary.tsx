@@ -176,7 +176,8 @@ function CitedSummary({ summary }: { summary: Summary }) {
   const parts = citations.map((citation, index) => {
     const span = citation.start !== undefined && citation.start >= start && citation.start < citation.end
       ? characters.slice(citation.start, citation.end).join('') : '';
-    const existingLink = /^(?:\[[^\]]+\]\(https?:\/\/.+\)|https?:\/\/\S+)$/i.test(span.trim());
+    const linkText = span.trim().replace(/^\((.*)\)$/, '$1');
+    const existingLink = /^(?:\[[^\]]+\]\(https?:\/\/.+\)|https?:\/\/\S+)$/i.test(linkText);
     const fragment = characters.slice(start, existingLink ? citation.start : citation.end).join('');
     start = citation.end;
     return <Text key={index}>{fragment}<Text accessibilityRole="link" accessibilityLabel={citation.title}
