@@ -46,3 +46,14 @@ Read-only Sol review identified five blockers; repairs isolate sessions per oper
 Founder accepted v0.1.4 Pro positive flow. Service-selector child #40 adds official Expo Material radio options for InnoSage staging/production, separate encrypted key profiles, preserved original job routing and a disabled future OpenAI entry. Existing paid production HTTP identity endpoint returned401 without credentials (reachable/auth protected); no authorized paid production request or inference executed. 13 offline tests and TypeScript PASS. No backend deployment. Production Free remains unavailable in Recorder; explicit Pro requirement. Android v0.1.5/versionCode6 is building for native UI verification and phone installation. First build lacked ANDROID_HOME; corrected to the existing local Android SDK without changing source.
 
 Service-selector independent Sol HIGH read-only source review returned no source-level blockers. 13 local checks and TypeScript pass, git diff whitespace check passes. Native build and device UX checks pending; no real paid production invocation performed.
+
+
+## Service selector ready for founder verification
+
+- Child #40; stacked draft PR #41: https://github.com/innosage-llc/innosage-labs/pull/41. Runtime source2181dfc.
+- PASS: TypeScript and13 deterministic protocol/isolation/paragraph checks; independent Sol HIGH read-only source review with no blockers; Android release build (381tasks,3m2s).
+- APK v0.1.5/versionCode6 SHA-256 c09ed3a4fc311d567c6faee421142e8818a5ee02ac832b0d58e472292f967e14.
+- PASS: emulator official Material production radio selection and preference persistence across force-stop/relaunch. Separate production profile initially empty. Native screenshot reviewed; OpenAI is Coming soon and has no selection handler.
+- PASS: Samsung RFCY310NA7M in-place install, package version confirmed, launch and Transcription service settings opened. UI reports Staging selected and Pro key saved after upgrade. No actual key value retrieved.
+- NOT RUN: real production Pro authorization/upload/inference; existing production Router probe /health returned404 and is not claimed as health validation. Worker identity returned401 without credentials, proving only endpoint reachability/auth protection. No production backend deployment.
+- Founder can switch services locally, save the matching key, and use a new recording to verify actual target. Existing jobs retain their service. Recorder Free remains staging-only. Master and child remain open pending acceptance; OpenAI implementation is a later milestone.
