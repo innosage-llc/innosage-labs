@@ -6,7 +6,13 @@
   "scripts": {
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
-    "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs"
+    "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs",
+    "ios": "expo run:ios --device",
+    "ios:prebuild": "expo prebuild --platform ios --no-install",
+    "test:platform": "node --test platform.test.mjs",
+    "ios:check": "bash scripts/check-ios-development.sh",
+    "ios:testflight:build": "npx eas-cli build --platform ios --profile testflight",
+    "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight"
   },
   "dependencies": {
     "@expo/ui": "^58.0.27",

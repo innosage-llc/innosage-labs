@@ -153,3 +153,9 @@ visible to the configured OpenAI project. Choose Light, Medium, High, or Extra
 high thinking. Use **Custom recipe** to enter and save reusable instructions.
 Enable **Search the web** for a custom recipe to require an OpenAI web search
 during generation. Source links appear inline and persist with the summary.
+
+## iPhone development
+
+See [IOS_DEVELOPMENT.md](IOS_DEVELOPMENT.md) for local Xcode/team/device setup, build/debug commands, supported provider boundaries, and the physical-device acceptance checklist. iOS prebuild and JavaScript bundling do not establish physical-iPhone acceptance.
+
+For installation without connecting a phone to this Mac, use the prepared [TestFlight delivery path](TESTFLIGHT.md). It requires verified Expo/App Store Connect accounts and distribution signing; no TestFlight build has been uploaded yet.

@@ -1,8 +1,8 @@
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
-import { Host, Switch } from '@expo/ui/jetpack-compose';
-import { semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { RecorderSwitch } from './RecorderSwitch';
+import { supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
@@ -204,7 +204,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   }
 
   async function submit() {
-    if (connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
+    if ((!supportsProUpload && usePro) || connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
@@ -310,24 +310,21 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
               <Text style={{ color: palette.text }}>{usePro ? 'Pro · up to 4 hours · 512 MiB' : 'Free · up to 15 minutes · 50 MB'}</Text>
               {proAvailable ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Use InnoSage Pro</Text>
-                <Host matchContents style={{ minWidth: 60 }}>
-                  <Switch value={usePro} enabled={canChooseSpeakers && service === 'staging'} onCheckedChange={value => {
+                <RecorderSwitch value={usePro} enabled={canChooseSpeakers && service === 'staging'} onCheckedChange={value => {
                     setUsePro(value);
                     if (!value && !gateway) void connect();
-                  }} modifiers={[semantics({ contentDescription: 'Use InnoSage Pro' })]} />
-                </Host>
+                  }} label="Use InnoSage Pro" />
               </View> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Identify speakers</Text>
-                <Host matchContents style={{ minWidth: 60 }}>
-                  <Switch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
-                    modifiers={[semantics({ contentDescription: 'Identify speakers' })]} />
-                </Host>
+                <RecorderSwitch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
+                    label="Identify speakers" />
               </View>
               <Text style={{ color: palette.muted }}>Add speaker labels to this transcript. May take longer.</Text>
               {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
-              <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy} onPress={submit} />
+              {!supportsProUpload && usePro ? <Text style={{ color: palette.muted }}>InnoSage Pro uploads require separate iOS support. Choose OpenAI direct or staging Free access.</Text> : null}
+              <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy || (!supportsProUpload && usePro)} onPress={submit} />
             </>
           ) : service === 'production' ? (
             <Text style={{ color: palette.text }}>Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.</Text>
