@@ -147,3 +147,9 @@ compatible model from the OpenAI project's model list. Choose the original or
 a saved revision, then tap **Generate summary** to send that text to OpenAI.
 The latest summary is saved locally alongside its model and source. Reopen
 the transcript and tap **Summarize** to read the saved result.
+
+Summary model selection is limited to GPT-5.6 and newer compatible GPT models
+visible to the configured OpenAI project. Choose Light, Medium, High, or Extra
+high thinking. Use **Custom recipe** to enter and save reusable instructions.
+Enable **Search the web** for a custom recipe to require an OpenAI web search
+during generation. Source links appear inline and persist with the summary.

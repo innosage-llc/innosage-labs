@@ -1,3 +1,4 @@
+import type { SummaryOptions } from './OpenAIClient';
 import { fetch } from 'expo/fetch';
 import * as SecureStore from 'expo-secure-store';
 import { listSummaryModels, openAIKey, summarizeOpenAI, transcribeOpenAI, verifyOpenAI } from './OpenAIClient';
@@ -26,8 +27,8 @@ export const openAIAccess = {
   async summaryModels(signal: AbortSignal) {
     return listSummaryModels(http, await requireKey(), signal);
   },
-  async summarize(model: string, transcript: string, signal: AbortSignal) {
-    return summarizeOpenAI(http, await requireKey(), model, transcript, signal);
+  async summarize(model: string, transcript: string, options: SummaryOptions, signal: AbortSignal) {
+    return summarizeOpenAI(http, await requireKey(), model, transcript, options, signal);
   },
   async transcribe(file: Blob, signal: AbortSignal) {
     return transcribeOpenAI(http, await requireKey(), file, signal);
