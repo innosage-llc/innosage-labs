@@ -1,0 +1,9 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'co.innosage'
+version = '1.0.0'
+android {
+  namespace 'co.innosage.recorderupload'
+}

@@ -13,6 +13,9 @@ import {
 } from 'expo-audio';
 import { Host, Slider } from '@expo/ui/jetpack-compose';
 import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { Transcript } from './Transcript';
+import { ProSettings } from './ProSettings';
+import { ThemeProvider } from './ui/theme';
 import { Directory, File, Paths } from 'expo-file-system';
 
 const recordings = new Directory(Paths.document, 'recordings');
@@ -30,11 +33,13 @@ function formatTime(time: number) {
 }
 
 function RecorderScreen() {
+  const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
   const [phase, setPhase] = useState<'idle' | 'starting' | 'recording' | 'saving'>('idle');
   const [message, setMessage] = useState('');
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
+  const [transcriptRecording, setTranscriptRecording] = useState<File>();
   const [playingFile, setPlayingFile] = useState<string>();
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
@@ -138,8 +143,11 @@ function RecorderScreen() {
         disabled={phase === 'starting' || phase === 'saving'}
         onPress={phase === 'recording' ? stop : start}
       />
+      <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+      {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.copy}>{message}</Text> : null}
       <Text accessibilityRole="header" style={styles.heading}>Recordings</Text>
+      {transcriptRecording ? <Transcript recording={transcriptRecording} onClose={() => setTranscriptRecording(undefined)} /> : null}
       <FlatList
         data={files}
         keyExtractor={(file) => file.uri}
@@ -160,6 +168,8 @@ function RecorderScreen() {
                   onPress={() => togglePlayback(item)}
                 />
               </View>
+              <Button title="Transcript" accessibilityLabel={`Transcript for recording from ${date}`}
+                disabled={phase !== 'idle'} onPress={() => { player.pause(); setTranscriptRecording(item); }} />
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
                   <Host matchContents={{ vertical: true }} style={styles.slider}>
@@ -190,7 +200,7 @@ function RecorderScreen() {
 }
 
 export default function App() {
-  return <SafeAreaProvider><RecorderScreen /></SafeAreaProvider>;
+  return <SafeAreaProvider><ThemeProvider><RecorderScreen /></ThemeProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
