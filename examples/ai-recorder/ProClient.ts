@@ -131,6 +131,8 @@ export class ProClient {
     const normalized = key.trim();
     if (!normalized || /\s/.test(normalized) || normalized.length > 8192)
       throw new Error("Enter a valid Pro API key.");
+    if (/^sk-(proj|svcacct)-/.test(normalized))
+      throw new Error("Choose OpenAI to use an OpenAI API key.");
     const accountScope = await this.identity(normalized);
     await this.store.setItemAsync(
       this.profileKey,

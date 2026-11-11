@@ -5,7 +5,7 @@ type Http = (url: string, init: RequestInit) => Promise<Pick<Response, 'ok' | 's
 
 export function openAIKey(value: string) {
   const key = value.trim();
-  if (!key || /\s/.test(key) || key.length > 4096) throw new Error('Enter an OpenAI Platform API key.');
+  if (!key.startsWith('sk-') || /\s/.test(key) || key.length > 4096) throw new Error('Enter an OpenAI Platform API key.');
   return key;
 }
 

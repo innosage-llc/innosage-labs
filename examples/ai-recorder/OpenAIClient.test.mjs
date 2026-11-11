@@ -3,14 +3,15 @@ import test from 'node:test';
 import { openAIMaxBytes, transcribeOpenAI, verifyOpenAI } from './OpenAIClient.ts';
 
 test('preflight only checks model access and refuses redirects', async () => {
+  await assert.rejects(verifyOpenAI(assert.fail, 'synthetic-pro-key'), /OpenAI Platform API key/);
   await verifyOpenAI(async (url, request) => {
     assert.equal(url, 'https://api.openai.com/v1/models/gpt-transcribe');
     assert.equal(request.method, 'GET');
-    assert.equal(request.headers.Authorization, 'Bearer synthetic-key');
+    assert.equal(request.headers.Authorization, 'Bearer sk-proj-synthetic-key');
     assert.equal(request.redirect, 'error');
     assert.equal(request.body, undefined);
     return Response.json({ id: 'gpt-transcribe' });
-  }, ' synthetic-key ');
+  }, ' sk-proj-synthetic-key ');
 });
 
 test('a direct multipart request submits the recording once and returns original text', async () => {
@@ -24,18 +25,18 @@ test('a direct multipart request submits the recording once and returns original
     assert.equal(request.body.get('file').name, 'recording.m4a');
     assert.equal(await request.body.get('file').text(), 'fixture');
     return Response.json({ text: 'Synthetic transcript.' });
-  }, 'synthetic-key', new Blob(['fixture'], { type: 'audio/mp4' }), new AbortController().signal);
+  }, 'sk-proj-synthetic-key', new Blob(['fixture'], { type: 'audio/mp4' }), new AbortController().signal);
   assert.equal(calls, 1);
   assert.equal(transcript, 'Synthetic transcript.');
 });
 
 test('oversize is rejected locally and quota errors are neither retried nor echoed', async () => {
   const signal = new AbortController().signal;
-  await assert.rejects(transcribeOpenAI(assert.fail, 'synthetic-key', { size: openAIMaxBytes }, signal), /25 MB/);
+  await assert.rejects(transcribeOpenAI(assert.fail, 'sk-proj-synthetic-key', { size: openAIMaxBytes }, signal), /25 MB/);
   let calls = 0;
   await assert.rejects(transcribeOpenAI(async () => {
     calls++;
     return Response.json({ error: 'sensitive upstream diagnostic' }, { status: 429 });
-  }, 'synthetic-key', new Blob(['fixture']), signal), /quota/);
+  }, 'sk-proj-synthetic-key', new Blob(['fixture']), signal), /quota/);
   assert.equal(calls, 1);
 });

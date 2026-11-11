@@ -42,6 +42,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [service, setService] = useState<ServiceId>('staging');
   const isOpenAI = service === 'openai';
   const proClient = isOpenAI ? undefined : clientForService(service);
+  const [unsavedOpenAI, setUnsavedOpenAI] = useState<string>();
   const [openAIConfigured, setOpenAIConfigured] = useState(false);
   const [usePro, setUsePro] = useState(false);
   const [proAvailable, setProAvailable] = useState(false);
@@ -200,7 +201,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   }
 
   async function submit() {
-    if (connecting || submission.current || busy || (isOpenAI ? !openAIConfigured : !gateway && !usePro)) return;
+    if (connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
@@ -213,8 +214,14 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         const id = operation ?? randomUUID();
         await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
         setOperation(id);
-        const transcript = await openAIAccess.transcribe(recording, controller.signal);
-        await persistResult({ state: 'COMPLETED', transcript });
+        const transcript = unsavedOpenAI ?? await openAIAccess.transcribe(recording, controller.signal);
+        setUnsavedOpenAI(transcript);
+        try {
+          await persistResult({ state: 'COMPLETED', transcript });
+        } catch {
+          throw new Error('Transcription is ready. Retry saving before closing this screen.');
+        }
+        setUnsavedOpenAI(undefined);
         return;
       }
       const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
@@ -288,8 +295,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
           ) : isOpenAI ? (
             <>
               <Text style={{ color: palette.text }}>OpenAI · M4A under 25 MB</Text>
-              {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : openAIConfigured ? (
-                <Button title={operation ? 'Retry transcription' : 'Transcribe'} onPress={submit} />
+              {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
+                <Button title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} onPress={submit} />
               ) : (
                 <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
               )}
