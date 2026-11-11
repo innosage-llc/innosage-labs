@@ -11,3 +11,4 @@ This is a curated command/result ledger, not a complete terminal transcript. Per
 - Director identified repeated motion and excessive similar road shots in first candidate; revision underway. No final director score or pass yet.
 - Synthetic helper verification: generated 4.2s test footage, extracted nine timestamps into one sheet with hash receipt. Local score regeneration produced a byte-identical 76s stereo 48kHz WAV.
 - Founder review and final issue closure remain pending. No personal video has been posted by this workflow.
+- First accepted-method director round rejected all five candidates (70/73/71/66/77). Revisions in progress; scores are not rounded up to meet the threshold. Full-duration audio service returned an app-reload error once; preserved failure and serialized project switching with audio review thereafter.

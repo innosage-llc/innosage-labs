@@ -32,6 +32,10 @@ with tempfile.TemporaryDirectory() as tmp:
         name = f'sheet-{begin // 12:03}.jpg'
         canvas.save(a.output / name, quality=92)
         sheets.append(name)
-receipt = {'sha256': hashlib.file_digest(a.video.open('rb'), 'sha256').hexdigest(), 'video_duration': duration, 'timestamps': times, 'sheets': sheets, 'method': '2fps + near-end frame; not continuous playback', 'audio_review': 'NOT_PERFORMED', 'director_score': None}
+digest = hashlib.sha256()
+with a.video.open('rb') as source:
+    for chunk in iter(lambda: source.read(1024 * 1024), b''):
+        digest.update(chunk)
+receipt = {'sha256': digest.hexdigest(), 'video_duration': duration, 'timestamps': times, 'sheets': sheets, 'method': '2fps + near-end frame; not continuous playback', 'audio_review': 'NOT_PERFORMED', 'director_score': None}
 (a.output / 'receipt.json').write_text(json.dumps(receipt, indent=2))
 print(json.dumps({'frames': len(times), 'sheets': len(sheets), 'duration': duration}))
