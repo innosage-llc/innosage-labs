@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Button, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
@@ -16,8 +16,11 @@ import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { AppHeader, RootNavigation } from './ui/AppChrome';
+import { ActionButton } from './ui/ActionButton';
 import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
+import { selectedService } from './ProAccess';
+import { services } from './ServiceConfig';
 import { Directory, File, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
@@ -54,6 +57,7 @@ function RecorderScreen() {
   const [files, setFiles] = useState(listRecordings);
   const [phase, setPhase] = useState<CapturePhase>('idle');
   const [message, setMessage] = useState('');
+  const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   const [transcriptRecording, setTranscriptRecording] = useState<File>();
@@ -78,6 +82,12 @@ function RecorderScreen() {
     }
   });
   const { durationMillis } = useAudioRecorderState(recorder, 500);
+
+  useEffect(() => {
+    let current = true;
+    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); }).catch(() => {});
+    return () => { current = false; };
+  }, [showPro]);
 
 
   async function importAudio() {
@@ -203,51 +213,71 @@ function RecorderScreen() {
       <AppHeader title={{ record: 'Record', library: 'Library', settings: 'Settings' }[destination]} />
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)} onClose={() => setTranscriptRecording(undefined)} /> : null}
-      {phase === 'recording' && destination !== 'record' ? <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
-        <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>Recording · {formatTime(durationMillis / 1000)}</Text>
-        <Button title="Return to recording" onPress={() => setDestination('record')} />
+      {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
+        <View style={{ flex: 1 }}>
+          <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatTime(durationMillis / 1000)}</Text>
+          <Text style={styles.support}>Your audio is staying on this device.</Text>
+        </View>
+        <ActionButton title="Return" fullWidth={false} variant="text" onPress={() => setDestination('record')} />
       </View> : null}
-      {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text, padding: spacing.lg }}>{message}</Text> : null}
+      {message ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{message}</Text> : null}
       {destination === 'record' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-
-      <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>{phase === 'recording' ? 'Recording in progress' : 'Ready when you are'}</Text>
-      <Text style={styles.copy}>
-        {phase === 'recording'
-          ? `Recording · ${formatTime(durationMillis / 1000)}`
-          : 'Record and play audio saved on this device.'}
-      </Text>
-      <Button
-        title={{ idle: 'Start recording', starting: 'Starting…', recording: 'Stop recording', saving: 'Saving…', importing: 'Start recording' }[phase]}
-        disabled={phase !== 'idle' && phase !== 'recording'}
-        onPress={phase === 'recording' ? stop : start}
-      />
-      <Text style={styles.copy}>Recording works offline. You can keep recording with the screen locked.</Text>
+        <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
+          {phase === 'recording' ? 'Your recording is in progress.' : 'Keep the thought. Even without internet.'}
+        </Text>
+        <Text style={styles.copy}>Recordings stay on this device. Nothing is uploaded until you choose to transcribe.</Text>
+        {phase === 'recording' ? <View style={styles.timerCard}>
+          <Text style={[typography.caption, { color: palette.muted }]}>RECORDING</Text>
+          <Text accessibilityLiveRegion="polite" style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
+          <Text style={styles.support}>Keep recording with the screen locked.</Text>
+        </View> : <View style={styles.valueCard}>
+          <Text style={styles.cardTitle}>Made for the moment</Text>
+          <Text style={styles.support}>Capture now. Choose later if you want a transcript or summary.</Text>
+        </View>}
+        <ActionButton
+          title={{ idle: 'Start recording', starting: 'Starting…', recording: 'Stop & save', saving: 'Saving…', importing: 'Start recording' }[phase]}
+          variant={phase === 'recording' ? 'outlined' : 'primary'}
+          disabled={phase !== 'idle' && phase !== 'recording'}
+          onPress={phase === 'recording' ? stop : start}
+        />
+        <Text style={styles.support}>Offline first · No account needed to record</Text>
       </ScrollView> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <Text style={styles.copy}>Choose and configure the service used for new transcriptions. Existing jobs keep their service.</Text>
-        <Button title="Transcription service" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+        <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
+        <Text style={styles.copy}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
+        <View style={styles.valueCard}>
+          <Text style={styles.cardTitle}>Transcription service</Text>
+          <Text style={styles.support}>{serviceLabel}</Text>
+          <Text style={styles.support}>Choose the service for new transcriptions. Existing jobs keep the service they started with.</Text>
+          <ActionButton title="Choose service and manage keys" variant="primary" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
+        </View>
       </ScrollView> : <View style={{ flex: 1, paddingHorizontal: spacing.lg, gap: spacing.md }}>
-      <Button title={phase === 'importing' ? 'Importing…' : 'Import audio'} disabled={phase !== 'idle'} onPress={importAudio} />
+      <ActionButton title={phase === 'importing' ? 'Importing…' : 'Import audio'} disabled={phase !== 'idle'} variant="primary" onPress={importAudio} />
       <FlatList
         data={files}
         keyExtractor={(file) => file.uri}
-        ListEmptyComponent={<Text style={styles.copy}>No recordings yet.</Text>}
+        ListEmptyComponent={<View style={styles.emptyState}>
+          <Text style={styles.cardTitle}>Your recordings live here</Text>
+          <Text style={styles.support}>Make a recording or import an M4A file. Playback and transcript choices stay on this device.</Text>
+        </View>}
         extraData={playback}
         renderItem={({ item }) => {
           const selected = playingFile === item.uri;
           const action = selected && playback.playing ? 'Pause' : 'Play';
           const label = recordingLabel(item);
           return (
-            <View style={styles.recording}>
+            <View style={styles.recordingCard}>
               <View style={styles.row}>
                 <Text style={styles.filename}>{label} · M4A</Text>
-                <Button
+                <ActionButton
+                  fullWidth={false}
+                  variant="text"
                   title={action}
                   accessibilityLabel={`${action} ${label}`}
                   disabled={phase !== 'idle'}
                   onPress={() => togglePlayback(item)}
                 />
               </View>
-              <Button title="Transcript" accessibilityLabel={`Transcript for ${label}`}
+              <ActionButton title="Transcript" accessibilityLabel={`Transcript for ${label}`} variant="outlined"
                 disabled={phase !== 'idle'} onPress={() => { player.pause(); setTranscriptRecording(item); }} />
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
@@ -275,7 +305,7 @@ function RecorderScreen() {
         }}
       />
       </View>}
-      <RootNavigation selected={destination} onSelect={setDestination} enabled={canSwitchDestination(phase)} />
+      <RootNavigation selected={destination} onSelect={next => { setDestination(next); setMessage(''); }} enabled={canSwitchDestination(phase)} />
     </SafeAreaView>
   );
 }
@@ -285,9 +315,17 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  copy: { fontSize: 16, color: '#374151' },
-  filename: { flex: 1, fontSize: 15, color: '#111827' },
-  recording: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#d1d5db' },
+  copy: { fontSize: 16, lineHeight: 24, color: '#49454F' },
+  support: { fontSize: 14, lineHeight: 21, color: '#49454F' },
+  filename: { flex: 1, fontSize: 15, color: '#1D1B20' },
+  cardTitle: { fontSize: 17, lineHeight: 24, fontWeight: '600', color: '#1D1B20' },
+  valueCard: { padding: 20, gap: 12, borderRadius: 24, backgroundColor: '#F3EDF7' },
+  timerCard: { alignItems: 'center', padding: 24, gap: 8, borderRadius: 28, backgroundColor: '#F3EDF7' },
+  timer: { fontSize: 48, lineHeight: 56, fontVariant: ['tabular-nums'], fontWeight: '500', color: '#1D1B20' },
+  emptyState: { gap: 10, paddingTop: 28, paddingBottom: 16 },
+  recordingCard: { padding: 16, marginBottom: 12, gap: 10, borderRadius: 20, backgroundColor: '#F3EDF7' },
+  recordingBanner: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3EDF7' },
+  notice: { color: '#1D1B20', padding: 16, backgroundColor: '#F3EDF7' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   slider: { width: '100%' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },

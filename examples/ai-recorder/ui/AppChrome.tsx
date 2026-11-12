@@ -44,7 +44,7 @@ export function RootNavigation({ selected, onSelect, enabled }: {
         selected={selected === destination.id} enabled={enabled}
         onClick={() => onSelect(destination.id)} colors={{
           selectedIconColor: palette.text, selectedTextColor: palette.text,
-          selectedIndicatorColor: palette.border, unselectedIconColor: palette.muted,
+          selectedIndicatorColor: mode === 'light' ? '#E8DEF8' : '#4A4458', unselectedIconColor: palette.muted,
           unselectedTextColor: palette.muted,
         }}>
         <NavigationBarItem.Icon><Icon source={icons[destination.id]} size={24} /></NavigationBarItem.Icon>

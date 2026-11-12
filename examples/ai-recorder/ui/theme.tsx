@@ -17,13 +17,13 @@ export interface ThemePalette {
 }
 
 export const lightPalette: ThemePalette = {
-  background: '#f8fafc',
-  surface: '#ffffff',
-  text: '#0f172a',
-  muted: '#475569',
-  border: '#cbd5e1',
-  controlBorder: '#64748b',
-  accent: '#1d4ed8',
+  background: '#FFFBFE',
+  surface: '#F3EDF7',
+  text: '#1D1B20',
+  muted: '#49454F',
+  border: '#E7E0EC',
+  controlBorder: '#79747E',
+  accent: '#6750A4',
   onAccent: '#ffffff',
   danger: '#b91c1c',
   onDanger: '#ffffff',
@@ -31,17 +31,17 @@ export const lightPalette: ThemePalette = {
 };
 
 export const darkPalette: ThemePalette = {
-  background: '#090d16',
-  surface: '#131c2e',
-  text: '#f8fafc',
-  muted: '#94a3b8',
-  border: '#26354a',
-  controlBorder: '#94a3b8',
-  accent: '#60a5fa',
-  onAccent: '#090d16',
-  danger: '#f87171',
-  onDanger: '#090d16',
-  success: '#4ade80',
+  background: '#141218',
+  surface: '#211F26',
+  text: '#E6E0E9',
+  muted: '#CAC4D0',
+  border: '#49454F',
+  controlBorder: '#938F99',
+  accent: '#D0BCFF',
+  onAccent: '#381E72',
+  danger: '#F2B8B5',
+  onDanger: '#601410',
+  success: '#B7DDB4',
 };
 
 export const palettes: Record<ThemeMode, ThemePalette> = {
