@@ -10,7 +10,7 @@ Stacked on draft PR #57 at a139eab543734719e1673fccd114d3b9f4772cb2; parent #56 
 - [x] Final code 723ffbb: 31 tests, typecheck, standalone Release build and full Android Release lint PASS; matching actual AFTER journey captured with SHA256 manifest.
 - [x] Fresh independent exact-source Sol6.1 medium review: no actionable findings; tests/typecheck independently rerun. Native runtime/evidence review remains explicitly distinct.
 - [x] Verify background/root continuity, repeated capture/save/handoff taps, no autoplay, expiry/leave cancellation, picker cancel/M4A/WAV rejection, relaunch, paused seek, 150% font and bottom scroll reachability.
-- [ ] Draft PR and verified immutable screenshot/source links.
+- [x] Draft PR59 stacked on PR57; evidence e521999 contains all30 actual screenshot originals and manifest. Remote final source, every PNG hash and all4 embedded raw URLs read back successfully. No Actions run triggered.
 
 Existing execution-tool approval route resolved initial sandbox-only tooling failures without adding product/device capabilities or changing manifest, SDK or discovery links. All fixture data is synthetic/local; no uploads or billable calls.
 
