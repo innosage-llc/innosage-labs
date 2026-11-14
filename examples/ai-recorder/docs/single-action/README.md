@@ -70,3 +70,7 @@ Fresh independent read-only gpt-6.1-sol medium CODE review of exact9d19955 and i
 ## Later bounded continuation
 
 [Two-Start diagnosis/evidence continuation](continuation-60m/README.md): Draft62/BLOCKED retained. Diagnostic sample succeeds; production configuration-transition interruption prevents P2 Saved fullscroll. Earlier failure remains unexplained. Original evidence above is historical; latest final state is16known identities, exact production/settings restored and owned resources stopped.
+
+## Later fixed-configuration production Saved proof
+
+[Separately authorized one-Start production320dp/font2.0 proof](production-small-30m/README.md) fills only boundedP2visual/scroll/bounds/handoff evidence. LowerStartactivation remainsNOT_TESTED; earliergenericstartup andconfiguration-transition failures remainunresolved. Draft62/BLOCKED retained pendingcoordinator. Latestknownset17identities, originalsettings/grants andexactproduction restored, ownedruntime stopped. Earlierpackets remainhistorical.
