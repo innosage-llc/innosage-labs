@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { hasSavedFeedback, microphonePermissionMessage, recordingSavedMessage } from './recordFeedback.ts';
 import { handoffReducer as reduce, initialHandoff, locateRecording } from './libraryHandoff.ts';
 
 const saved = (uri = 'file:///recording-a.m4a') => reduce(initialHandoff, { type: 'saved', uri });
@@ -84,4 +85,31 @@ test('leaving/replacing/unmounting cancels pending scroll and recovery callbacks
   for (let i = 0; i < 20; i++) t.mock.timers.tick(200);
   assert.equal(attempts, 1);
   assert.equal(unavailable, 0);
+});
+
+// Presentation regression: file identity outlives temporary success feedback.
+
+
+test('saved feedback ends when navigation/playback clears its message, preserving URI identity', () => {
+  const saved = reduce(initialHandoff, { type: 'saved', uri: 'file:///synthetic/one.m4a' });
+  assert.equal(hasSavedFeedback('idle', saved.savedUri, recordingSavedMessage), true);
+  const viewed = reduce(saved, { type: 'view' });
+  const returned = reduce(viewed, { type: 'leave' });
+  assert.equal(returned.savedUri, saved.savedUri);
+  assert.equal(hasSavedFeedback('idle', returned.savedUri, ''), false);
+  assert.equal(hasSavedFeedback('idle', returned.savedUri, 'Could not play the recording.'), false);
+});
+
+test('new capture and busy/error states cannot reuse a prior saved affordance', () => {
+  for (const phase of ['starting', 'recording', 'saving', 'importing']) {
+    assert.equal(hasSavedFeedback(phase, 'file:///synthetic/one.m4a', recordingSavedMessage), false);
+  }
+  assert.equal(hasSavedFeedback('idle', undefined, recordingSavedMessage), false);
+  const reset = reduce({ ...initialHandoff, savedUri: 'file:///synthetic/one.m4a' }, { type: 'reset' });
+  assert.equal(hasSavedFeedback('idle', reset.savedUri, ''), false);
+});
+
+test('microphone recovery copy follows native canAskAgain, without inventing a settings action', () => {
+  assert.equal(microphonePermissionMessage(true), 'Microphone access was not allowed. Tap Start recording to ask again.');
+  assert.equal(microphonePermissionMessage(false), 'Microphone access is blocked. Enable Microphone for AI Recorder in Android Settings, then tap Start recording.');
 });

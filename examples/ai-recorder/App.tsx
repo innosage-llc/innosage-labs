@@ -19,6 +19,7 @@ import { AppHeader, RootNavigation } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
 import { RecordControl } from './ui/RecordControl.android';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
+import { hasSavedFeedback, microphonePermissionMessage, recordingSavedMessage } from './ui/recordFeedback';
 import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
@@ -94,7 +95,7 @@ function RecorderScreen() {
       await source.move(saved);
       setFiles(listRecordings());
       dispatchHandoff({ type: 'saved', uri: saved.uri });
-      setMessage('Recording saved on this device.');
+      setMessage(recordingSavedMessage);
     } catch {
       dispatchHandoff({ type: 'reset' });
       setMessage('Could not save the recording.');
@@ -205,8 +206,9 @@ function RecorderScreen() {
     ++playRequest.current;
     setMessage('');
     try {
-      if (!(await requestRecordingPermissionsAsync()).granted) {
-        setMessage('Allow microphone access to record.');
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        setMessage(microphonePermissionMessage(permission.canAskAgain));
         setCapturePhase('idle');
         return;
       }
@@ -284,6 +286,8 @@ function RecorderScreen() {
     return () => subscription.remove();
   }, [destination, phase]);
 
+  const showSavedFeedback = hasSavedFeedback(phase, handoff.savedUri, message);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: palette.background }}>
       <AppHeader title={{ record: 'Record', library: 'Library', settings: 'Settings' }[destination]} />
@@ -297,7 +301,7 @@ function RecorderScreen() {
       </View> : null}
       {message && destination !== 'record' ? <View style={styles.notice}>
         <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text>
-        {handoff.savedUri && phase === 'idle' ? <ActionButton title="View in Library" variant="text"
+        {showSavedFeedback ? <ActionButton title="View in Library" variant="text"
           fullWidth={false} onPress={viewSavedRecording} /> : null}
       </View> : null}
       {destination === 'record' ? <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="automatic"
@@ -311,11 +315,11 @@ function RecorderScreen() {
               style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
             {message ? <Text accessibilityLiveRegion="polite" style={[styles.copy, { textAlign: 'center' }]}>{message}</Text> : null}
           </> : null}
-          {handoff.savedUri && phase === 'idle' ? <View>
+          {showSavedFeedback ? <View>
             <ActionButton title="View in Library" variant="tonal" fullWidth={false} onPress={viewSavedRecording} />
           </View> : null}
           <RecordControl phase={phase} onPress={phase === 'recording' ? stop : start} />
-          {!(handoff.savedUri && phase === 'idle') ? <Text style={[styles.support, { textAlign: 'center' }]}>
+          {!showSavedFeedback ? <Text style={[styles.support, { textAlign: 'center' }]}>
             Recordings are stored on this device.
           </Text> : null}
         </View>
