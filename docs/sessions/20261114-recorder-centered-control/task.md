@@ -1,23 +1,18 @@
-# Task
+# Centered recorder control — coordinator R1/R2 corrections
 
-- [x] Read UI entry; dependency check PASS at official revision a9e5bd3fa00b4e61f632e43f85da73aee1942582; overview then native-ui/ui.
-- [x] Verify remote main c1cafcce07ef156418ba89528807188271923bef; create isolated task branch.
-- [x] Investigate theme provenance and choose installed native control; see design.md.
-- [x] Implement bounded launch simplification. Typecheck and existing 36 tests PASS; native/runtime gates in progress. Scoped issue #60 created after duplicate check.
-- [x] Run final-source local source/build/runtime checks and independent code/visual review; see evidence README and review.md.
-- [x] Push final evidence and publish review-ready PR [#61](https://github.com/innosage-llc/innosage-labs/pull/61), linked to [#60](https://github.com/innosage-llc/innosage-labs/issues/60).
-- [x] Stop at new owner UI and merge approval boundary; approval itself remains PENDING.
+Current state: final correction package for coordinator delivery review. Owner approval is not being requested. No merge, auto-merge, deployment, remote workflow, Library upload, Slack message or broader acceptance issue closure.
 
-First Release runtime found installed Shape.Circle native defaults render a near-zero radius despite declaration documentation. Supply explicit radius1 and32 vertices; rerun final-source build/checks/review and replace candidate captures. Permission dialog and denied-flow exercise are genuine runtime, not mocks.
+- [x] Continue same isolated branch/PR61/issue60. Verify previous remote head73c3471 and mainc1cafcce before corrections; no duplicates or rebase.
+- [x] Inspect coordinator observation, actual retained image, original/global notice and final prior source. Preserve original raw receipts and historical PNGs privately.
+- [x] R1: current-success presentation predicate shared by CTA/storage; preserve file URI, handlers, recorder/player ownership and navigation. Focused retained-URI/busy/error regressions.
+- [x] R2: use actual native canAskAgain; explicit retryable copy and manual Android device Settings > Apps > AI Recorder > Permissions > Microphone path. No new button, permission declaration, Retry save or Library titles/previews.
+- [x] Final runtime6d5645f:39 tests, typecheck, offline Release and full native lint PASS. Installed APK/embedded JS read-back equal.
+- [x] Final actual save/new-capture/manual-playback/return and true force-stop/relaunch without clear-data verified. Idle/storage/no stale CTA; files retained. Both permission denial branches and actual retry/manual recovery exercised.
+- [x] Final200%/320dp actual recording and saved states captured. Restore font/display/accessibility; leave task emulator available for coordinator review.
+- [x] Fresh independent local Sol6.1 medium code review; fresh independent visual review of final actual cold idle/saved/error/recording. Preserve residual suggestions and runtime boundaries in review.md.
+- [x] Full45-file product/config/lock source-equivalence record created; all updated PNGs bound to final runtime source. Raw traces remain outside public repo.
+- [ ] Publish refreshed evidence on existing PR61/issue60, verify final remote head/main, PNG bytes and literal-newline formatting.
 
-Independent visual review: first action and completion were clear. Correct saved-state retrieval grouping/emphasis by centering the existing native View in Library action with tonal styling. A transient navigation screenshot must be recaptured after settling. Permission recovery remains the authorized original Start recording/system prompt contract; no invented Settings/retry-save action. Small-screen scrolling intentionally clips offscreen content; stop/nav remain reachable and both scroll endpoints are documented, not a sticky-timer requirement. Final evidence and checks must bind the corrected source.
+Historical implementation: approved center-circle superseded the old lower text-button proposal; installed native Circle required explicit radius; saved action was centered/grouped after initial visual review. Theme provenance was corrected factually without changing theme bytes/sourceHash or claiming shared-release acceptance. Earlier readiness statements and screenshots are superseded by this correction package, not new owner approval.
 
-Final runtime implementation5068e16;36 tests/typecheck/offline Release/full lint PASS. Installed APK and embedded JS verified equal. Actual Release PNG manifest includes default/recording/saved/Library/manual playback/large text/small screen/permission/TalkBack focus. Source/render checks and NOT_RUN native fault cases are explicitly separated. Final fresh visual review retains bounded product suggestions for owner judgment; code review has no actionable findings. No remote workflows, provider calls, merge or deploy.
-
-Artifact commit293a7174b65878a89948e35568f31724e9306dde publishes23 original PNGs and sanitized manifest. Parent delivery includes exact local path/hash/size plus commit-pinned repository blob/raw routes, retained privately outside Labs. No Slack sent. Task-owned emulator stopped after exact original settings restoration. Remote main remains c1cafcce; no rebase, merge, auto-merge, deploy or broader issue closure. Session is awaiting the new owner UI judgment, not closed via a merge workflow.
-
-## Coordinator R1/R2 correction — in progress
-
-R1 confirmed by comparing baseline global message gate with5068 Record branch. Retained savedUri can outlive success message. Use one success-only presentation predicate for CTA/storage; retain URI, handlers, ownership and navigation. R2 uses actual native canAskAgain for truthful English retry/manual-settings guidance, no new action or permission. Add focused presentation/recovery regression tests; rerun local gates and exact-source runtime/reviews. Preserve historical evidence privately; replace launch comparison with observed force-stop/relaunch without clear-data. Do not seek owner approval yet.
-
-R1/R2 independent visual review confirmed consistent cold/post-playback idle and clear retryable wording, but requested a more explicit blocked-permission recovery path. Add only truthful Android device Settings > Apps > AI Recorder > Permissions > Microphone copy; no new button or feature. Timestamp/title suggestion remains out of scope; visual suggestions are not relabeled as a finding-free PASS. Final checks/evidence must bind this last copy revision.
+Observed limitation: native capture failed once during external permission/notification switching, then recovered after data-preserving cold relaunch. No ownership/recovery workaround added; cause unverified. Controlled failure injection, physical/spoken audio, audible TalkBack and unclaimed platforms remain explicit NOT_RUN/NOT_VERIFIED. See evidence README and review.md.

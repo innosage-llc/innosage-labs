@@ -1,56 +1,62 @@
-# Centered native recording control — #60
+# Centered recording control — R1/R2 correction
 
-Review-ready [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61), scoped [issue #60](https://github.com/innosage-llc/innosage-labs/issues/60).
+Review package: [PR61](https://github.com/innosage-llc/innosage-labs/pull/61), [issue60](https://github.com/innosage-llc/innosage-labs/issues/60). **Coordinator delivery review is pending. Do not seek owner approval, merge, auto-merge or deploy yet.** Broader acceptance issues remain open.
 
-Record now opens with a brief state and a large centered native microphone button, with a visible Start recording label below and one local-storage line. Recording shows the recorder's real timer and explicit Stop & save. Saved offers the existing URI-bound View in Library action, now grouped centrally. Marketing heading, tinted explanation card and repeated offline/account copy are removed. No waveform, service call, permission declaration, dependency or navigation change.
+Record retains its brief native header, centered native144dp circular microphone, visible English Start recording label and one local-storage line. Recording uses actual recorder duration and explicit Stop & save. No waveform, new feature, dependency/Router/SDK change or permission declaration.
 
-| Before: same-source retained Release launch | After: final-source installed Release |
+| Before: verified retained launch at unchanged main | After: actual final Release cold process launch |
 | --- | --- |
 | <img src="screenshots/before-idle.png" width="240"> | <img src="screenshots/after-idle.png" width="240"> |
 
-| Recording | Saved | Small screen,200% text |
+## Bounded corrections
+
+R1: saved URI identity outlives transient success feedback. The earlier Record branch checked only idle+URI for the CTA/storage, while its heading fell back to Ready when the message cleared. A single hasSavedFeedback predicate now requires idle+URI+the current success message for both CTA and storage. Navigation, handlers, recorder/player ownership, files and URI identity are preserved. No reset-on-tab-switch or deletion workaround.
+
+R2: existing Expo requestRecordingPermissionsAsync returns canAskAgain. Retryable denial explicitly says Start recording asks again. Permanent denial names the actual manual path: Android device Settings > Apps > AI Recorder > Permissions > Microphone; allow access, return and tap Start recording. No Open settings button, new permission or invented Retry save. Actual system pages and both native response branches were exercised.
+
+| Saved feedback | Playback return: honest idle | Permanent denial: explicit manual path |
 | --- | --- | --- |
-| <img src="screenshots/recording-timer.png" width="220"> | <img src="screenshots/saved.png" width="220"> | <img src="screenshots/small-saved.png" width="220"> |
+| <img src="screenshots/saved.png" width="220"> | <img src="screenshots/post-playback-idle.png" width="220"> | <img src="screenshots/permission-denied.png" width="220"> |
 
-## Source and artifact identity
+## Frozen source and installed artifact
 
-Runtime implementation: `5068e16d13c6e686a0cbbe2c10157699a1de960a`; subsequent evidence-only commits do not alter runtime source. Installed APK was pulled back and matches the built Release byte-for-byte:
+Final runtime source: `6d5645f34f88ecd940c730eedd96e6529e6c919a`. Later evidence-only commits must match every tracked product file outside docs, including lockfile, against that source; see source-equivalence.json. The pulled installed package equals the built offline Release:
 
-- APK SHA256: `d82cbbac0cbb94726c2e53536258c5b79a618e64592d2f4f3e5a11df29df038e`.
-- Embedded JS SHA256: `b048e53487190a9f43ce000c05ef1573bcddadbe3bb318ce99db1b26e8d832c6`.
-- Android API36 arm64;1080×2400,420dpi; default font1.0, large font2.0; small override840×1491 (320dp wide). Host audio input/output disabled. UTC capture times are authoritative; emulator's displayed local clock uses its default timezone.
+- APK SHA256 `522983e55f30567529bd4a61384c8ebc34c169905800573a5ce931795f4d6997`.
+- Embedded JS SHA256 `22422cccec847c87cce73e1d51a8cbcbbdeb86f70eb819c8055d5c4141464575`.
+- Android API36 arm64;1080×2400 at420dpi, default font1.0; large text2.0 and small840×1491 (320dp) tested separately. Host audio input/output disabled. UTC capture times are authoritative; emulator clock uses its default timezone.
 
-[Manifest](manifest.json) gives every original PNG's source, capture time, dimensions, hash and size. Baseline is the owner-supplied, already-verified launch at unchanged remote main `c1cafcce`, not an old saved-state image. Its retained APK/JS attestation is inherited; this task did not access its original device or worktree.
+[PNG manifest](manifest.json) records original bytes, source, dimensions, capture time, hash and size. All updated product PNGs come from this installed final source. The before image is the owner-supplied verified c1cafcce launch baseline; original runtime/worktree was not accessed. Prior candidate after-idle and other historical images are superseded and retained privately, not reused or relabeled as final launch evidence. The new after-idle is an observed force-stop/relaunch without clearing data; cold-library shows the retained synthetic files afterward.
 
-## Local validation
+## Checks and actual runtime
 
 | Check | Result and scope |
 | --- | --- |
-| Locked Node24 `npm test` | PASS36/36:23 protocol/recovery +13 navigation/handoff tests; offline fixtures |
-| `npm run typecheck` | PASS on final implementation |
-| Local offline `:app:assembleRelease` | PASS, arm64-v8a; no remote CI |
-| Full `:app:lintRelease` | PASS,0 errors/22 warnings; full lint, not just vital lint |
-| Actual RecordControl rendered-state contracts | PASS5 phases/45 assertions in a private local harness with stubbed module boundaries: labels, native enabled state, semantics,144dp target and explicit shape radius. This does not exercise native async callbacks. |
-| Installed artifact verification | PASS built and installed APK/JS hashes equal |
-| Independent code review | Fresh local gpt-6.1-sol medium, exact implementation5068e16 versus baseline: no actionable findings; source-only |
-| Independent visual review | Separate fresh local gpt-6.1-sol medium; see review disposition in session docs |
+| Node24 npm test | PASS39/39:23 protocol/recovery +16 navigation/handoff/presentation tests. New cases cover stale feedback with retained URI, busy/error exclusions and both canAskAgain branches. Offline fixtures only. |
+| Typecheck | PASS on final product source |
+| Offline arm64 assembleRelease | PASS local build |
+| Full lintRelease | PASS0 errors/22 warnings; full native lint, not only vital lint |
+| Native control render contract harness | PASS5 phases/45 assertions with stubbed module boundaries; not native async integration |
+| Installed package/embedded JS | PASS equal to built Release |
+| Independent code review | Fresh local gpt-6.1-sol medium exact-source review, no actionable findings; source-only |
+| Independent visual review | Separate fresh local Sol6.1 medium; findings/dispositions remain explicit in session review.md, not a blanket visual PASS |
 
-## Actual runtime exercised
+Actual final Release evidence:
 
-- Idle: real Material FilledIconButton, mic icon, visible English label; accessibility tree exposes Start recording as android.widget.Button with144dp square bounds.
-- Recording: actual duration progresses; explicit Stop & save and stop icon. Repeated stop taps produce one saved file. Recorder stays active when switching roots and returning (earlier candidate of the same unchanged controller); final-source normal recording captures wait for navigation to settle.
-- Saved → View in Library: matching newly saved date/time row highlighted; no autoplay. Explicit Play advances the actual local player's time, Pause retains position. Separate synthetic captures cover multiple recordings, not one continuous screenshot timeline.
-- Cold relaunch retains Library files. Transcription/summary/settings service calls were never activated.
--200% text and320dp small screen: start, recording, stop and saved Library action reachable; fixed bottom navigation unobscured. Both recording scroll endpoints are captured. Offscreen content naturally clips; status/timer are not sticky. Scales are applied before capture; live font/display reconfiguration during active recording is not an acceptance claim.
-- Permission denial: actual original error message; Start recording reopens the real microphone prompt. Starting is visible beneath the genuine system dialog. No invented Open settings or Retry save action.
-- Installed TalkBack: bound service, native keyboard focus/Enter starts recording; Tab reacquires Stop & save and Enter saves. Screenshots show focus. Exact original service/null, enabled0, touch exploration0, font1.0 and display configuration restored. Audible announcements, touch-exploration gestures and physical listening remain NOT_VERIFIED.
+- Save yields success+View in Library; new recording removes the old success/CTA. State-aware captures validate saved and idle text before accepting those labels.
+- View in Library locates the saved row without autoplay; explicit Play advances actual local playback, Pause retains position. Returning to Record gives Ready+storage and no stale CTA while saved files remain.
+- Force-stop/relaunch without clear-data gives the same truthful idle; Library retains the prior recordings. No transcription/summary/service API was activated.
+- Retryable denial reopens a genuine system microphone prompt on Start recording. A second denial yields blocked/manual-path guidance; retry remains blocked without pretending another prompt opened. Manual system permission recovery then allows recording. Existing optional notification requests are declined.
+-200% text and320dp small screen preserve reachable recording/save actions and fixed bottom navigation. Both small recording scroll endpoints are captured. Content outside the scroll viewport clips normally; no sticky timer was added.
 
-## Explicit limits
+During external permission/notification switching, the existing native start path returned its honest start error and a retry remained Starting before failing. A data-preserving cold process relaunch recovered normal capture. Cause is unverified; no recorder-owner reset or new recovery handler was introduced. This is an observed runtime limit, not a controlled native-failure-injection PASS.
 
-NOT_RUN: isolated production saving-busy screenshot (too brief in normal local saves), actual stop/save/disk-full/native-start failure injection, telephony interruption, process death during capture, physical microphone/spoken-marker/audio-quality acceptance, iOS/Web runtime, live provider/product quota and any remote workflow. Saving disabled/label behavior has the rendered-state check plus installed native source inspection; neither substitutes for an injected asynchronous native save failure. No mock or fault-injection screenshots are included.
+No fault-injection/mock screenshots. UI automation uses observed labels for static controls and checks actual phase boundaries; preliminary mistimed or misnamed captures are retained privately and excluded from the delivery manifest. Repeated sequential input that arrives after a completed save is a new Start action; no claim is made that a post-idle tap is debounced. Native busy guards remain unchanged.
 
-The initial candidate exposed an installed Shape.Circle default-radius discrepancy; final control supplies explicit radius1 and32 vertices through the official API. Failed candidate/transient captures are retained privately and excluded here. A preliminary timing script tapped during scroll settling; the final small-screen save was rerun after settling and observed successful before restoring display.
+## Readiness limits and authority
 
-Shared theme provenance: #57 changed the consumer palette without refreshing its manifest. Only factual localHash/localModifications entries were corrected; theme bytes and sourceHash remain unchanged. Canonical source and release metadata hashes were checked locally. This partial theme record is not full generic-release compliance or Founder acceptance; that release acceptance remains unverified/pending.
+NOT_RUN/NOT_VERIFIED: actual native start/stop/save/disk-full failure injection, isolated normal saving-busy screenshot, capture process-death/telephony interruption, physical microphone/spoken-marker/audio-quality acceptance, audible TalkBack/touch-exploration gestures, iOS/Web runtime and live providers. Prior TalkBack keyboard focus/activation at5068e16 is historical unchanged-control evidence; it is not relabeled as a final6d5645f runtime check. Render/helper tests do not establish native async save recovery.
 
-No merge, auto-merge, deploy, broader-issue closure or new owner UI approval has occurred. The updated actual UI must be shown to the owner for a new approval before merge.
+Timestamp-only older-file recognition remains out of scope; no titles/previews were added. Saved CTA emphasis versus the expressly approved large central mic remains a documented design tradeoff. The permission-review finding was addressed through truthful copy and an explicit observed manual path, within the no-new-button constraint.
+
+Theme bytes/sourceHash remain unchanged. Earlier manifest localHash provenance was corrected factually; no full generic-release compliance or Founder acceptance is claimed. No dependency/discovery repair, remote CI, merge, deployment or broader-issue closure. Raw Skills/Brain text, prompts, logs, device identifiers and host paths remain private outside Labs. Task emulator stays available for coordinator delivery review; original font/display/accessibility values are restored.

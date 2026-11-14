@@ -1,5 +1,7 @@
 # Centered recording control
 
-Owner authorized a large centered native circular microphone control, a visible Start recording label, real recording timer and Stop & save, with simpler launch copy. Preserve recording ownership, saving, Library handoff and navigation. Android Release runtime and local CI only. No merge, deployment or release acceptance is authorized; owner must approve updated runtime UI again.
+Current state: bounded R1/R2 correction package for coordinator delivery review. Do not seek owner approval, merge, auto-merge or deploy yet.
 
-This session changes the existing consumer; it does not introduce a generic UI snapshot or claim acceptance of the experimental shared UI release. Raw execution receipts remain private outside this repository.
+Owner authorized the centered native circular microphone control, visible English label, real timer/Stop & save and simplified launch copy. The correction makes idle/saved feedback consistent without changing retained URI or audio ownership, and uses native canAskAgain for truthful retry/manual-system-settings copy. No new Open settings button, permissions, titles/previews or dependencies.
+
+Runtime source and exact local gates/evidence are documented in examples/ai-recorder/docs/centered-control. Raw execution/Skills/Brain/review receipts remain private outside Labs. The task-owned emulator is left available after exact font/display/accessibility restoration for coordinator review. No close-session/merge workflow is run.
