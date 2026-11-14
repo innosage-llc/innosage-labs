@@ -1,0 +1,66 @@
+{
+  "at": "2026-11-14T11:12:56.663475+00:00",
+  "binding": {
+    "production_source": "9d199559f96aedd019d56ee374de8888460eee4c",
+    "control_sha256": "e70ae9732fd560f1fe824b2e9546d3c4e7f14448da5b285a7c1027e69cb37151",
+    "entry_sha256": "fba36cdfff5341aa584402925b97cca3ea450aa66ab3fd688e65771c16a1e46e",
+    "scope": "actual native render/hit/disabled semantics with externally set phases and callback count; no recording/async save claim",
+    "apk_sha256": "3b28c9ffce56ccc0e45512a5e641afe35f890daa36453a6a36571f65947b320c",
+    "js_sha256": "668c44364bcec3518617aa6bc23633cda21e027ef4597b875115baaad6c45c06",
+    "at": "2026-11-14T11:11:15.588896+00:00",
+    "compatible_install": true
+  },
+  "results": [
+    {
+      "phase": "starting",
+      "enabled": false,
+      "icon_and_label_hits": 2,
+      "additional_rapid_taps": 3,
+      "callback_count": 0,
+      "native_enabled_attribute": "false",
+      "single_actionable_parent": true,
+      "status": "PASS"
+    },
+    {
+      "phase": "saving",
+      "enabled": false,
+      "icon_and_label_hits": 2,
+      "additional_rapid_taps": 3,
+      "callback_count": 0,
+      "native_enabled_attribute": "false",
+      "single_actionable_parent": true,
+      "status": "PASS"
+    },
+    {
+      "phase": "importing",
+      "enabled": false,
+      "icon_and_label_hits": 2,
+      "additional_rapid_taps": 3,
+      "callback_count": 0,
+      "native_enabled_attribute": "false",
+      "single_actionable_parent": true,
+      "status": "PASS"
+    },
+    {
+      "phase": "idle",
+      "enabled": true,
+      "icon_and_label_hits": 2,
+      "additional_rapid_taps": 3,
+      "callback_count": 5,
+      "native_enabled_attribute": "true",
+      "single_actionable_parent": true,
+      "status": "PASS"
+    },
+    {
+      "phase": "recording",
+      "enabled": true,
+      "icon_and_label_hits": 2,
+      "additional_rapid_taps": 3,
+      "callback_count": 5,
+      "native_enabled_attribute": "true",
+      "single_actionable_parent": true,
+      "status": "PASS"
+    }
+  ],
+  "limitation": "externally set phases; no real native async starting/saving duration or fault injection claim"
+}

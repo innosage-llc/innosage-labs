@@ -1,0 +1,225 @@
+{
+  "entry": "innosage-universal-ui",
+  "actual_read": true,
+  "dependency_gate": "PASS before official overview read",
+  "framework_revision": "a9e5bd3fa00b4e61f632e43f85da73aee1942582",
+  "design_revision": "6f6d87d61652cf5695ee3e9d4057b5c46404eed2",
+  "selected": [
+    "expo-overview",
+    "expo-ui",
+    "expo-native-ui"
+  ],
+  "classification": "existing Android standalone action/copy/icon audit",
+  "omissions": {
+    "expo-router": "No navigation behavior change; existing destination icon asset only",
+    "expo-animation": "No new gestures or animation",
+    "expo-design-system": "Existing theme/manifest unchanged",
+    "expo-project-structure": "Existing app",
+    "expo-data-fetching": "No network/data change",
+    "eas": "Local offline gates, no delivery"
+  },
+  "generic_release": "Existing0.1.0 Experimental; no new generic snapshot consumption or acceptance claim",
+  "private_receipt_hashes": [
+    {
+      "receipt_id": "00-SKILL.md.txt",
+      "sha256": "6a150b0ff757f31ce59af70d9f3c447fb905466fbe3e78d0a3db1857a6965184",
+      "bytes": 8708
+    },
+    {
+      "receipt_id": "01-SKILL.md.txt",
+      "sha256": "c63fb61657430f4d4e266ea9f037b4e63ebd78686b57b6a20f98a4047b144c55",
+      "bytes": 9588
+    },
+    {
+      "receipt_id": "02-AGENTS.md.txt",
+      "sha256": "2fc6ab7cb0d81f79950bd7fa4c1b9858900d565738a136097e4194d2bbac6345",
+      "bytes": 9651
+    },
+    {
+      "receipt_id": "03-STRATEGY.md.txt",
+      "sha256": "95373c77c87e1bf2aa0bd949a9f9b4ef2691f49107b903a9c072bc535e9e5655",
+      "bytes": 4148
+    },
+    {
+      "receipt_id": "04-SKILL.md.txt",
+      "sha256": "39cc5f7c5d259459fa0606265713208602d0f7aa7cfcb578bb9ea8a2a40c7b73",
+      "bytes": 3481
+    },
+    {
+      "receipt_id": "component-inventory.txt",
+      "sha256": "1e86a24a5589eb60d67647761deab7e7fb17bf391fa36a8372b9b67df97d4186",
+      "bytes": 4338
+    },
+    {
+      "receipt_id": "dependency-gate.json",
+      "sha256": "ffa85b78b36d101aaf58a7ce02e31712db42aa67d0c2efc35e55052453b109c2",
+      "bytes": 972
+    },
+    {
+      "receipt_id": "installed-00.txt",
+      "sha256": "25404c69979157304a889854cc233ca8ce6013480e3468222a01e3b8b2be42c7",
+      "bytes": 2537
+    },
+    {
+      "receipt_id": "installed-01.txt",
+      "sha256": "04cf081d019180b4c49703b96a8557fdd785b409e89d313f93fded38b6947af5",
+      "bytes": 959
+    },
+    {
+      "receipt_id": "installed-02.txt",
+      "sha256": "d7e1d403a9cee02c4e07a9e901483a8445030129d7c952725bc26b5581910693",
+      "bytes": 551
+    },
+    {
+      "receipt_id": "installed-03.txt",
+      "sha256": "f7d9df7dd907ed71bef8f3fad50115f93cca947024e355f716cd9511cc674e1b",
+      "bytes": 5136
+    },
+    {
+      "receipt_id": "installed-04.txt",
+      "sha256": "9c7c2d1b73cc25752d3f11ca2a99e53c2f7ad8e115587c5fc066597742c7152f",
+      "bytes": 3305
+    },
+    {
+      "receipt_id": "installed-05.txt",
+      "sha256": "8e9c27e1b8709ee56a21f196dc26d475105ab625dd2843616a909156101ef79f",
+      "bytes": 3365
+    },
+    {
+      "receipt_id": "installed-06.txt",
+      "sha256": "2ec395c00e69ff7de4af9f426c6b6ffe74f0550072734c682241bcd4df5c34cc",
+      "bytes": 20604
+    },
+    {
+      "receipt_id": "installed-07.txt",
+      "sha256": "e6b2f1823b3b954df50a4e2d3b6f338587e5c3f1388ed0c9ccaecfa6226b96d3",
+      "bytes": 895
+    },
+    {
+      "receipt_id": "installed-08.txt",
+      "sha256": "6946e3ff92ec73e6b9e6517919b8a02e52ef362011fae5d1645c0c84516671c3",
+      "bytes": 1214
+    },
+    {
+      "receipt_id": "installed-09.txt",
+      "sha256": "c9c64e58bc4523d9978202a222a48d6d0c941ade3027131b49afd1ca60ea09fa",
+      "bytes": 6743
+    },
+    {
+      "receipt_id": "installed-10.txt",
+      "sha256": "7218afccaa5e7ddfd9e43666b2df487ea5a0953495eaada63527a19262921a18",
+      "bytes": 30186
+    },
+    {
+      "receipt_id": "next-00-SKILL.md.txt",
+      "sha256": "f8dab000d0956381a600a42be762189be081ec0d24000c4cd012fc7681292ac5",
+      "bytes": 16037
+    },
+    {
+      "receipt_id": "next-01-design-knowledge-index.md.txt",
+      "sha256": "f03e3be2b440c519fcf9ade02c1eb9cc3affb75554cc633a3e1ba763348b7e6c",
+      "bytes": 5754
+    },
+    {
+      "receipt_id": "next-02-README.md.txt",
+      "sha256": "a0943197775705bd37f06b6518d9639f8503693c434abb24e800445d7262f1a3",
+      "bytes": 1812
+    },
+    {
+      "receipt_id": "next-03-patterns.md.txt",
+      "sha256": "bf14e277a50795db5ba6325edd492a157efc09eec60cce17d9c7a9c72d0331f9",
+      "bytes": 3937
+    },
+    {
+      "receipt_id": "next-04-iteration.md.txt",
+      "sha256": "ceb5d3e810709506d14ce2727b628fd9c6f03e8dd3d67388efe72e4a0f43ce28",
+      "bytes": 7074
+    },
+    {
+      "receipt_id": "next-05-registry.json.txt",
+      "sha256": "8f2a84bb8914eca0c12a07e9434869c5c0f44e58caaef321943ca0378aab2914",
+      "bytes": 4998
+    },
+    {
+      "receipt_id": "next-06-README.md.txt",
+      "sha256": "2fadf79c0a4b04d61123b3a622db5a4cb2246a4b863b050e36ac0f8fea4c0013",
+      "bytes": 3066
+    },
+    {
+      "receipt_id": "next-07-SKILL.md.txt",
+      "sha256": "59c0a8c7469d380ddc8499f359a4de8dd53268d5f50dbab896c967f8359ec4d6",
+      "bytes": 6982
+    },
+    {
+      "receipt_id": "next-08-SKILL.md.txt",
+      "sha256": "a54ee681808bdeece32d9219ce74b5e4f86156d76cc6d00fb21ac2633f44c64f",
+      "bytes": 12589
+    },
+    {
+      "receipt_id": "receipt-index.json",
+      "sha256": "5826ebad680174604e2675432c9164f43a6610f65976db9c02a7abdc0b5e40ff",
+      "bytes": 5628
+    },
+    {
+      "receipt_id": "ref-00.txt",
+      "sha256": "2b146682f69e02b96880ca57c7e145ca7c0807ed906f9a2fbd023947720cd21c",
+      "bytes": 9056
+    },
+    {
+      "receipt_id": "ref-01.txt",
+      "sha256": "31139554879619a87a63113867bd046f382043e21132d0d5fd04c2d1445f6bbd",
+      "bytes": 8103
+    },
+    {
+      "receipt_id": "ref-02.txt",
+      "sha256": "13d959f1a2bbd27758e384fe63e81a77cbe5bcaaea89da2a2a6b7c373133c8b4",
+      "bytes": 19945
+    },
+    {
+      "receipt_id": "ref-03.txt",
+      "sha256": "441a4ec3ba49911da534599ad59c7ac98dcd14b0483b72ace8d5db5699acf5b5",
+      "bytes": 17764
+    },
+    {
+      "receipt_id": "ref-04.txt",
+      "sha256": "5355a14493089b85f64ceeb92f46c4ab0b7927b6e425dd02e8b820ada503dc90",
+      "bytes": 4588
+    },
+    {
+      "receipt_id": "ref-05.txt",
+      "sha256": "91f9dc2525974fe047693578a5fc9696ad8cf8c669981b346934f30b5b740f0e",
+      "bytes": 3124
+    },
+    {
+      "receipt_id": "ref-06.txt",
+      "sha256": "1f8c1968fee67a699bd8b8fb5369fc4de68bd550bcdef4dff06f2dc312c2c767",
+      "bytes": 8088
+    },
+    {
+      "receipt_id": "ref-07.txt",
+      "sha256": "8f9f7fc698f6f43e6358798b1c8abbcb4dd24e2d8e4e1b55f70b7aead7924b7c",
+      "bytes": 6550
+    },
+    {
+      "receipt_id": "ref-08.txt",
+      "sha256": "334e8e015fbff00ee10b6e05ea941f0186afc64163da5607a544a28a1a370396",
+      "bytes": 2069
+    },
+    {
+      "receipt_id": "ref-09.txt",
+      "sha256": "472a671d0065eb52de3473ff6c7d00683f6dd7737a4764df6573ac64be49c0b2",
+      "bytes": 4156
+    },
+    {
+      "receipt_id": "ref-10.txt",
+      "sha256": "da82d2c2e3f62b0b8798bcb1d6318f2577d1721c5397f19dfbb7e262511e0174",
+      "bytes": 2093
+    },
+    {
+      "receipt_id": "selection.json",
+      "sha256": "31448393b52cba731ccde8715f595854d1a27f5e7fd27384d695b407a5126f43",
+      "bytes": 832
+    }
+  ],
+  "read_is_not_automatic_dispatch": true
+}
