@@ -8,7 +8,7 @@
 - [x] Fresh independent read-only Sol6.1 medium code/actual-PNG visual reviews completed; no actionable source/material visual finding; full small Saved bottom-scroll evidence unresolved.
 - [x] Extra third start FAILED with existing start-error UI; failure preserved, no retry/reset/diagnosis/fix. Intended background/complete-scroll checks NOT_RUN. Historical5PASS1PARTIAL/old episode NOT_REPRODUCED/NOT_FIXED unchanged.
 - [x] Exact13 originals+2 new=15 retained; third produced no saved identity. Production APK/JS reverified; final Record idle; only owned emulator safely STOPPED and ports released. Old candidate bytes unchanged.
-- [ ] Publish sanitized immutable evidence + linked draft PR and read back exact PNG bytes (controller tracks publication).
+- [x] Published29 immutable PNGs at8cb41426b19bee8b4f591bb7e657198991b475c9; exact remote raw-route bytes/hash/size all match. Created draft PR62, linked issue60 preserving old evidence; controller retains exact remote readbacks.
 
 Status: implementation and engineering packet prepared; full runtime acceptance BLOCKED by new native-start failure and unresolved complete-scroll evidence. Parent owns actual UI delivery and fresh owner approval. No merge/auto-merge/deploy/owner message/approval request/Slack/Library upload or broader issue closure.
 
