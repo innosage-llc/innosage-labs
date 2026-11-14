@@ -4,7 +4,7 @@
   "startup": "NOT_REPRODUCED / NOT_FIXED; cause/stage UNKNOWN",
   "candidate1_pause": "UNRESOLVED original input state; remains PARTIAL",
   "targeted_playback": "PASS observed Pause\u2192Play and two stationary0:11/0:26 samples; limited pre-input freshness",
-  "pre_input_capture_gap_seconds": 10.516702,
+  "pre_input_capture_gap_seconds": 10.517085,
   "targeted_pause_activations": 1,
   "resume_activations": 0,
   "record_start_save_activations": 0,

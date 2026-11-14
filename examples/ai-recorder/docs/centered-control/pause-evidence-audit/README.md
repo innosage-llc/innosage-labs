@@ -30,12 +30,12 @@ Only the existing synthetic **3:59:20 PM,26-second** clip was played. No recordi
 | Observation | UTC / state |
 | --- | --- |
 | Play invocation | 08:32:49.734437 |
-| Actual pre-Pause PNG completed | 08:32:50.911966: **Pause,0:00 /0:26** |
+| Actual pre-Pause PNG completed | 08:32:50.911583: **Pause,0:00 /0:26** |
 | Single Pause invocation / command returned | 08:33:01.428668 /08:33:01.455281 |
 | First fresh hierarchy snapshot began | 08:33:01.455643: **Play,0:11 /0:26** |
 | Second fresh hierarchy snapshot began | 08:33:06.855733: **Play,0:11 /0:26** |
 
-**Observed result: Pause→Play and stationary0:11 across5.400090s.** This is a positive check for this clip/build, not a repair or general absence-of-defect claim. The pre-input screenshot-to-invocation gap was **10.516702s** because of tool round trips; it was early in the26s clip, and the actual paused position was11s, but this was **not an immediate pre-tap image/hierarchy**. That protocol limitation is retained rather than silently retrying the single allowed activation. No active-capture hierarchy dump was attempted; slow idle acquisition could consume playback duration. Both post-Pause hierarchies were fresh.
+**Observed result: Pause→Play and stationary0:11 across5.400090s.** This is a positive check for this clip/build, not a repair or general absence-of-defect claim. The pre-input screenshot-to-invocation gap was **10.517085s** because of tool round trips; it was early in the26s clip, and the actual paused position was11s, but this was **not an immediate pre-tap image/hierarchy**. That protocol limitation is retained rather than silently retrying the single allowed activation. No active-capture hierarchy dump was attempted; slow idle acquisition could consume playback duration. Both post-Pause hierarchies were fresh.
 
 [Actual pre-Pause PNG](immediate-before-pause.png) · [First paused PNG](paused-first.png) · [Second paused PNG](paused-second.png) · [hash/size/time manifest](manifest.json) · [structured results](results.json).
 
