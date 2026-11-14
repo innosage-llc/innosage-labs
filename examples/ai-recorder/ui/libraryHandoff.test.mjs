@@ -111,5 +111,5 @@ test('new capture and busy/error states cannot reuse a prior saved affordance', 
 
 test('microphone recovery copy follows native canAskAgain, without inventing a settings action', () => {
   assert.equal(microphonePermissionMessage(true), 'Microphone access was not allowed. Tap Start recording to ask again.');
-  assert.equal(microphonePermissionMessage(false), 'Microphone access is blocked. Enable Microphone for AI Recorder in Android Settings, then tap Start recording.');
+  assert.equal(microphonePermissionMessage(false), 'Microphone access is blocked. In Android device Settings, open Apps > AI Recorder > Permissions > Microphone. Allow access, return here, then tap Start recording.');
 });

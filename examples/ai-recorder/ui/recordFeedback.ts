@@ -11,5 +11,5 @@ export function hasSavedFeedback(phase: CapturePhase, savedUri: string | undefin
 export function microphonePermissionMessage(canAskAgain: boolean) {
   return canAskAgain
     ? 'Microphone access was not allowed. Tap Start recording to ask again.'
-    : 'Microphone access is blocked. Enable Microphone for AI Recorder in Android Settings, then tap Start recording.';
+    : 'Microphone access is blocked. In Android device Settings, open Apps > AI Recorder > Permissions > Microphone. Allow access, return here, then tap Start recording.';
 }
