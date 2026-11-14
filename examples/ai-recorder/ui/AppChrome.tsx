@@ -5,7 +5,7 @@ import { Host, Icon, IconButton, NavigationBar, NavigationBarItem, Text, TopAppB
 import { fillMaxWidth } from '@expo/ui/jetpack-compose/modifiers';
 import BackIcon from '@expo/material-symbols/arrow_back.xml';
 import RecordIcon from '@expo/material-symbols/mic.xml';
-import LibraryIcon from '@expo/material-symbols/library_music.xml';
+import LibraryIcon from '@expo/material-symbols/folder.xml';
 import SettingsIcon from '@expo/material-symbols/settings.xml';
 import { useTheme } from './theme';
 import { destinations, type RootDestination } from './navigation';

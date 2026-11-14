@@ -1,0 +1,76 @@
+{
+  "at": "2026-11-14T12:11:44.475209+00:00",
+  "source": "9d199559f96aedd019d56ee374de8888460eee4c",
+  "production": {
+    "apk_sha256": "1d3581f6f19773a5122647c11916d867608fda91672cfd0abfa48640819b5dee",
+    "apk_bytes": 26102283,
+    "js_sha256": "ceb030d7262c0e68a7734201ddd512e9a966b1edc8daa95854d40847685a9a0f"
+  },
+  "configuration": "840x1491@420dpi/font2.0",
+  "scroll_clip": [
+    0,
+    231,
+    840,
+    1218
+  ],
+  "native_action": {
+    "index": "0",
+    "text": "",
+    "resource-id": "",
+    "class": "android.view.View",
+    "package": "co.innosage.labs.airecorder",
+    "content-desc": "",
+    "checkable": "false",
+    "checked": "false",
+    "clickable": "true",
+    "enabled": "true",
+    "focusable": "true",
+    "focused": "false",
+    "scrollable": "false",
+    "long-clickable": "false",
+    "password": "false",
+    "selected": "false",
+    "bounds": "[126,611][715,1155]",
+    "drawing-order": "0",
+    "hint": ""
+  },
+  "label": {
+    "index": "1",
+    "text": "Start recording",
+    "resource-id": "",
+    "class": "android.widget.TextView",
+    "package": "co.innosage.labs.airecorder",
+    "content-desc": "",
+    "checkable": "false",
+    "checked": "false",
+    "clickable": "false",
+    "enabled": "true",
+    "focusable": "false",
+    "focused": "false",
+    "scrollable": "false",
+    "long-clickable": "false",
+    "password": "false",
+    "selected": "false",
+    "bounds": "[158,1042][683,1134]",
+    "drawing-order": "1",
+    "hint": ""
+  },
+  "circle_native_independent_node": "UNAVAILABLE in merged hierarchy",
+  "circle_actual_PNG_pixel_bounds": [
+    233,
+    632,
+    610,
+    1010
+  ],
+  "circle_measurement": "purple decorative circle pixel extent, independently distinct from native hit bounds; source144dp at420dpi nominal378px",
+  "fixed_navigation_container": [
+    0,
+    1218,
+    840,
+    1428
+  ],
+  "bottom_label_gap_to_nav_px": 84,
+  "bottom_action_gap_to_nav_px": 63,
+  "lower_Start_activation": "NOT_TESTED; oneStartcap exhausted",
+  "earlier_script_failure": "Preserved: selected Record tab has no clickable ancestor; no Start/save error"
+}

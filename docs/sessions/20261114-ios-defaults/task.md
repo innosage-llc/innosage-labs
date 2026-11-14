@@ -20,3 +20,11 @@ Base: fresh main40d95184a1e7c903b3994818767e59357bbf7392. Existing draft PR52/co
 - [ ] Actual Simulator native build/default capture. Official Xcode27.2 download in progress; local CocoaPods absent. Generated project/export do not establish native functionality.
 
 See examples/ai-recorder/IOS_DEFAULTS.md for source/component decisions and minimal actual-device-free verification.
+
+## Latest-main reconciliation · 2026-11-14 23:42 UTC
+
+Owner reports license acceptance complete; read-only checks confirm Xcode27.2/27B52 and iPhoneSimulator27.2 SDK now work without license error. CocoaPods1.17.0 and its Homebrew Ruby4.0.9 dependency installed successfully. No system Ruby/PATH files changed; shell Ruby remains2.6.10. Local Pod dependency preparation is running separately.
+
+Fresh upstream main9bb86d2f8e56c58375c9247dcf5dc1e72405e2c3 merged into this isolated candidate without conflicts (not a GitHub PR merge). Android AppChrome and RecordControl.android remain byte-identical to main, including folder icon and the unified one-action control. Shared idle Ready duplication and saved copy follow main. iOS native record Button now owns circle+visible label as one action, and Library uses folder SFsymbol. Typecheck,39tests, both Hermes exports/opposite-platform graph checks and Android Release lint PASS; independent read-only review found no definite source findings. Native UI remains unverified.
+
+CoreSimulator's system executable/framework is absent. Xcode outer signature verified valid; Gatekeeper accepts the bundled XcodeSystemResources.pkg as Apple Installer. Necessary approved installation using noninteractive sudo stopped with `sudo: a password is required` before installation. No password requested, no authentication bypass, no Simulator created. Runtime staging also exits70 because IDESimulatorFoundation cannot load the missing CoreSimulator framework. Owner must finish required Xcode system-component setup with administrator authentication on the Mac before native build/Simulator capture can proceed. License acceptance must not be repeated.

@@ -1,12 +1,12 @@
 # iOS default-view candidate
 
-Related to [issue51](https://github.com/innosage-llc/innosage-labs/issues/51). This bounded successor reconciles the earlier [draft PR52](https://github.com/innosage-llc/innosage-labs/pull/52) with current Android main. PR52 and its branch remain intact. Physical iPhone, provider, signing and distribution acceptance in51 remain open.
+Related to [issue51](https://github.com/innosage-llc/innosage-labs/issues/51). This bounded successor reconciles the earlier [draft PR52](https://github.com/innosage-llc/innosage-labs/pull/52) with Android main9bb86d2. PR52 and its branch remain intact. Physical iPhone, provider, signing and distribution acceptance in51 remain open.
 
 Only five requested defaults: **Record idle, empty Library, Settings, default transcription service, ordinary Files import picker**. No recordings, keys or provider requests are needed. This is source support awaiting native qualification; it is not a claim that those screens have run on iOS.
 
 ## Source/component decisions
 
-Expo58.0.23 / @expo/ui58.0.27 / RN0.88.1, dependencies unchanged. Retain existing architecture and theme; no Router or SDK migration. Installed universal UI has no tabs/navigation stack, so iOS uses installed SwiftUI TabView/NavigationStack. Universal Button/Picker/Switch cover ordinary controls. Seek needs editing-ended behavior absent from universal Slider, so its iOS adapter uses SwiftUI Slider. Record control uses a native SwiftUI button with circle shape and SF Symbol, matching the existing start/stop state. State remains in RecorderScreen above tab mounts.
+Expo58.0.23 / @expo/ui58.0.27 / RN0.88.1, dependencies unchanged. Retain existing architecture and theme; no Router or SDK migration. Installed universal UI has no tabs/navigation stack, so iOS uses installed SwiftUI TabView/NavigationStack. Universal Button/Picker/Switch cover ordinary controls. Seek needs editing-ended behavior absent from universal Slider, so its iOS adapter uses SwiftUI Slider. Record control uses one native SwiftUI button owning the circle, SF Symbol and visible label, matching the latest main start/stop action contract. State remains in RecorderScreen above tab mounts.
 
 | Surface | iOS source/export | State owner / native check |
 |---|---|---|
@@ -55,6 +55,6 @@ Android uses native APK/ADB evidence. iOS preflights actual main support/tooling
 
 ## Current verification limits
 
-Typecheck, existing Node24 tests, both Hermes exports, both prebuilds and independent source review passed. iOS sourcemap contains no Jetpack Compose/Android control/uploader modules after full transitive source inspection. These checks establish source/configuration preparation only. **Native iOS NOT BUILT; 0/5 captures** until actual compiler/Simulator evidence is recorded. No new Penpot blocker page is needed while installation is pending; accepted Android and historical iOS pages remain intact.
+Typecheck, existing Node24 tests, both Hermes exports, both prebuilds and independent source review passed. iOS sourcemap contains no Jetpack Compose/Android control/uploader modules after full transitive source inspection. These checks establish source/configuration preparation only. **Native iOS NOT BUILT; 0/5 captures** until actual compiler/Simulator evidence is recorded. Xcode27.2/SDK27.2 and CocoaPods1.17.0 are now installed, but CoreSimulator system resources require owner administrator authentication (`sudo: a password is required`); the license gate itself is cleared. No new Penpot blocker page is needed while installation is pending; accepted Android and historical iOS pages remain intact.
 
 After build: cold-launch exact Release app, verify native Record idle → Library empty → Settings → service initial page → Library Files picker open/cancel. Inspect each real screenshot, verify app foreground/native JS provenance, then publish a new versioned iOS candidate page in the existing exact Penpot target and verify actual save/reopen. Stop for owner review; do not close51 or merge from these defaults alone.

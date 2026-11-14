@@ -5,7 +5,7 @@ import { disabled, navigationTitle, navigationBarTitleDisplayMode } from '@expo/
 import { destinations, type RootDestination } from './navigation';
 import type { RootShellProps } from './RootShell';
 import { useTheme } from './theme';
-const icons = { record: 'mic.fill', library: 'waveform', settings: 'gearshape' } as const;
+const icons = { record: 'mic.fill', library: 'folder', settings: 'gearshape' } as const;
 
 // State remains in RecorderScreen above native tab mounts; the shell owns chrome only.
 export function RootShell({ selected, onSelect, enabled, children }: RootShellProps) {
