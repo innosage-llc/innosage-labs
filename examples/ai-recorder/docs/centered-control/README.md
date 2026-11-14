@@ -1,6 +1,8 @@
+**Latest: bounded frozen-main/candidate A/B complete — 5 PASS / 1 PARTIAL, no reproduced native start error. BLOCKED pending coordinator finite residual-risk decision, not indefinite investigation.** [A/B results, qualifications and recommendation](ab-native-start/README.md). Original error remains NOT_REPRODUCED / NOT_FIXED; no preexisting classification or repair.
+
 # Centered recording control — R1/R2 correction
 
-**BLOCKED pending native-start investigation; no repair established.** See [investigation](native-start-investigation.md). Prior successful evidence and checks do not clear this blocker. No owner approval, merge, auto-merge or deploy.
+**BLOCKED pending coordinator residual-risk decision after the bounded A/B packet.** See [latest A/B result](ab-native-start/README.md) and [historical investigation](native-start-investigation.md). Prior successful evidence is not a claim that the original episode was repaired. No owner approval, merge, auto-merge or deploy.
 
 Review package: [PR61](https://github.com/innosage-llc/innosage-labs/pull/61), [issue60](https://github.com/innosage-llc/innosage-labs/issues/60). **Coordinator delivery review is pending. Do not seek owner approval, merge, auto-merge or deploy yet.** Broader acceptance issues remain open.
 

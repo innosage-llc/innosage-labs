@@ -1,3 +1,7 @@
+**Current: six-slot A/B budget exhausted: 5 PASS / 1 PARTIAL; original failure NOT_REPRODUCED / NOT_FIXED. BLOCKED pending coordinator residual-risk decision.** [Latest A/B packet](../../../examples/ai-recorder/docs/centered-control/ab-native-start/README.md). Public product remains6d, docs only.
+
+## Earlier execution and review record
+
 **BLOCKED: native-start cause/reproducibility remain unknown; no repair.** See [investigation](../../../examples/ai-recorder/docs/centered-control/native-start-investigation.md). Earlier independent reviews do not clear this runtime blocker.
 
 # Independent reviews and dispositions

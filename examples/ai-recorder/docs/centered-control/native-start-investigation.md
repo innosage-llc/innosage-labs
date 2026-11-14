@@ -1,6 +1,8 @@
+**Latest: bounded frozen-main/candidate A/B complete — 5 PASS / 1 PARTIAL, no reproduced native start error. BLOCKED pending coordinator finite residual-risk decision, not indefinite investigation.** [A/B results, qualifications and recommendation](ab-native-start/README.md). Original error remains NOT_REPRODUCED / NOT_FIXED; no preexisting classification or repair.
+
 # Native start investigation — BLOCKED
 
-**Readiness: BLOCKED pending native-start investigation. Startup lifecycle is NOT repaired. Coordinator review remains pending; no owner UI/merge acceptance is requested.** This supersedes earlier review-ready language. Production runtime source is `6d5645f34f88ecd940c730eedd96e6529e6c919a`; intake PR61 head was `9c50e7a38bef3b1bb63abf2ad05fd222caf67138`. The R1/R2 screenshot artifact remains `8ae6828889015bf8d711c9c2706c9631471c7a6e`; its successful states are historical evidence, not resolution of this blocker.
+**Historical investigation record; latest bounded A/B/risk decision is linked above. Startup lifecycle is NOT repaired. Coordinator review remains pending; no owner UI/merge acceptance is requested.** This supersedes earlier review-ready language. Production runtime source is `6d5645f34f88ecd940c730eedd96e6529e6c919a`; intake PR61 head was `9c50e7a38bef3b1bb63abf2ad05fd222caf67138`. The R1/R2 screenshot artifact remains `8ae6828889015bf8d711c9c2706c9631471c7a6e`; its successful states are historical evidence, not resolution of this blocker.
 
 ## Observed sequence (2026-11-14 UTC)
 

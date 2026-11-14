@@ -43,3 +43,16 @@ See [investigation](../../../examples/ai-recorder/docs/centered-control/native-s
 - [x] Preserve original public error/immutable private receipts and artifact8ae; new proof separately classified as controlled investigation, not owner UI.
 
 Next diagnostic is evidence capture at recurrence, and only after reproducible failure a safely signed private stage/error-logging build. No further trial loop or baseline build in this run.
+
+## Explicit six-slot frozen A/B follow-up
+
+- [x] Read90min budget; wall-clock origin07:37:13UTC, deadline09:07:13UTC. Check budget throughout; no extension.
+- [x] Cold full copies with complete data/key/cache chains; byte-check and resolve backing only within each copy. Both booted and exposed ten originals before baseline replacement; original profile untouched.
+- [x] Build exact c1 privately offline with matched existing native config/cache/key. Verify same signer/package/versionCode10/schema, compatible install-r on copy only, ten identities retained; verify both APK/JS source identities.
+- [x] main1/2/3 PASS; candidate1 PARTIAL (core timer/save/locate/play observed, post-playback Pause/hierarchy assertion failed; initial outer-shell PASS mislabel preserved and corrected); candidate2/3 PASS. All six slots consumed; no replay/seventh execution.
+- [x] Scenario3 is actual notification On→Off with normal return and observed prompt. Both versions showed process death/recreation then successful capture. No inference of old root cause.
+- [x] Main10→11→12→13 verified; candidate immediate11 NOT_VERIFIED, later12/final13 verified. Exact final ten originals+three named outputs each retained. Restore grants/flags/settings and production6d; safely stop copies. Full original profile bytes unchanged.
+- [x] No product repair/instrumentation or new native tests/reviews claimed. Historical39/typecheck/Release/full lint/review scopes remain unchanged; main private assembleRelease PASS.
+- [x] Publish only sanitized A/B packet/PNG proof on existing PR61/issue60. Keep BLOCKED pending finite coordinator residual-risk decision; recommendation is accept disclosed residual risk for presentation PR after packet review, not executor acceptance or owner approval.
+
+No matching baseline failure/causal evidence. Original episode NOT_REPRODUCED, NOT_FIXED; no proposed production fix. If coordinator rejects residual risk, next action requires a separately bounded private stage/error diagnostic at recurrence, not an endless retry loop. No merge/auto-merge/deploy/owner notification/Slack/Library/remote CI.
