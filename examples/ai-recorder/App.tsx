@@ -17,7 +17,9 @@ import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { AppHeader, RootNavigation } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
+import { RecordControl } from './ui/RecordControl.android';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
+import { hasSavedFeedback, microphonePermissionMessage, recordingSavedMessage } from './ui/recordFeedback';
 import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
@@ -93,7 +95,7 @@ function RecorderScreen() {
       await source.move(saved);
       setFiles(listRecordings());
       dispatchHandoff({ type: 'saved', uri: saved.uri });
-      setMessage('Recording saved on this device.');
+      setMessage(recordingSavedMessage);
     } catch {
       dispatchHandoff({ type: 'reset' });
       setMessage('Could not save the recording.');
@@ -204,8 +206,9 @@ function RecorderScreen() {
     ++playRequest.current;
     setMessage('');
     try {
-      if (!(await requestRecordingPermissionsAsync()).granted) {
-        setMessage('Allow microphone access to record.');
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        setMessage(microphonePermissionMessage(permission.canAskAgain));
         setCapturePhase('idle');
         return;
       }
@@ -283,6 +286,8 @@ function RecorderScreen() {
     return () => subscription.remove();
   }, [destination, phase]);
 
+  const showSavedFeedback = hasSavedFeedback(phase, handoff.savedUri, message);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: palette.background }}>
       <AppHeader title={{ record: 'Record', library: 'Library', settings: 'Settings' }[destination]} />
@@ -291,35 +296,33 @@ function RecorderScreen() {
       {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
         <View style={{ flex: 1 }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatTime(durationMillis / 1000)}</Text>
-          <Text style={styles.support}>Your audio is staying on this device.</Text>
         </View>
         <ActionButton title="Return" fullWidth={false} variant="text" onPress={() => navigate('record')} />
       </View> : null}
-      {message ? <View style={styles.notice}>
+      {message && destination !== 'record' ? <View style={styles.notice}>
         <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text>
-        {handoff.savedUri && phase === 'idle' ? <ActionButton title="View in Library" variant="text"
+        {showSavedFeedback ? <ActionButton title="View in Library" variant="text"
           fullWidth={false} onPress={viewSavedRecording} /> : null}
       </View> : null}
-      {destination === 'record' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
-          {phase === 'recording' ? 'Your recording is in progress.' : 'Keep the thought. Even without internet.'}
-        </Text>
-        <Text style={styles.copy}>Recordings stay on this device. Nothing is uploaded until you choose to transcribe.</Text>
-        {phase === 'recording' ? <View style={styles.timerCard}>
-          <Text style={[typography.caption, { color: palette.muted }]}>RECORDING</Text>
-          <Text accessibilityLiveRegion="polite" style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
-          <Text style={styles.support}>Keep recording with the screen locked.</Text>
-        </View> : <View style={styles.valueCard}>
-          <Text style={styles.cardTitle}>Made for the moment</Text>
-          <Text style={styles.support}>Capture now. Choose later if you want a transcript or summary.</Text>
-        </View>}
-        <ActionButton
-          title={{ idle: 'Start recording', starting: 'Starting…', recording: 'Stop & save', saving: 'Saving…', importing: 'Start recording' }[phase]}
-          variant={phase === 'recording' ? 'outlined' : 'primary'}
-          disabled={phase !== 'idle' && phase !== 'recording'}
-          onPress={phase === 'recording' ? stop : start}
-        />
-        <Text style={styles.support}>Offline first · No account needed to record</Text>
+      {destination === 'record' ? <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: spacing.xxl }}>
+        <View style={{ alignItems: 'center', gap: spacing.xl }}>
+          <Text accessibilityLiveRegion="polite" style={[typography.heading, { color: palette.text, textAlign: 'center' }]}>
+            {phase === 'recording' ? 'Recording' : phase === 'starting' ? 'Starting…' : phase === 'saving' ? 'Saving…' : message || 'Ready to record'}
+          </Text>
+          {phase === 'recording' ? <>
+            <Text selectable accessibilityLabel={`Recording duration ${formatTime(durationMillis / 1000)}`}
+              style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
+            {message ? <Text accessibilityLiveRegion="polite" style={[styles.copy, { textAlign: 'center' }]}>{message}</Text> : null}
+          </> : null}
+          {showSavedFeedback ? <View>
+            <ActionButton title="View in Library" variant="tonal" fullWidth={false} onPress={viewSavedRecording} />
+          </View> : null}
+          <RecordControl phase={phase} onPress={phase === 'recording' ? stop : start} />
+          {!showSavedFeedback ? <Text style={[styles.support, { textAlign: 'center' }]}>
+            Recordings are stored on this device.
+          </Text> : null}
+        </View>
       </ScrollView> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={styles.copy}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
@@ -414,7 +417,6 @@ const styles = StyleSheet.create({
   filename: { flex: 1, fontSize: 15, color: '#1D1B20' },
   cardTitle: { fontSize: 17, lineHeight: 24, fontWeight: '600', color: '#1D1B20' },
   valueCard: { padding: 20, gap: 12, borderRadius: 24, backgroundColor: '#F3EDF7' },
-  timerCard: { alignItems: 'center', padding: 24, gap: 8, borderRadius: 28, backgroundColor: '#F3EDF7' },
   timer: { fontSize: 48, lineHeight: 56, fontVariant: ['tabular-nums'], fontWeight: '500', color: '#1D1B20' },
   emptyState: { gap: 10, paddingTop: 28, paddingBottom: 16 },
   recordingCard: { padding: 16, marginBottom: 12, gap: 10, borderRadius: 20, backgroundColor: '#F3EDF7' },

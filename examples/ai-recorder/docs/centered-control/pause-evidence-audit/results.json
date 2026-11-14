@@ -1,0 +1,28 @@
+{
+  "status": "BLOCKED pending coordinator finite residual-risk decision",
+  "frozen_AB": "5 PASS / 1 PARTIAL; unchanged; six slots not replayed",
+  "startup": "NOT_REPRODUCED / NOT_FIXED; cause/stage UNKNOWN",
+  "candidate1_pause": "UNRESOLVED original input state; remains PARTIAL",
+  "targeted_playback": "PASS observed Pause\u2192Play and two stationary0:11/0:26 samples; limited pre-input freshness",
+  "pre_input_capture_gap_seconds": 10.517085,
+  "targeted_pause_activations": 1,
+  "resume_activations": 0,
+  "record_start_save_activations": 0,
+  "runtime_source": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+  "apk_sha256": "522983e55f30567529bd4a61384c8ebc34c169905800573a5ce931795f4d6997",
+  "js_sha256": "22422cccec847c87cce73e1d51a8cbcbbdeb86f70eb819c8055d5c4141464575",
+  "budget_start": "2026-11-14T08:25:58Z",
+  "deadline": "2026-11-14T08:45:58Z",
+  "physical_audio": "NOT_ASSESSED; host input/output disabled",
+  "product_repair": "NONE; no product edits/build/install",
+  "restoration": {
+    "completed": "2026-11-14T08:34:00Z",
+    "identities_before_after_equal": true,
+    "count": 13,
+    "settings_grants_flags_equal": true,
+    "copy_status": "STOPPED; owned ports free; no open profile files",
+    "apk_before_after_equal": true
+  },
+  "report_checkpoint": "2026-11-14T08:35:36.613069+00:00",
+  "elapsed_minutes_at_checkpoint": 9.64
+}
