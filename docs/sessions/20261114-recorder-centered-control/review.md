@@ -30,3 +30,7 @@ Saved CTA prominence versus the owner-approved large circular mic remains the do
 ## Observed runtime boundary
 
 External permission/notification switching produced an observed native start error and a retry that remained Starting before failing. Data-preserving cold relaunch restored normal capture. Cause is unverified; no ownership-reset or recovery-handler workaround was introduced. Failed/transition captures stay private. The final evidence chain starts from observed normal recording and validates saved/idle labels before accepting them. Controlled native failure injection, physical audio, audible TalkBack and other NOT_RUN limits remain explicit in the evidence README.
+
+## Bounded controlled follow-up (no repair)
+
+Three actual production6d trials completed without the observed failure: explicit cold microphone/notification prompts, warm denial/manual allow with normal Back navigation, then isolated Activity bring-front return. Actual advancing timers and save feedback were checked; all prior data remained. The original mixed failure episode is not erased. Cause/stage and baseline defect remain unestablished, no diagnostic or production fix was built. Historical independent code/visual reviews do not clear BLOCKED; no new fix review is claimed. Exact original settings/grants/flags restored; only task emulator safely stopped. See current investigation report for confounds, times and proof images.

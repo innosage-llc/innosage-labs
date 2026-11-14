@@ -24,9 +24,22 @@ Correction artifact commit8ae6828889015bf8d711c9c2706c9631471c7a6e contains25 fi
 - [x] Write current evidence before diagnostics; distinguish observation, inference, baseline-unproven and unrepaired status.
 - [x] Read original scripts/trace events and actual error PNG; inspect installed native permission/notification/start sources.
 - [x] Verify clean intake head9c50e7a and remote mainc1cafcce; product bytes checked against6d.
-- [ ] Controlled runtime trials / installed APK re-read: NOT_RUN, authorized device unavailable; no startup allowed.
+- [ ] Controlled runtime trials / installed APK re-read: NOT_RUN, authorized device unavailable; no startup attempted in that earlier continuation under the coordinator’s then-current executor prompt; not an approval rejection. Superseded by the authorized recovery below.
 - [ ] Baseline reproduction: NOT_RUN / NOT_ESTABLISHED.
 - [ ] Product repair: NONE; no causal basis for mutation.
 - [x] Publish sanitized BLOCKER report and actual production error diagnostic; update PR61/issue60, preserve prior limits and original private receipts.
 
 See [investigation](../../../examples/ai-recorder/docs/centered-control/native-start-investigation.md). Smallest next step is same-owned-device production verification and one separated, observed trial after coordinator makes it available. No acceptance, merge or deployment.
+
+## Authorized same-AVD recovery and bounded trials
+
+- [x] Verify original AVD ownership/data/audio-disabled configuration and free configured ports; recover only that same AVD.
+- [x] Installed production APK/JS match6d before and after actual trials; no build/install/update/instrumentation.
+- [x]3/3 controlled trials complete: cold prompt handling, warm denial/manual recovery with normal Back return, isolated original Activity bring-front method. Each has visually observed advancing timer and successful Stop & save;0 observed start failures.
+- [x] Record setup OS process death distinctly from warm-process denial/recovery; full foreground/permission/PID/native-host lifecycle receipts private. Direct JS AppState/per-stage logging NOT_RUN.
+- [x] All7 original display identities plus3 new saves retained;10 verified again after process recreation. No data clearing or playback/provider action.
+- [x] Exact initial font/display/accessibility and microphone/notification grants+flags restored through app Settings UI only; final idle verified. Safely stop only owned emulator; final availability STOPPED.
+- [x] No supported repair. Original failed stage/root cause/reproducibility remain unknown; baseline NOT_RUN/NOT_ESTABLISHED. Keep BLOCKED; no owner acceptance or merge/deploy.
+- [x] Preserve original public error/immutable private receipts and artifact8ae; new proof separately classified as controlled investigation, not owner UI.
+
+Next diagnostic is evidence capture at recurrence, and only after reproducible failure a safely signed private stage/error-logging build. No further trial loop or baseline build in this run.

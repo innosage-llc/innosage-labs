@@ -1,0 +1,55 @@
+{
+  "classification": "CONTROLLED INVESTIGATION ONLY; production6d; not owner acceptance UI",
+  "date_utc": "2026-11-14",
+  "runtime_source_commit": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+  "files": [
+    {
+      "file": "t1-timer-confirmed.png",
+      "sha256": "c9a821df4fda1dc27c10bc284be40a0b098bcddc56a3ec6fe7b406f11b55c74f",
+      "size_bytes": 86163,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:19:04 UTC"
+    },
+    {
+      "file": "t1-save-result.png",
+      "sha256": "bef7247d27cdd8db684fb640bc0309a421d15b71369889196ecdfb4c353b097a",
+      "size_bytes": 88222,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:19:14 UTC snapshot start"
+    },
+    {
+      "file": "t2-progress-observation.png",
+      "sha256": "f74007a4f90313db669923faa880362ea2dd707fc1c4e9238d4da6cd7b63c738",
+      "size_bytes": 87488,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:22:26 UTC"
+    },
+    {
+      "file": "t2-save-result.png",
+      "sha256": "3ea1ad452186597526dbba489519ecbe90ae5eef534be2ccd008d9b6848d55c5",
+      "size_bytes": 87877,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:22:44 UTC snapshot start"
+    },
+    {
+      "file": "t3-timer-progress.png",
+      "sha256": "4230e054059a27a24ba37e181d1eced64a0a98da56b6e1f44fbf80e236e1d9df",
+      "size_bytes": 87098,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:23:18 UTC"
+    },
+    {
+      "file": "t3-save-result.png",
+      "sha256": "135383ac9597b654e129519ea457c8bf68706c129d77976c42d1389ceba85a18",
+      "size_bytes": 87873,
+      "width": 1080,
+      "height": 2400,
+      "observation_time": "07:23:34 UTC snapshot start"
+    }
+  ]
+}
