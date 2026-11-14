@@ -1,8 +1,8 @@
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
-import { Host, Switch } from '@expo/ui/jetpack-compose';
-import { semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { RecorderSwitch } from './RecorderSwitch';
+import { supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
@@ -235,7 +235,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   async function submit() {
-    if (connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
+    if ((!supportsProUpload && usePro) || connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
@@ -264,6 +264,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
       let paid = terminal ? undefined : paidOperation;
       if ((!operation || terminal) && usePro) {
+        if (!supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
         if (!profile) throw new Error('Configure your InnoSage Pro API key first.');
@@ -393,25 +394,26 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
               <Text style={{ color: palette.muted }}>{usePro ? 'InnoSage Pro · up to 4 hours · 512 MiB' : 'Free staging · up to 15 minutes · 50 MB'}</Text>
               {proAvailable ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Use InnoSage Pro</Text>
-                <Host matchContents style={{ minWidth: 60 }}>
-                  <Switch value={usePro} enabled={canChooseSpeakers && service === 'staging'} onCheckedChange={value => {
+                <View style={{ minWidth: 60 }}>
+                  <RecorderSwitch value={usePro} enabled={canChooseSpeakers && service === 'staging' && (supportsProUpload || usePro)} onCheckedChange={value => {
                     setUsePro(value);
                     if (!value && !gateway) void connect();
-                  }} modifiers={[semantics({ contentDescription: 'Use InnoSage Pro' })]} />
-                </Host>
+                  }} label="Use InnoSage Pro" />
+                </View>
               </View> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Identify speakers</Text>
-                <Host matchContents style={{ minWidth: 60 }}>
-                  <Switch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
-                    modifiers={[semantics({ contentDescription: 'Identify speakers' })]} />
-                </Host>
+                <View style={{ minWidth: 60 }}>
+                  <RecorderSwitch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
+                    label="Identify speakers" />
+                </View>
               </View>
               <Text style={{ color: palette.muted }}>Add speaker labels to this transcript. May take longer.</Text>
               {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
               {statusUnknown && operation ? <ActionButton title={busy ? 'Checking status…' : 'Check same operation'} variant="outlined" disabled={busy} onPress={checkOperationStatus} /> : null}
-              <ActionButton title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} variant="primary" disabled={busy} onPress={submit} />
+              {!supportsProUpload && usePro ? <Text style={{ color: palette.muted }}>Pro uploads are unavailable on iOS. Choose staging Free access or OpenAI direct. Existing Pro results can still be read.</Text> : null}
+              <ActionButton title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} variant="primary" disabled={busy || (!supportsProUpload && usePro)} onPress={submit} />
             </>
           ) : service === 'production' ? (
             <Text style={{ color: palette.text }}>Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.</Text>

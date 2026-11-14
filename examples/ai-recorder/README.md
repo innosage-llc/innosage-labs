@@ -187,3 +187,5 @@ Do not copy this bounded modal controller into a deeper route hierarchy: evaluat
 the SDK-compatible Expo Router native stack/tabs and preserve long-lived audio
 state above route mounts. See [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
 and [Expo native tabs](https://docs.expo.dev/router/advanced/native-tabs/).
+
+The bounded native iOS default-view candidate, platform-separated inspection commands and current verification limits are documented in [IOS_DEFAULTS.md](IOS_DEFAULTS.md). Native build/capture evidence is required before calling iOS verified; broader iPhone/provider acceptance remains in issue #51.

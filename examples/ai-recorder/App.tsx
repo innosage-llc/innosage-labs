@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { BackHandler, Platform, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
   requestNotificationPermissionsAsync,
@@ -11,13 +11,12 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { Host, Slider } from '@expo/ui/jetpack-compose';
-import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { PlaybackSeek } from './PlaybackSeek';
 import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
-import { AppHeader, RootNavigation } from './ui/AppChrome';
+import { RootShell } from './ui/RootShell';
 import { ActionButton } from './ui/ActionButton';
-import { RecordControl } from './ui/RecordControl.android';
+import { RecordControl } from './ui/RecordControl';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
 import { hasSavedFeedback, microphonePermissionMessage, recordingSavedMessage } from './ui/recordFeedback';
 import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
@@ -208,11 +207,11 @@ function RecorderScreen() {
     try {
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
-        setMessage(microphonePermissionMessage(permission.canAskAgain));
+        setMessage(microphonePermissionMessage(permission.canAskAgain, Platform.OS));
         setCapturePhase('idle');
         return;
       }
-      await requestNotificationPermissionsAsync();
+      if (Platform.OS === 'android') await requestNotificationPermissionsAsync();
       player.pause();
       await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
@@ -289,8 +288,7 @@ function RecorderScreen() {
   const showSavedFeedback = hasSavedFeedback(phase, handoff.savedUri, message);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: palette.background }}>
-      <AppHeader title={{ record: 'Record', library: 'Library', settings: 'Settings' }[destination]} />
+    <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}>
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)} onClose={() => setTranscriptRecording(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
@@ -372,19 +370,17 @@ function RecorderScreen() {
               </View>
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
-                  <Host matchContents={{ vertical: true }} style={styles.slider}>
-                    <Slider
+                  <PlaybackSeek
                       max={playback.duration}
                       value={position}
                       enabled={phase === 'idle'}
-                      modifiers={[fillMaxWidth(), semantics({ contentDescription: `Playback position for ${label}` })]}
+                      label={`Playback position for ${label}`}
                       onValueChange={(value) => {
                         pendingSeek.current = value;
                         setSeekPosition(value);
                       }}
                       onValueChangeFinished={finishSeek}
                     />
-                  </Host>
                   <View style={styles.times}>
                     <Text style={styles.filename}>{formatTime(position)}</Text>
                     <Text style={styles.copy}>{formatTime(playback.duration)}</Text>
@@ -402,8 +398,7 @@ function RecorderScreen() {
         }}
       />
       </View>}
-      <RootNavigation selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)} />
-    </SafeAreaView>
+    </RootShell>
   );
 }
 
