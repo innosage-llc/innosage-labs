@@ -307,9 +307,9 @@ function RecorderScreen() {
       {destination === 'record' ? <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: spacing.xxl }}>
         <View style={{ alignItems: 'center', gap: spacing.xl }}>
-          <Text accessibilityLiveRegion="polite" style={[typography.heading, { color: palette.text, textAlign: 'center' }]}>
-            {phase === 'recording' ? 'Recording' : phase === 'starting' ? 'Starting…' : phase === 'saving' ? 'Saving…' : message || 'Ready to record'}
-          </Text>
+          {phase === 'recording' || message ? <Text accessibilityLiveRegion="polite" style={[typography.heading, { color: palette.text, textAlign: 'center' }]}>
+            {phase === 'recording' ? 'Recording' : message}
+          </Text> : null}
           {phase === 'recording' ? <>
             <Text selectable accessibilityLabel={`Recording duration ${formatTime(durationMillis / 1000)}`}
               style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>

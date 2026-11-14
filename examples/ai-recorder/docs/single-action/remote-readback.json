@@ -1,0 +1,181 @@
+{
+  "at": "2026-11-14T11:23:40.590152+00:00",
+  "evidence_commit": "8cb41426b19bee8b4f591bb7e657198991b475c9",
+  "exact_remote_png_byte_checks": 29,
+  "results": [
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/before-idle-default.png",
+      "sha256": "45301df453df5ea67c3d09cceded79de01e7cfa35c8e059ac9f8b548fce30d53",
+      "bytes": 85003,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/before-small-large-idle.png",
+      "sha256": "50be8ef74560e18abca3c5cb9125202c65f3fa348182be0c71e1b764047457db",
+      "bytes": 110376,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/after-idle-default.png",
+      "sha256": "b753a0bef7ec40516823f33f6ea88296eef643a9630fa93fa8896e16d3ae6842",
+      "bytes": 76413,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/after-small-large-idle.png",
+      "sha256": "96a3299fdf5fd13ba2e7f68f0e8f3dbf9a1f1e19b8304a5d08833e2a06c25f12",
+      "bytes": 96800,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/permission-denied.png",
+      "sha256": "ffed3d5132f809f541b65ed9481da897c24579ac39702fddb6b379f919e807e0",
+      "bytes": 107333,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/permission-retry-prompt.png",
+      "sha256": "8d8b4d68fe448f49f782c377a8a9495a92d56159ebb97851581213d06f3ee7ba",
+      "bytes": 80654,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record1-early.png",
+      "sha256": "1c06a165cb1f40fbe7827cf25bed1347d64e6ac41387f582608912b4e7234e9e",
+      "bytes": 82166,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record1-advancing-real.png",
+      "sha256": "a59f94f721f166f51fa3017dc33ebff45db10bc113caa886224b40e9e507aab3",
+      "bytes": 85487,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/saved1-default.png",
+      "sha256": "160944fe3ce7402a53f138c5087435266e6c1e6a783822177b899b1e55bc4d0f",
+      "bytes": 83348,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/library1-ready.png",
+      "sha256": "f7860b7081fe2b85fba5c5e21811774ebc704900a684cf3daa235ec1cc91ead3",
+      "bytes": 128483,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/play1-early.png",
+      "sha256": "509ad883a067051e659e3a212e9c4f17c5557d06a8134c23cabc086d237040f5",
+      "bytes": 129063,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/play1-pre-pause.png",
+      "sha256": "de40e9fd4eed860936467d9a0ee7108d32a5a0c960970dcb3d4bf217af10926c",
+      "bytes": 120293,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/paused1-a.png",
+      "sha256": "d64bbef479fdd021c55667d103c581158f07956805373b108d42628c00e7d069",
+      "bytes": 119728,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/paused1-b.png",
+      "sha256": "d64bbef479fdd021c55667d103c581158f07956805373b108d42628c00e7d069",
+      "bytes": 119728,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/return1-idle.png",
+      "sha256": "124d9c60668bf3bea90fd4a4b93ee12f14c0c8c91e795b577f05601a4d8576b3",
+      "bytes": 75767,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record2-small-early.png",
+      "sha256": "71353a829ef2f67f4b7bb5edd91f2f6f7f11e4795df728dd3fd91391e694bc22",
+      "bytes": 88703,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record2-small-advancing.png",
+      "sha256": "d58a72de30bbc1c74e265d796df4c7d71b16941edf1324938ff37f605d7ebe80",
+      "bytes": 89780,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/saved2-small.png",
+      "sha256": "ab8aa730f22b8d7afe1895ae9f5d0b4f661d420b65fe5459b23d02143e017cea",
+      "bytes": 100736,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/library2-small-ready.png",
+      "sha256": "1c90d887168416d135c925126e56045799d04512749692e1cc0feb50ee1bba6f",
+      "bytes": 122228,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/tb-speech-focus-5.png",
+      "sha256": "c668f2b48779ad06a7baacc038fb4c997e209c06822b1618e8343794674e79bd",
+      "bytes": 83434,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/tb-speech-next-focus.png",
+      "sha256": "6da3133335af4409aabdc0d0265d1868db84dc611917b9d5cd9313f12f0d30a3",
+      "bytes": 79775,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record3-before-background.png",
+      "sha256": "e8acf7874b179b5161ec4853f8cdecdbde710fc032e1187d71391a4f32c7daa1",
+      "bytes": 64426,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/record3-fresh-observation.png",
+      "sha256": "a5f4366095f08c1c63d269df8d8dc700d509f15d547acc12a530484a1fd8cb18",
+      "bytes": 99158,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/HARNESS-starting-after-repeat.png",
+      "sha256": "a1c9083e3e465c0e94fb599d2a2262e831d54bb5d859b1f50fba220be4211835",
+      "bytes": 92405,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/HARNESS-saving-after-repeat.png",
+      "sha256": "c0bec1f55785c9b87337901ababce7345ada36ba18776ac12d7a4d1b428a7786",
+      "bytes": 89136,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/HARNESS-recording-after-repeat.png",
+      "sha256": "95cce7f656ef8afeccb777afb8097578298fbe2ba560074cdd8397fbd6b8c479",
+      "bytes": 96966,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/final-idle-before-stop.png",
+      "sha256": "d852fab69ed99d017ff3b250b306b80ec1a0ce6c869bafe82ec05ece91a30109",
+      "bytes": 75564,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/final-library-0.png",
+      "sha256": "af4a806ad4d1043fb6d43e19c65b2e34a5a665ab643acb26635094898ce3e55b",
+      "bytes": 127997,
+      "status": "PASS"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/8cb41426b19bee8b4f591bb7e657198991b475c9/examples/ai-recorder/docs/single-action/screenshots/final-library-9.png",
+      "sha256": "766c116d69a2f84c68020db6fca9345d12beb06754d6261c7556711701d26fe3",
+      "bytes": 120339,
+      "status": "PASS"
+    }
+  ]
+}
