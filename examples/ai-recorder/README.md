@@ -7,13 +7,14 @@ after reopening the app.
 
 ## Product promise and release status
 
-**Promise:** Start a conversation recording from the Android app, keep it going
-while the screen is locked or another app is open, then find and play the M4A
-locally, including without a network connection. Transcription and summaries are
-separate, user-started actions: the selected service receives the audio or
-transcript needed for that request. This is hybrid capture and AI processing,
-not fully offline AI. There is no cross-device sync or backup promise. Uninstall
-removes app-private files and saved results; it does not delete an original
+**Promise:** AI Recorder is intended to make Android conversation capture and
+local review straightforward: record from the app, continue while the screen is
+locked or another app is open, then find and play the M4A locally, including
+without a network connection. Transcription and summaries are separate,
+user-started actions: the selected service receives the audio or transcript
+needed for that request. This is hybrid capture and AI processing, not fully
+offline AI. There is no cross-device sync or backup promise. Uninstall removes
+app-private files and saved results; it does not delete an original transcript
 already retained by the staging Gateway.
 
 ### Available in the current Android `main`
@@ -27,17 +28,22 @@ already retained by the staging Gateway.
   key and never falls back to staging; Free Gateway access is staging-only.
 - **Transcript work:** Optional speaker labels (off by default), a preserved
   original, and separately saved local revisions. A completed transcript can be
-  reopened offline. The staging Gateway retains uploaded originals server-side.
+  reopened offline. The staging Gateway commits original transcripts server-side.
 - **Summaries:** Meeting Essentials or a saved Custom recipe from the chosen
   original or revision, using a configured OpenAI Platform key. The user selects
   an available compatible model and thinking level. Custom recipes can require
   web search; returned inline source links are saved with the summary.
 
-Limits are service-specific: staging Free allows up to 15 minutes and 50 MB;
-InnoSage Pro allows up to four hours and 512 MiB; the direct OpenAI transcription
-pilot accepts a new M4A smaller than 25,000,000 bytes. OpenAI requests use the
-user's project quota. A provider's availability, quota, and service limits still
-apply. See the sections below for key handling, recovery, data flow, and details.
+Limits are service-specific. The app displays a staging Free limit of up to
+15 minutes and 50 MB ([source](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/Transcript.tsx#L361));
+the Gateway rejects source files over 50,000,000 bytes
+([limit](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/server/gateway.py#L20),
+[check](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/server/gateway.py#L203));
+the Router owns decoded-duration and admission limits. InnoSage Pro allows up
+to four hours and 512 MiB; the direct OpenAI transcription pilot accepts a new
+M4A smaller than 25,000,000 bytes. OpenAI requests use the user's project quota.
+A provider's availability, quota, and service limits still apply. See the
+sections below for key handling, recovery, data flow, and details.
 
 ### Evidence and maturity
 
@@ -49,9 +55,9 @@ commitment.
 | State | What this document means |
 | --- | --- |
 | Implemented in `main` | The Android capture, Library, Settings, import, transcription, transcript editing, and summary flows described below exist in source. This is not a claim that every provider operation or failure mode has passed live acceptance. |
-| Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. The bounded main-versus-candidate control check was 5 PASS / 1 PARTIAL across six runs. |
+| Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. PR #61's bounded six-run main-versus-candidate control check was 5 PASS / 1 PARTIAL; its original Start error was NOT_REPRODUCED / NOT_FIXED. A later, separate PR #62 run observed a new native Start failure with unknown cause and stage. |
 | In development | [PR #62](https://github.com/innosage-llc/innosage-labs/pull/62) is a draft UI refinement: one native action for the circle and label, shared disabled behavior, removal of the competing idle “Ready to record” line, and clearer saved copy. It is not in `main` and is not a released feature. |
-| Not established | The native Start error remains NOT_REPRODUCED / NOT_FIXED, with unknown cause and stage. The bounded UI check does not prove universal recording reliability. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
+| Not established | PR #61's original Start error remains NOT_REPRODUCED / NOT_FIXED; this describes only that bounded check. PR #62 later observed a separate Start failure (“Could not start recording…”) with no successful output and unknown cause/stage. A separately authorized one-Start production Saved proof passed at 320 dp / 200% text for top/bottom reachability, native bounds, and Library handoff; lower Start activation was NOT_TESTED ([immutable report at `14fa865`](https://github.com/innosage-llc/innosage-labs/blob/14fa865f95d2d7ed61bc603d2e63c9c9069e7df2/examples/ai-recorder/docs/single-action/production-small-30m/README.md)). The fresh Start failure and config-transition interrupted capture remain unresolved. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
 | Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; a signed install, TestFlight delivery, and physical-iPhone product journey are not established. Web is unsupported. |
 
 The merged [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61)
@@ -70,12 +76,15 @@ QA aids; they are not AI Recorder features or supported app platforms.
 - **Provider and data flow:** For each offered service, verify the selected route,
   key/quota requirements, exact size and duration limits, original/revision
   distinction, and same-operation recovery behavior. Clearly disclose that
-  remote requests leave the device and that staging Gateway originals persist
-  server-side; do not describe AI processing as offline or all data as local.
-- **UI follow-up:** Keep PR #62 draft-only until the saved state is fully
-  reachable at 320 dp / 200% text and the new native Start failure is resolved or
-  explicitly accepted with evidence and scope. Do not infer reliability from the
-  prior 5 PASS / 1 PARTIAL check.
+  remote requests leave the device and that staging Gateway retains original
+  transcripts server-side; do not describe AI processing as offline or all data
+  as local.
+- **UI follow-up:** The bounded PR #62 production Saved proof passed top/bottom
+  reachability, native bounds, and Library handoff at 320 dp / 200% text; lower
+  Start activation was NOT_TESTED. PR #62 remains draft/blocked pending a fresh
+  user risk decision because the separate new Start failure and config-transition
+  interrupted capture remain unresolved. Do not infer reliability from PR #61's
+  5 PASS / 1 PARTIAL check.
 - **Platform claims:** Claim iOS availability only after the signed installation
   and physical-device capture, playback, import, relaunch, and supported-provider
   journey are verified. Do not claim web support from Expo compatibility alone.
@@ -141,8 +150,8 @@ requires an explicit new transcription. Global ASR concurrency remains one.
 The Gateway commits the original transcript before reporting completion and
 cleaning up the upstream artifact. Original and edited transcripts are also
 retained separately on the phone. Reopening a saved transcript works offline.
-The staging Gateway stores originals server-side. It does not provide server-side
-editing or cross-device synchronization in this milestone.
+The staging Gateway commits original transcripts server-side. It does not
+provide server-side editing or cross-device synchronization in this milestone.
 
 ### Identify speakers
 
@@ -196,9 +205,9 @@ project quota. The result and any revisions are stored locally. Reopen the
 recording to read or manually play the original audio.
 
 Paid transcription follows the existing four-hour decoded-duration policy.
-This sample enforces the effective512MiB source limit. Router's larger source
-advertisement is tracked separately in Infra #205. Audio hashing reads1MiB at a
-time; the Android Expo module uploads the app-private file in64KiB chunks using
+This sample enforces the effective 512 MiB source limit. Router's larger source
+advertisement is tracked separately in Infra #205. Audio hashing reads 1 MiB at a
+time; the Android Expo module uploads the app-private file in 64 KiB chunks using
 fixed-length HTTPS, redirect refusal and cancellation. Originals and attributed
 text are saved before remote cleanup. Retained capabilities allow same-operation
 cleanup recovery. This Android milestone's real Pro and long-audio acceptance is
