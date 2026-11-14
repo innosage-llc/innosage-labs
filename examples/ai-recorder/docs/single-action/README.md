@@ -66,3 +66,7 @@ Fresh independent read-only gpt-6.1-sol medium CODE review of exact9d19955 and i
 [Final safety/data ledger](safety-ledger.json) records the original13 exact display identities, two authorized new saves (expected15), failed third attempt with no new saved identity, final installed APK and settings/shutdown state. The stopped old candidate was copied with all data/key/backing files verified independent before boot; all chains stayed inside the new owned copy. Original profile and old candidate were not booted or modified. Only owned resources were operated; no ADB server restart/root, other AVD or physical device activity.
 
 [Sanitized routing ledger](routing-ledger.json) retains revision/read receipt hashes and selection/omissions. Original routing/gate/inventory/source-read receipts and full audit remain private in the controller; no Skills/Brain/raw traces/logs/host paths/serials/keys/audio are published. Existing theme/manifest bytes remain unchanged. No dependency, SDK, router, release, tool installation, provider call, Slack/Library upload, owner message or approval request.
+
+## Later bounded continuation
+
+[Two-Start diagnosis/evidence continuation](continuation-60m/README.md): Draft62/BLOCKED retained. Diagnostic sample succeeds; production configuration-transition interruption prevents P2 Saved fullscroll. Earlier failure remains unexplained. Original evidence above is historical; latest final state is16known identities, exact production/settings restored and owned resources stopped.
