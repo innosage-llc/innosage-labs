@@ -311,8 +311,9 @@ function RecorderScreen() {
               style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
             {message ? <Text accessibilityLiveRegion="polite" style={[styles.copy, { textAlign: 'center' }]}>{message}</Text> : null}
           </> : null}
-          {handoff.savedUri && phase === 'idle' ? <ActionButton title="View in Library" variant="text"
-            fullWidth={false} onPress={viewSavedRecording} /> : null}
+          {handoff.savedUri && phase === 'idle' ? <View>
+            <ActionButton title="View in Library" variant="tonal" fullWidth={false} onPress={viewSavedRecording} />
+          </View> : null}
           <RecordControl phase={phase} onPress={phase === 'recording' ? stop : start} />
           {!(handoff.savedUri && phase === 'idle') ? <Text style={[styles.support, { textAlign: 'center' }]}>
             Recordings are stored on this device.
