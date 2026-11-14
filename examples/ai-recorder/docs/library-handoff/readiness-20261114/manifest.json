@@ -1,0 +1,81 @@
+{
+  "appSourceCommit": "723ffbba6a6eb242c31759c1ba9d03e71f31d895",
+  "apkSha256": "079cbf6e17eeda00594e0ee14527de6ec4736d300a476fedd692148d6db0e314",
+  "runtime": "task-local Android API36 emulator, 1080x2400, 420dpi, font scale1.0, standalone Release; host audio disabled; no Metro",
+  "talkBackVersion": "16.0.0.738667889 (60149341)",
+  "captureDate": "2026-11-14",
+  "images": [
+    {
+      "file": "12-hardware-cta.png",
+      "sha256": "bdbf4aded5cc08558dc0c65f090a8809a8eb0289ef59b5e95384b8cc2a3c0724",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "13-activated-library.png",
+      "sha256": "d1b92368c30ceef9e8d7571016b78c9cb10b2a5bf6772ef06553b8b183820abf",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "17-play-focus.png",
+      "sha256": "2aef9063245a64ad182adf6a2604907daff7f168ab975c9bd732d417c33d4bec",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "18-play-activate.png",
+      "sha256": "091a9f57a12c9bcbf3a80c008221862768558c9a1f3ef907e0e3e3d486d07771",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "24-tone-progress.png",
+      "sha256": "26f654d17a066772d39ea6305afb64e340decd94561b9a707be71fd30a56fe56",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "25-tone-paused.png",
+      "sha256": "6d3fc74e84604f4aa4f297fe032ec475531351ad73fce7b8b087acbf81074901",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "26-slider-focus.png",
+      "sha256": "b1959dbaaf14988165daa81a920090d2b86a2e833381aa71468b1bf22ea5b808",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "28-seek-drag.png",
+      "sha256": "9f6f80be5e83d738e422dbe8e0a0b429b7a35cc4645a43395ad0de1ecfa84ba3",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "30-record-return.png",
+      "sha256": "171656376d89f19073d2d8c8bc73af398f04c07b94c6298b159307202e000bfd",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "32-library-stale-check.png",
+      "sha256": "047b6a7302b0a7333a31ff159bde7797e2a9223b3a3a25a92603fc9ebf604ea8",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "34-picker.png",
+      "sha256": "e272b3e5c8a3e479f3a6de1ec4773ef134f6f4ecae3842d1ffdda3064a69eb3a",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "36-picker-return.png",
+      "sha256": "ce0fa88c328e847d1205a08230c0de233919137c44a3b7714f31e57522f1884f",
+      "width": 1080,
+      "height": 2400
+    }
+  ]
+}

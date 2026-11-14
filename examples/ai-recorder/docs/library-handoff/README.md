@@ -67,3 +67,7 @@ Host microphone/audio was disabled intentionally to exclude personal/ambient con
 **NOT_RUN / acceptance limitations:** audible listening and physical microphone/speaker quality; TalkBack focus/announcement/navigation; process death during active capture; actual disk-full/save failure; telephony/audio-focus interruption; iOS/Web; full parent #56 and design-workflow acceptance. Native UI labels/bounds and enlarged-font screenshots do not certify a screen reader. Locating an offscreen unmeasured target is regression-tested in the retry helper, while the real saved item is the newest row in this app's ordering. Very large collections were not stress-tested.
 
 No personal audio/text, keys, audio upload, external transcription, billable service request, deployment or merge. This remains a **draft engineering candidate with explicit device/audio/accessibility acceptance limits**.
+
+## Additive readiness evidence — 2026-11-14
+
+The earlier TalkBack NOT_RUN status is superseded only for the bounded actual interaction checks in [readiness report](readiness-20261114/README.md). Spoken announcements and audible listening remain NOT_VERIFIED; this does not establish full accessibility or owner acceptance. App source remains723ffbb; no build/test rerun. Stack unchanged; settings restored and task emulator stopped.
