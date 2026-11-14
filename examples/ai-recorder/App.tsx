@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useReducer, useRef, useState } from 'react';
+import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
@@ -17,6 +17,7 @@ import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { AppHeader, RootNavigation } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
+import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
 import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
@@ -56,6 +57,19 @@ function RecorderScreen() {
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
   const [phase, setPhase] = useState<CapturePhase>('idle');
+  // Native callbacks can arrive before React commits a disabled button.
+  const phaseRef = useRef<CapturePhase>('idle');
+  function setCapturePhase(next: CapturePhase) { phaseRef.current = next; setPhase(next); }
+  const activeCapture = useRef(false);
+  const finishedUrls = useRef(new Set<string>());
+  const playRequest = useRef(0);
+  const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
+  const library = useRef<FlatList<File>>(null);
+  const [libraryReady, setLibraryReady] = useState(false);
+  const visibleUris = useRef(new Set<string>());
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<File>[] }) => {
+    visibleUris.current = new Set(viewableItems.map(token => token.item.uri));
+  }).current;
   const [message, setMessage] = useState('');
   const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
   const player = useAudioPlayer();
@@ -66,19 +80,25 @@ function RecorderScreen() {
   const pendingSeek = useRef<number>(undefined);
   const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, async (status) => {
-    if (!status.isFinished) return;
+    if (!status.isFinished || !activeCapture.current || (status.url && finishedUrls.current.has(status.url))) return;
+    activeCapture.current = false;
+    if (status.url) finishedUrls.current.add(status.url);
+    setCapturePhase('saving');
     try {
       if (status.hasError || !status.url) throw new Error('Recording did not finish.');
       const source = new File(status.url);
       if (!source.exists || !source.size) throw new Error('Recording file is empty.');
       recordings.create({ idempotent: true });
-      await source.move(new File(recordings, `Recording-${Date.now()}-${source.name}`));
+      const saved = new File(recordings, `Recording-${Date.now()}-${source.name}`);
+      await source.move(saved);
       setFiles(listRecordings());
+      dispatchHandoff({ type: 'saved', uri: saved.uri });
       setMessage('Recording saved on this device.');
     } catch {
+      dispatchHandoff({ type: 'reset' });
       setMessage('Could not save the recording.');
     } finally {
-      setPhase('idle');
+      setCapturePhase('idle');
     }
   });
   const { durationMillis } = useAudioRecorderState(recorder, 500);
@@ -89,9 +109,55 @@ function RecorderScreen() {
     return () => { current = false; };
   }, [showPro]);
 
+  function navigate(next: RootDestination) {
+    if (!canSwitchDestination(phaseRef.current) || next === destination) return;
+    dispatchHandoff({ type: 'leave' });
+    visibleUris.current.clear();
+    setLibraryReady(false);
+    setDestination(next);
+    setMessage('');
+  }
+
+  function viewSavedRecording() {
+    if (phaseRef.current !== 'idle' || !handoff.savedUri) return;
+    if (!files.some(file => file.uri === handoff.savedUri && file.exists)) {
+      dispatchHandoff({ type: 'reset' });
+      setMessage('This recording is no longer available on this device.');
+      return;
+    }
+    dispatchHandoff({ type: 'view' });
+    setMessage('');
+    setDestination('library');
+  }
+
+  useEffect(() => {
+    const request = handoff.request;
+    if (destination !== 'library' || !libraryReady || !request || request.located) return;
+    return locateRecording(() => {
+      const index = files.findIndex(file => file.uri === request.uri);
+      if (index < 0) return false;
+      library.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+      if (!visibleUris.current.has(request.uri)) return false;
+      dispatchHandoff({ type: 'located', id: request.id });
+      return true;
+    }, () => {
+      dispatchHandoff({ type: 'expire', id: request.id });
+      setMessage('Find your saved recording by its date and time in Library.');
+    });
+  }, [destination, libraryReady, files, handoff.request]);
+
+  useEffect(() => {
+    const request = handoff.request;
+    if (!request?.located) return;
+    const timer = setTimeout(() => dispatchHandoff({ type: 'expire', id: request.id }), 5000);
+    return () => clearTimeout(timer);
+  }, [handoff.request]);
+
 
   async function importAudio() {
-    setPhase('importing');
+    if (phaseRef.current !== 'idle') return;
+    setCapturePhase('importing');
+    dispatchHandoff({ type: 'reset' });
     setMessage('');
     let cached: File | undefined;
     let label: File | undefined;
@@ -127,42 +193,50 @@ function RecorderScreen() {
       } catch {
         // A cache cleanup failure must not leave the import controls disabled.
       }
-      setPhase('idle');
+      setCapturePhase('idle');
     }
   }
 
   async function start() {
-    setPhase('starting');
+    if (phaseRef.current !== 'idle') return;
+    setCapturePhase('starting');
+    dispatchHandoff({ type: 'reset' });
+    ++playRequest.current;
     setMessage('');
     try {
       if (!(await requestRecordingPermissionsAsync()).granted) {
         setMessage('Allow microphone access to record.');
-        setPhase('idle');
+        setCapturePhase('idle');
         return;
       }
       await requestNotificationPermissionsAsync();
       player.pause();
       await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
+      activeCapture.current = true;
       recorder.record();
-      setPhase('recording');
+      setCapturePhase('recording');
     } catch {
+      activeCapture.current = false;
       setMessage('Could not start recording. Return to the app and try again.');
-      setPhase('idle');
+      setCapturePhase('idle');
     }
   }
 
   async function stop() {
-    setPhase('saving');
+    if (phaseRef.current !== 'recording') return;
+    setCapturePhase('saving');
     try {
       await recorder.stop();
     } catch {
       setMessage('Could not stop the recording.');
-      setPhase(recorder.getStatus().isRecording ? 'recording' : 'idle');
+      setCapturePhase(recorder.getStatus().isRecording ? 'recording' : 'idle');
     }
   }
 
   async function togglePlayback(file: File) {
+    if (phaseRef.current !== 'idle') return;
+    const request = ++playRequest.current;
     try {
       if (playingFile === file.uri) {
         if (player.playing) {
@@ -179,13 +253,14 @@ function RecorderScreen() {
         player.replace(file.uri);
         setPlayingFile(file.uri);
       }
-      player.play();
+      if (request === playRequest.current && phaseRef.current === 'idle') player.play();
     } catch {
       setMessage('Could not play the recording.');
     }
   }
 
   async function finishSeek() {
+    if (phaseRef.current !== 'idle') return;
     const target = pendingSeek.current;
     if (target === undefined) return;
     pendingSeek.current = undefined;
@@ -202,7 +277,7 @@ function RecorderScreen() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!canSwitchDestination(phase)) return true;
       if (destination === 'record') return false;
-      setDestination('record');
+      navigate('record');
       return true;
     });
     return () => subscription.remove();
@@ -218,9 +293,13 @@ function RecorderScreen() {
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatTime(durationMillis / 1000)}</Text>
           <Text style={styles.support}>Your audio is staying on this device.</Text>
         </View>
-        <ActionButton title="Return" fullWidth={false} variant="text" onPress={() => setDestination('record')} />
+        <ActionButton title="Return" fullWidth={false} variant="text" onPress={() => navigate('record')} />
       </View> : null}
-      {message ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{message}</Text> : null}
+      {message ? <View style={styles.notice}>
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text>
+        {handoff.savedUri && phase === 'idle' ? <ActionButton title="View in Library" variant="text"
+          fullWidth={false} onPress={viewSavedRecording} /> : null}
+      </View> : null}
       {destination === 'record' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
           {phase === 'recording' ? 'Your recording is in progress.' : 'Keep the thought. Even without internet.'}
@@ -251,23 +330,34 @@ function RecorderScreen() {
           <ActionButton title="Choose service and manage keys" variant="primary" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
         </View>
       </ScrollView> : <View style={{ flex: 1, paddingHorizontal: spacing.lg, gap: spacing.md }}>
-      <ActionButton title={phase === 'importing' ? 'Importing…' : 'Import audio'} disabled={phase !== 'idle'} variant="primary" onPress={importAudio} />
+      <ActionButton title={phase === 'importing' ? 'Importing…' : 'Import audio'} fullWidth={false}
+        disabled={phase !== 'idle'} variant="text" onPress={importAudio} />
       <FlatList
+        ref={library}
+        onLayout={() => setLibraryReady(true)}
+        onViewableItemsChanged={onViewableItemsChanged}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          library.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+        }}
         data={files}
         keyExtractor={(file) => file.uri}
         ListEmptyComponent={<View style={styles.emptyState}>
           <Text style={styles.cardTitle}>Your recordings live here</Text>
           <Text style={styles.support}>Make a recording or import an M4A file. Playback and transcript choices stay on this device.</Text>
         </View>}
-        extraData={playback}
+        extraData={{ playback, handoff }}
         renderItem={({ item }) => {
           const selected = playingFile === item.uri;
           const action = selected && playback.playing ? 'Pause' : 'Play';
           const label = recordingLabel(item);
+          const highlighted = handoff.request?.located && handoff.request.uri === item.uri;
           return (
-            <View style={styles.recordingCard}>
+            <View style={[styles.recordingCard, { backgroundColor: palette.background,
+              borderColor: highlighted ? palette.accent : palette.border,
+              borderWidth: highlighted ? 2 : 0 }]}>
+              {highlighted ? <Text accessibilityLiveRegion="polite" style={{ color: palette.accent, fontWeight: '600' }}>Newly saved recording</Text> : null}
               <View style={styles.row}>
-                <Text style={styles.filename}>{label} · M4A</Text>
+                <Text style={[styles.filename, { color: palette.text, fontWeight: '600' }]}>{label}</Text>
                 <ActionButton
                   fullWidth={false}
                   variant="text"
@@ -277,8 +367,6 @@ function RecorderScreen() {
                   onPress={() => togglePlayback(item)}
                 />
               </View>
-              <ActionButton title="Transcript" accessibilityLabel={`Transcript for ${label}`} variant="outlined"
-                disabled={phase !== 'idle'} onPress={() => { player.pause(); setTranscriptRecording(item); }} />
               {selected && playback.isLoaded && playback.duration > 0 ? (
                 <>
                   <Host matchContents={{ vertical: true }} style={styles.slider}>
@@ -286,7 +374,7 @@ function RecorderScreen() {
                       max={playback.duration}
                       value={position}
                       enabled={phase === 'idle'}
-                      modifiers={[fillMaxWidth(), semantics({ contentDescription: 'Playback position' })]}
+                      modifiers={[fillMaxWidth(), semantics({ contentDescription: `Playback position for ${label}` })]}
                       onValueChange={(value) => {
                         pendingSeek.current = value;
                         setSeekPosition(value);
@@ -300,12 +388,18 @@ function RecorderScreen() {
                   </View>
                 </>
               ) : null}
+              <ActionButton title="Transcript" fullWidth={false} accessibilityLabel={`Transcript for ${label}`} variant="text"
+                disabled={phase !== 'idle'} onPress={() => {
+                  if (phaseRef.current !== 'idle') return;
+                  ++playRequest.current;
+                  player.pause(); dispatchHandoff({ type: 'leave' }); setTranscriptRecording(item);
+                }} />
             </View>
           );
         }}
       />
       </View>}
-      <RootNavigation selected={destination} onSelect={next => { setDestination(next); setMessage(''); }} enabled={canSwitchDestination(phase)} />
+      <RootNavigation selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)} />
     </SafeAreaView>
   );
 }
@@ -325,7 +419,7 @@ const styles = StyleSheet.create({
   emptyState: { gap: 10, paddingTop: 28, paddingBottom: 16 },
   recordingCard: { padding: 16, marginBottom: 12, gap: 10, borderRadius: 20, backgroundColor: '#F3EDF7' },
   recordingBanner: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3EDF7' },
-  notice: { color: '#1D1B20', padding: 16, backgroundColor: '#F3EDF7' },
+  notice: { padding: 16, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   slider: { width: '100%' },
   times: { flexDirection: 'row', justifyContent: 'space-between' },

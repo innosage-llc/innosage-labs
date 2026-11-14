@@ -1,5 +1,5 @@
 import { Host, Button as MaterialButton, FilledTonalButton, OutlinedButton, TextButton, Text } from '@expo/ui/jetpack-compose';
-import { fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { defaultMinSize, fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import type { ColorValue } from 'react-native';
 import { useTheme } from './theme';
 
@@ -30,9 +30,10 @@ export function ActionButton({ title, onPress, disabled = false, accessibilityLa
     disabledContentColor: palette.muted as ColorValue,
   } : undefined;
 
-  return <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: fullWidth ? '100%' : 120, minHeight: 48 }}>
+  return <Host matchContents={{ vertical: true, horizontal: !fullWidth }} colorScheme={mode}
+    style={{ width: fullWidth ? '100%' : undefined, alignSelf: fullWidth ? 'stretch' : 'flex-start', minHeight: 48 }}>
     <Component enabled={!disabled} onClick={onPress} colors={colors}
-      modifiers={[...(fullWidth ? [fillMaxWidth()] : []), ...(accessibilityLabel ? [semantics({ contentDescription: accessibilityLabel })] : [])]}>
+      modifiers={[defaultMinSize({ minHeight: 48 }), ...(fullWidth ? [fillMaxWidth()] : []), ...(accessibilityLabel ? [semantics({ contentDescription: accessibilityLabel })] : [])]}>
       <Text>{title}</Text>
     </Component>
   </Host>;

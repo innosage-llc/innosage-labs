@@ -1,3 +1,19 @@
+# Recorder Library handoff — Labs #58
+
+Stacked on draft PR #57 at a139eab543734719e1673fccd114d3b9f4772cb2; parent #56 remains open. Owner reserves merge. No deployment or remote CI.
+
+- [x] Install locked dependencies offline; verify SDK58 installed component inventory and native declarations.
+- [x] Build unchanged Android debug candidate; capture actual BEFORE record/save/Library and explicit play/pause on a clean task-local API36 emulator at 1080×2400, 420dpi. Source was unchanged until captures were saved and hashed. Host microphone/audio disabled; no physical-device/audio-quality claim.
+- [x] Implement native saved-result View in Library, URI-bound location and five-second text-labeled highlight; preserve top-level audio state and user-triggered playback.
+- [x] Reorder Library to identity/playback/progress followed by compact native Transcript; compact native Import.
+- [x] Add guarded capture/import/playback callbacks, token-safe handoff state and bounded cancellable virtual-list retries with focused regressions.
+- [ ] Final tests/typecheck/native build and matching AFTER runtime journeys.
+- [ ] Fresh independent exact-source review and remediation; draft PR and verified immutable screenshot links.
+
+Existing execution-tool approval route resolved initial sandbox-only tooling failures without adding product/device capabilities or changing manifest, SDK or discovery links. All fixture data is synthetic/local; no uploads or billable calls.
+
+## Predecessor readiness-fix context (preserved during reconciliation)
+
 # PR57 authorized readiness fixes — 2026-11-14
 
 Owner authorized squash merges of57/59/Hub462 with final checks and independent review. Fresh review of a139eab found stalled status recovery could indefinitely lock Back and known authorization failures were mislabeled offline. Add a30-second abort deadline to the same-operation read, retain known provider/service messages, and cover deadline/cancellation/success/error classification with local mocks. No new request/upload/permission/dependency or navigation change. Run final typecheck, transcript/navigation aggregates, native Release/full lint and fresh read-only review before merge. Real remote recovery, physical audio and spoken feedback remain unverified; no live service call.
