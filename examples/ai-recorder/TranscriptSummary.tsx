@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Linking, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, Text, TextInput, View } from 'react-native';
+import { Host, Switch } from '@expo/ui/jetpack-compose';
+import { semantics } from '@expo/ui/jetpack-compose/modifiers';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { meetingEssentials, thinkingBudgets, type ThinkingEffort, type SummaryCitation } from './OpenAIClient';
 import { openAIAccess } from './OpenAIAccess';
 import { useTheme } from './ui/theme';
+import { ActionButton } from './ui/ActionButton';
 
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
 type Props = {
@@ -77,7 +80,7 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <Button title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
+      <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
         setOpen(!open);
         if (!open && !summary) void run(async () => {
           const file = savedFiles()[0] ?? output;
@@ -89,8 +92,8 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
       }} />
       {open ? <>
         <Text accessibilityRole="header" style={{ color: palette.text }}>Recipe library</Text>
-        <Button title={recipe === meetingEssentials.id ? '✓ Meeting Essentials' : 'Meeting Essentials'} disabled={busy || recipe === meetingEssentials.id} onPress={() => setRecipe(meetingEssentials.id)} />
-        <Button title={recipe === 'custom' ? '✓ Custom recipe' : 'Custom recipe'} disabled={busy || recipe === 'custom'} onPress={() => {
+        <ActionButton title={recipe === meetingEssentials.id ? '✓ Meeting Essentials' : 'Meeting Essentials'} disabled={busy || recipe === meetingEssentials.id} onPress={() => setRecipe(meetingEssentials.id)} />
+        <ActionButton title={recipe === 'custom' ? '✓ Custom recipe' : 'Custom recipe'} disabled={busy || recipe === 'custom'} onPress={() => {
           setRecipe('custom');
           if (!customLoaded.current) void run(async () => {
             const value = await SecureStore.getItemAsync('recorder.custom-summary-recipe');
@@ -108,9 +111,12 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
             value={instructions} onChangeText={setInstructions} style={{ color: palette.text, borderWidth: 1, borderColor: palette.muted, padding: spacing.sm }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ color: palette.text }}>Search the web</Text>
-            <Switch accessibilityLabel="Search the web" disabled={busy} value={webSearch} onValueChange={setWebSearch} />
+            <Host matchContents style={{ minWidth: 60 }}>
+              <Switch modifiers={[semantics({ contentDescription: 'Search the web' })]}
+                enabled={!busy} value={webSearch} onCheckedChange={setWebSearch} />
+            </Host>
           </View>
-          <Button title="Save custom recipe" disabled={busy || !instructions.trim()}
+          <ActionButton title="Save custom recipe" disabled={busy || !instructions.trim()}
             onPress={() => void run(async () => {
               await SecureStore.setItemAsync('recorder.custom-summary-recipe', JSON.stringify({ instructions: instructions.trim(), webSearch }));
               customLoaded.current = true;
@@ -119,10 +125,10 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
         </> : null}
         <Text accessibilityRole="header" style={{ color: palette.text }}>Thinking budget</Text>
         {thinkingBudgets.map(budget => (
-          <Button key={budget.effort} title={effort === budget.effort ? '✓ ' + budget.label : budget.label}
+          <ActionButton key={budget.effort} title={effort === budget.effort ? '✓ ' + budget.label : budget.label}
             disabled={busy || effort === budget.effort} onPress={() => setEffort(budget.effort)} />
         ))}
-        <Button title={model ? 'Model: ' + model : 'Choose OpenAI model'} disabled={busy} onPress={() => {
+        <ActionButton title={model ? 'Model: ' + model : 'Choose OpenAI model'} disabled={busy} onPress={() => {
           if (choosing) { setChoosing(false); return; }
           void run(async signal => {
             const available = await openAIAccess.summaryModels(signal);
@@ -133,13 +139,13 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
           });
         }} />
         {choosing ? models.map(id => (
-          <Button key={id} title={id} disabled={busy} onPress={() => { setModel(id); setChoosing(false); }} />
+          <ActionButton key={id} title={id} disabled={busy} variant="text" onPress={() => { setModel(id); setChoosing(false); }} />
         )) : null}
-        {revision.exists ? <Button title={source === 'original' ? 'Source: Original · Switch to saved revision' : 'Source: Saved revision · Switch to original'}
+        {revision.exists ? <ActionButton title={source === 'original' ? 'Source: Original · Switch to saved revision' : 'Source: Saved revision · Switch to original'}
           disabled={busy} onPress={() => setSource(source === 'original' ? 'revision' : 'original')} /> : null}
-        <Text style={{ color: palette.muted }}>Generate sends the selected transcript text to OpenAI.
-          {recipe === 'custom' && webSearch ? ' OpenAI may use details from the text to form web queries.' : ''}</Text>
-        <Button title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'}
+        <Text style={{ color: palette.muted }}>Only the selected transcript text is sent to OpenAI for this summary. The source, model, and thinking budget are saved with the result on this device. Summary generation uses your OpenAI project quota.
+          {recipe === 'custom' && webSearch ? ' Web search is on. OpenAI may use relevant details from the text to form public web queries.' : ' Web search is off.'}</Text>
+        <ActionButton title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'} variant="primary"
           disabled={busy || (!unsaved && (!recipe || !model || (recipe === 'custom' && !instructions.trim())))} onPress={() => void run(async signal => {
             if (unsaved) { await persist(unsaved); return; }
             const transcript = (await (source === 'revision' ? revision : original).text()).trim();
@@ -152,7 +158,7 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
             signal.throwIfAborted();
             await persist({ recipe, model, source, effort, webSearch: searchEnabled, ...result });
           })} />
-        {unsaved ? <Button title="Discard unsaved summary" disabled={busy} onPress={() => { setUnsaved(undefined); setMessage(''); }} /> : null}
+        {unsaved ? <ActionButton title="Discard unsaved summary" variant="outlined" disabled={busy} onPress={() => { setUnsaved(undefined); setMessage(''); }} /> : null}
         {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
         {unsaved || summary ? <>
           <Text accessibilityRole="header" style={{ color: palette.text }}>{(unsaved ?? summary)?.recipe === 'custom' ? 'Custom recipe' : 'Meeting Essentials'}</Text>

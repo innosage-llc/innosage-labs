@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, TextInput, useNativeState } from "@expo/ui";
+import { TextInput, useNativeState } from "@expo/ui";
 import { Host, RadioButton } from "@expo/ui/jetpack-compose";
 import { clientForService, selectedService, selectService } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
 import { semantics } from "@expo/ui/jetpack-compose/modifiers";
 import { AppHeader } from "./ui/AppChrome";
+import { ActionButton } from "./ui/ActionButton";
 import { useTheme } from "./ui/theme";
 
 function accessFor(id: ServiceId) {
@@ -132,22 +133,10 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               }}
             />
           </Host>
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
-            <Button
-              label={busy ? "Checking…" : "Verify and save key"}
-              disabled={busy || !hasKey}
-              onPress={save}
-            />
-          </Host>
+          <ActionButton title={busy ? "Checking…" : "Verify and save key"} variant="primary"
+            disabled={busy || !hasKey} onPress={save} />
           {configured ? (
-            <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
-              <Button
-                label="Remove key"
-                variant="outlined"
-                disabled={busy}
-                onPress={remove}
-              />
-            </Host>
+            <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
           ) : null}
           {message ? (
             <Text
