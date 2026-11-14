@@ -12,6 +12,8 @@ Stacked on draft PR #57 at a139eab543734719e1673fccd114d3b9f4772cb2; parent #56 
 
 Existing execution-tool approval route resolved initial sandbox-only tooling failures without adding product/device capabilities or changing manifest, SDK or discovery links. All fixture data is synthetic/local; no uploads or billable calls.
 
+Initial regression run: 31/31 tests pass under existing Node24; typecheck caught an unavailable React Native ViewToken re-export. Use the callback's structural item type instead; final gates will run on the corrected source commit. Default shell Node22 rejected the existing experimental transform flag; it is not the supported test invocation.
+
 ## Predecessor readiness-fix context (preserved during reconciliation)
 
 # PR57 authorized readiness fixes — 2026-11-14

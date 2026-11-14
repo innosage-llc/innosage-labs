@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   RecordingPresets,
@@ -67,7 +67,7 @@ function RecorderScreen() {
   const library = useRef<FlatList<File>>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const visibleUris = useRef(new Set<string>());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<File>[] }) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: { item: File }[] }) => {
     visibleUris.current = new Set(viewableItems.map(token => token.item.uri));
   }).current;
   const [message, setMessage] = useState('');
