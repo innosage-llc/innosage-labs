@@ -1,0 +1,17 @@
+# Bounded native action decision
+
+User goal: tap either the large microphone/stop circle or its visible action name to perform the same action, hear one meaningful action, and retain busy safety, recording timer and saved-file handoff. Existing Record → save → Library → explicit Play/Pause → Record flow and state owners stay in App. No navigation, lifecycle, persistence, permission, provider or recovery change.
+
+Official component check: SDK58.0.23, installed @expo/ui58.0.27, RN0.88.1, Material Symbols0.1.1. Pinned overview classified this as standalone native control/layout plus icon audit; selected expo-ui and expo-native-ui. No Router work, theme change, gesture/animation work, network/data change, new project, delivery or upgrade: corresponding leaves omitted deliberately.
+
+Universal Button was checked first: native implementation delegates to Compose Button but omits contentPadding/shape/colors controls needed to preserve the existing circle and bounded surrounding hit region. Compose TextButton exposes these and enabled, delegates to Material3 TextButton, accepts Column/Box/Icon/Text content, and natively merges child text into a single button action. Use that export; no second click handler, contentDescription or hidden overlay. Box is 144dp clipped with official Shapes.Circle; it is decorative native content, not an input implementation. Label is native Text and contributes the only action name. Host uses the installed universal root export.
+
+The one transparent TextButton hugs actual circle +12dp gap+label, with12dp horizontal and8dp vertical content padding. Tradeoff: Material press/focus indication covers this bounded content group rather than only the circle. The circle remains visually primary. No enlarged full-screen hit region. Verify actual hit regions, merged semantics, wrapping and disabled state on target before acceptance.
+
+Modifier audit: installed clickable only accepts indication, not enabled; semantics only exposes contentDescription/contentType, not merge/clear/role. Reject modifier-only/duplicate-button workarounds. Native TextButton owns role, enabled and click behavior. Existing synchronous phaseRef guards continue to reject reentry.
+
+Library: prior library_music includes a music note, suggesting a music library. A local recordings/imported audio collection is better represented by the installed Material folder symbol. This is a one-import change at the same24dp native NavigationBarItem; Record/Library/Settings labels, destinations and handlers remain intact. No icon package addition.
+
+Design mode STATIC. Apply existing sibling theme and controlled comparison, preserve meaningful action/exception feedback and remove redundant idle status. Guardian default-state guidance is a bounded analogy, not a universal status ban. Generic UI-system0.1.0 remains Experimental / Founder acceptance pending: no generic snapshot consumed, no Canon or theme promotion. Existing product theme retained byte-for-byte. Small visual scope reuses existing journey; no new-app planning/prototype/navigation migration.
+
+SDK docs checked: [universal Button](https://docs.expo.dev/versions/v58.0.0/sdk/ui/universal/button/), [Compose Button](https://docs.expo.dev/versions/v58.0.0/sdk/ui/jetpack-compose/button/), [Surface](https://docs.expo.dev/versions/v58.0.0/sdk/ui/jetpack-compose/surface/); [Android merged semantics](https://developer.android.com/develop/ui/compose/accessibility/merging-clearing). Installed exports/types/Kotlin are authoritative where the documentation differs.
