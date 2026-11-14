@@ -175,10 +175,10 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       try {
         const result = await request(gateway!, operation!, false, controller.signal, paidOperation);
         if (pending.has(result.state) && !controller.signal.aborted) timer = setTimeout(poll, 3000);
-      } catch {
+      } catch (error) {
         if (!controller.signal.aborted) {
           setStatusUnknown(true);
-          setMessage('Connection interrupted. Status is unknown. Check this same operation to recover it; your original audio remains on this device.');
+          setMessage(statusRecoveryMessage(error));
         }
       }
     }

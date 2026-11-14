@@ -47,3 +47,29 @@ test('a completed same-operation read returns its result without cancelling its 
   assert.equal(reads, 1);
   assert.equal(owner.signal.aborted, false);
 });
+
+test('automatic polling after a manual status check retains revoked-key guidance', async () => {
+  // Exercise the real component handlers without mounting native React views.
+  const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
+  const manual = component.slice(component.indexOf('async function checkOperationStatus() {'), component.indexOf('\n  async function submit() {'));
+  const poll = component.slice(component.indexOf('async function poll() {'), component.indexOf('\n    void poll();'));
+  const denied = new ProServiceError('Pro authorization is unavailable or expired. Check your API key.', 'authorization');
+  const state = { busy: false, message: '', unknown: false };
+  const dependencies = {
+    operation: 'synthetic-operation', gateway: { url: 'https://synthetic.test' },
+    paidOperation: undefined, busy: false, submission: { current: null },
+    request: async () => { throw denied; }, pending: new Set(),
+    setBusy: value => { state.busy = value; },
+    setMessage: value => { state.message = value; },
+    setStatusUnknown: value => { state.unknown = value; },
+    readOperationWithDeadline, statusRecoveryMessage,
+    controller: new AbortController(),
+  };
+  const bind = source => new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(source) + ')')(...Object.values(dependencies));
+  await bind(manual)();
+  assert.equal(state.busy, false);
+  assert.equal(state.message, denied.message);
+  await bind(poll)(); // clearing busy restarts this effect in the component
+  assert.equal(state.message, denied.message);
+  assert.equal(state.unknown, true);
+});
