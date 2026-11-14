@@ -5,6 +5,81 @@ or another app is in front. Recordings are AAC in an M4A container. Finished fil
 are stored in the app's documents directory and available for offline playback
 after reopening the app.
 
+## Product promise and release status
+
+**Promise:** Start a conversation recording from the Android app, keep it going
+while the screen is locked or another app is open, then find and play the M4A
+locally, including without a network connection. Transcription and summaries are
+separate, user-started actions: the selected service receives the audio or
+transcript needed for that request. This is hybrid capture and AI processing,
+not fully offline AI. There is no cross-device sync or backup promise. Uninstall
+removes app-private files and saved results; it does not delete an original
+already retained by the staging Gateway.
+
+### Available in the current Android `main`
+
+- **Capture and review:** Record, Library, and Settings destinations; a large,
+  centered recording control; local M4A recording, playback, and relaunch access.
+  Android M4A import makes a local copy. Import is a Library action.
+- **Transcription choices:** Free access through the staging Gateway; separate
+  InnoSage Staging and Production Pro profiles; and a personal OpenAI Android
+  pilot. Staging remains the upgrade default. Production needs a production Pro
+  key and never falls back to staging; Free Gateway access is staging-only.
+- **Transcript work:** Optional speaker labels (off by default), a preserved
+  original, and separately saved local revisions. A completed transcript can be
+  reopened offline. The staging Gateway retains uploaded originals server-side.
+- **Summaries:** Meeting Essentials or a saved Custom recipe from the chosen
+  original or revision, using a configured OpenAI Platform key. The user selects
+  an available compatible model and thinking level. Custom recipes can require
+  web search; returned inline source links are saved with the summary.
+
+Limits are service-specific: staging Free allows up to 15 minutes and 50 MB;
+InnoSage Pro allows up to four hours and 512 MiB; the direct OpenAI transcription
+pilot accepts a new M4A smaller than 25,000,000 bytes. OpenAI requests use the
+user's project quota. A provider's availability, quota, and service limits still
+apply. See the sections below for key handling, recovery, data flow, and details.
+
+### Evidence and maturity
+
+**Status snapshot:** 2026-11-14, repository `main` at
+[`40d9518`](https://github.com/innosage-llc/innosage-labs/commit/40d95184a1e7c903b3994818767e59357bbf7392).
+This describes source and verification status, not a production distribution
+commitment.
+
+| State | What this document means |
+| --- | --- |
+| Implemented in `main` | The Android capture, Library, Settings, import, transcription, transcript editing, and summary flows described below exist in source. This is not a claim that every provider operation or failure mode has passed live acceptance. |
+| Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. The bounded main-versus-candidate control check was 5 PASS / 1 PARTIAL across six runs. |
+| In development | [PR #62](https://github.com/innosage-llc/innosage-labs/pull/62) is a draft UI refinement: one native action for the circle and label, shared disabled behavior, removal of the competing idle “Ready to record” line, and clearer saved copy. It is not in `main` and is not a released feature. |
+| Not established | The native Start error remains NOT_REPRODUCED / NOT_FIXED, with unknown cause and stage. The bounded UI check does not prove universal recording reliability. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
+| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; a signed install, TestFlight delivery, and physical-iPhone product journey are not established. Web is unsupported. |
+
+The merged [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61)
+centers the Android recording control. Its merge records source integration, not
+a reliability fix or full release acceptance. See the [bounded control evidence](docs/centered-control/ab-native-start/README.md)
+and [Android runtime audit](docs/android-runtime-audit/README.md) for the exact
+scope and gaps. Engineering inspection tools and design-review artifacts are
+QA aids; they are not AI Recorder features or supported app platforms.
+
+### Acceptance and release gates
+
+- **Capture:** On a physical Android phone, verify spoken markers before screen
+  lock, while locked, and in another app remain in the saved M4A in order; verify
+  local playback after relaunch and offline. Emulator evidence alone does not
+  close physical-phone acceptance.
+- **Provider and data flow:** For each offered service, verify the selected route,
+  key/quota requirements, exact size and duration limits, original/revision
+  distinction, and same-operation recovery behavior. Clearly disclose that
+  remote requests leave the device and that staging Gateway originals persist
+  server-side; do not describe AI processing as offline or all data as local.
+- **UI follow-up:** Keep PR #62 draft-only until the saved state is fully
+  reachable at 320 dp / 200% text and the new native Start failure is resolved or
+  explicitly accepted with evidence and scope. Do not infer reliability from the
+  prior 5 PASS / 1 PARTIAL check.
+- **Platform claims:** Claim iOS availability only after the signed installation
+  and physical-device capture, playback, import, relaunch, and supported-provider
+  journey are verified. Do not claim web support from Expo compatibility alone.
+
 Use Node 24, a JDK and an Android SDK compatible with Expo SDK 58. Connect an
 Android phone with USB debugging or start an emulator, then run:
 
