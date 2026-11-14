@@ -1,5 +1,7 @@
 # Centered recording control — R1/R2 correction
 
+**BLOCKED pending native-start investigation; no repair established.** See [investigation](native-start-investigation.md). Prior successful evidence and checks do not clear this blocker. No owner approval, merge, auto-merge or deploy.
+
 Review package: [PR61](https://github.com/innosage-llc/innosage-labs/pull/61), [issue60](https://github.com/innosage-llc/innosage-labs/issues/60). **Coordinator delivery review is pending. Do not seek owner approval, merge, auto-merge or deploy yet.** Broader acceptance issues remain open.
 
 Record retains its brief native header, centered native144dp circular microphone, visible English Start recording label and one local-storage line. Recording uses actual recorder duration and explicit Stop & save. No waveform, new feature, dependency/Router/SDK change or permission declaration.
@@ -49,7 +51,7 @@ Actual final Release evidence:
 - Retryable denial reopens a genuine system microphone prompt on Start recording. A second denial yields blocked/manual-path guidance; retry remains blocked without pretending another prompt opened. Manual system permission recovery then allows recording. Existing optional notification requests are declined.
 -200% text and320dp small screen preserve reachable recording/save actions and fixed bottom navigation. Both small recording scroll endpoints are captured. Content outside the scroll viewport clips normally; no sticky timer was added.
 
-During external permission/notification switching, the existing native start path returned its honest start error and a retry remained Starting before failing. A data-preserving cold process relaunch recovered normal capture. Cause is unverified; no recorder-owner reset or new recovery handler was introduced. This is an observed runtime limit, not a controlled native-failure-injection PASS.
+During external permission/notification switching, the observed native start path returned its honest start error and a retry remained Starting before failing. A data-preserving cold process relaunch recovered normal capture. Cause is unverified; no recorder-owner reset or new recovery handler was introduced. This is an observed runtime limit, not a controlled native-failure-injection PASS.
 
 No fault-injection/mock screenshots. UI automation uses observed labels for static controls and checks actual phase boundaries; preliminary mistimed or misnamed captures are retained privately and excluded from the delivery manifest. Repeated sequential input that arrives after a completed save is a new Start action; no claim is made that a post-idle tap is debounced. Native busy guards remain unchanged.
 
@@ -59,4 +61,4 @@ NOT_RUN/NOT_VERIFIED: actual native start/stop/save/disk-full failure injection,
 
 Timestamp-only older-file recognition remains out of scope; no titles/previews were added. Saved CTA emphasis versus the expressly approved large central mic remains a documented design tradeoff. The permission-review finding was addressed through truthful copy and an explicit observed manual path, within the no-new-button constraint.
 
-Theme bytes/sourceHash remain unchanged. Earlier manifest localHash provenance was corrected factually; no full generic-release compliance or Founder acceptance is claimed. No dependency/discovery repair, remote CI, merge, deployment or broader-issue closure. Raw Skills/Brain text, prompts, logs, device identifiers and host paths remain private outside Labs. Task emulator stays available for coordinator delivery review; original font/display/accessibility values are restored.
+Theme bytes/sourceHash remain unchanged. Earlier manifest localHash provenance was corrected factually; no full generic-release compliance or Founder acceptance is claimed. No dependency/discovery repair, remote CI, merge, deployment or broader-issue closure. Raw Skills/Brain text, prompts, logs, device identifiers and host paths remain private outside Labs. Prior restoration is historical. The task device is unavailable in the new diagnostic continuation; no settings were changed.

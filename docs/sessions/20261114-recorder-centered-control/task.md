@@ -1,6 +1,6 @@
 # Centered recorder control — coordinator R1/R2 corrections
 
-Current state: final correction package for coordinator delivery review. Owner approval is not being requested. No merge, auto-merge, deployment, remote workflow, Library upload, Slack message or broader acceptance issue closure.
+Current state: BLOCKED pending native-start investigation; startup lifecycle NOT repaired. Owner approval is not being requested. No merge, auto-merge, deployment, remote workflow, Library upload, Slack message or broader acceptance issue closure.
 
 - [x] Continue same isolated branch/PR61/issue60. Verify previous remote head73c3471 and mainc1cafcce before corrections; no duplicates or rebase.
 - [x] Inspect coordinator observation, actual retained image, original/global notice and final prior source. Preserve original raw receipts and historical PNGs privately.
@@ -17,4 +17,16 @@ Historical implementation: approved center-circle superseded the old lower text-
 
 Observed limitation: native capture failed once during external permission/notification switching, then recovered after data-preserving cold relaunch. No ownership/recovery workaround added; cause unverified. Controlled failure injection, physical/spoken audio, audible TalkBack and unclaimed platforms remain explicit NOT_RUN/NOT_VERIFIED. See evidence README and review.md.
 
-Correction artifact commit8ae6828889015bf8d711c9c2706c9631471c7a6e contains25 final original PNG routes and45-file source/lock equivalence. Final linkage commit changes docs only; runtime remains6d5645f. PR61 and issue60 updated in place; no duplicate or closure. Current readiness is coordinator review, not owner approval. Emulator remains running, font1.0/physical1080×2400/420dpi/accessibility null+0/touch0 restored; optional notifications off and microphone Ask every time via existing task-app system controls.
+Correction artifact commit8ae6828889015bf8d711c9c2706c9631471c7a6e contains25 final original PNG routes and45-file source/lock equivalence. Final linkage commit changes docs only; runtime remains6d5645f. PR61 and issue60 updated in place; no duplicate or closure. Earlier coordinator-review and emulator-running status is superseded: device unavailable in the native-start continuation. Prior restoration was font1.0/physical1080×2400/420dpi/accessibility null+0/touch0 restored; optional notifications off and microphone Ask every time via existing task-app system controls.
+
+## Native-start continuation
+
+- [x] Write current evidence before diagnostics; distinguish observation, inference, baseline-unproven and unrepaired status.
+- [x] Read original scripts/trace events and actual error PNG; inspect installed native permission/notification/start sources.
+- [x] Verify clean intake head9c50e7a and remote mainc1cafcce; product bytes checked against6d.
+- [ ] Controlled runtime trials / installed APK re-read: NOT_RUN, authorized device unavailable; no startup allowed.
+- [ ] Baseline reproduction: NOT_RUN / NOT_ESTABLISHED.
+- [ ] Product repair: NONE; no causal basis for mutation.
+- [x] Publish sanitized BLOCKER report and actual production error diagnostic; update PR61/issue60, preserve prior limits and original private receipts.
+
+See [investigation](../../../examples/ai-recorder/docs/centered-control/native-start-investigation.md). Smallest next step is same-owned-device production verification and one separated, observed trial after coordinator makes it available. No acceptance, merge or deployment.

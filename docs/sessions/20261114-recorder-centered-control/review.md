@@ -1,3 +1,5 @@
+**BLOCKED: native-start cause/reproducibility remain unknown; no repair.** See [investigation](../../../examples/ai-recorder/docs/centered-control/native-start-investigation.md). Earlier independent reviews do not clear this runtime blocker.
+
 # Independent reviews and dispositions
 
 All reviews used fresh local Mac Studio Codex CLI gpt-6.1-sol medium, read-only. Private raw outputs/prompts remain outside Labs. No review grants owner acceptance or merge authority. Current boundary: coordinator delivery review first; do not seek owner approval yet.
@@ -27,4 +29,4 @@ Saved CTA prominence versus the owner-approved large circular mic remains the do
 
 ## Observed runtime boundary
 
-External permission/notification switching produced an existing native start error and a retry that remained Starting before failing. Data-preserving cold relaunch restored normal capture. Cause is unverified; no ownership-reset or recovery-handler workaround was introduced. Failed/transition captures stay private. The final evidence chain starts from observed normal recording and validates saved/idle labels before accepting them. Controlled native failure injection, physical audio, audible TalkBack and other NOT_RUN limits remain explicit in the evidence README.
+External permission/notification switching produced an observed native start error and a retry that remained Starting before failing. Data-preserving cold relaunch restored normal capture. Cause is unverified; no ownership-reset or recovery-handler workaround was introduced. Failed/transition captures stay private. The final evidence chain starts from observed normal recording and validates saved/idle labels before accepting them. Controlled native failure injection, physical audio, audible TalkBack and other NOT_RUN limits remain explicit in the evidence README.

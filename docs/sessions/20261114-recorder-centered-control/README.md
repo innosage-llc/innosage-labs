@@ -1,3 +1,5 @@
+**BLOCKED pending native-start investigation; no startup repair established.** [Current report](../../../examples/ai-recorder/docs/centered-control/native-start-investigation.md). Prior review-ready and emulator-available statements are superseded.
+
 # Centered recording control
 
 Current state: bounded R1/R2 correction package for coordinator delivery review. Do not seek owner approval, merge, auto-merge or deploy yet.
