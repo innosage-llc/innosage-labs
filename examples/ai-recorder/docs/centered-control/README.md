@@ -1,5 +1,7 @@
 # Centered native recording control — #60
 
+Review-ready [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61), scoped [issue #60](https://github.com/innosage-llc/innosage-labs/issues/60).
+
 Record now opens with a brief state and a large centered native microphone button, with a visible Start recording label below and one local-storage line. Recording shows the recorder's real timer and explicit Stop & save. Saved offers the existing URI-bound View in Library action, now grouped centrally. Marketing heading, tinted explanation card and repeated offline/account copy are removed. No waveform, service call, permission declaration, dependency or navigation change.
 
 | Before: same-source retained Release launch | After: final-source installed Release |
