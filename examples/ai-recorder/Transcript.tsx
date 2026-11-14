@@ -20,9 +20,9 @@ import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { connectGateway, type Gateway } from './GatewayConnection';
+import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 type SpeakerResult = { requested: boolean; status: string; transcript?: string };
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
-class KnownServiceFailure extends Error {}
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
   QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
@@ -218,14 +218,16 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     const controller = new AbortController();
     submission.current = controller;
     try {
-      const result = await request(gateway, operation, false, controller.signal, paidOperation);
+      const result = await readOperationWithDeadline(
+        signal => request(gateway, operation, false, signal, paidOperation), controller.signal,
+      );
       setStatusUnknown(false);
       setMessage(pending.has(result.state)
         ? 'The same operation is still in progress. This check did not upload your audio again.'
         : result.state === 'COMPLETED' ? 'Transcript recovered from the same operation.' : 'This operation has ended. Review its status before starting another transcription.');
-    } catch {
+    } catch (error) {
       setStatusUnknown(true);
-      setMessage('Status is still unknown while offline. Your original audio remains on this device. Reconnect and check this same operation again.');
+      setMessage(statusRecoveryMessage(error));
     } finally {
       if (submission.current === controller) submission.current = null;
       setBusy(false);
