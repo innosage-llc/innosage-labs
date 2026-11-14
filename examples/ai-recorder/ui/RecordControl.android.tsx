@@ -14,7 +14,7 @@ export function RecordControl({ phase, onPress }: { phase: CapturePhase; onPress
   const label = { idle: 'Start recording', starting: 'Starting…', recording: 'Stop & save', saving: 'Saving…', importing: 'Start recording' }[phase];
   return <View style={{ alignItems: 'center', gap: spacing.md }}>
     <Host matchContents colorScheme={mode} style={{ width: 144, height: 144 }}>
-      <FilledIconButton enabled={!disabled} onClick={onPress} shape={Shape.Circle({})}
+      <FilledIconButton enabled={!disabled} onClick={onPress} shape={Shape.Circle({ radius: 1, verticesCount: 32 })}
         colors={{ containerColor: palette.accent, contentColor: palette.onAccent,
           disabledContainerColor: palette.surface, disabledContentColor: palette.muted }}
         modifiers={[size(144, 144), semantics({ contentDescription: label })]}>
