@@ -7,12 +7,16 @@ Stacked on draft PR #57 at a139eab543734719e1673fccd114d3b9f4772cb2; parent #56 
 - [x] Implement native saved-result View in Library, URI-bound location and five-second text-labeled highlight; preserve top-level audio state and user-triggered playback.
 - [x] Reorder Library to identity/playback/progress followed by compact native Transcript; compact native Import.
 - [x] Add guarded capture/import/playback callbacks, token-safe handoff state and bounded cancellable virtual-list retries with focused regressions.
-- [ ] Final tests/typecheck/native build and matching AFTER runtime journeys.
-- [ ] Fresh independent exact-source review and remediation; draft PR and verified immutable screenshot links.
+- [x] Final code 723ffbb: 31 tests, typecheck, standalone Release build and full Android Release lint PASS; matching actual AFTER journey captured with SHA256 manifest.
+- [x] Fresh independent exact-source Sol6.1 medium review: no actionable findings; tests/typecheck independently rerun. Native runtime/evidence review remains explicitly distinct.
+- [x] Verify background/root continuity, repeated capture/save/handoff taps, no autoplay, expiry/leave cancellation, picker cancel/M4A/WAV rejection, relaunch, paused seek, 150% font and bottom scroll reachability.
+- [ ] Draft PR and verified immutable screenshot/source links.
 
 Existing execution-tool approval route resolved initial sandbox-only tooling failures without adding product/device capabilities or changing manifest, SDK or discovery links. All fixture data is synthetic/local; no uploads or billable calls.
 
 Initial regression run: 31/31 tests pass under existing Node24; typecheck caught an unavailable React Native ViewToken re-export. Use the callback's structural item type instead; final gates will run on the corrected source commit. Default shell Node22 rejected the existing experimental transform flag; it is not the supported test invocation.
+
+Final results and provenance: examples/ai-recorder/docs/library-handoff/README.md and manifest.json. Physical microphone/audible listening, TalkBack, active-capture process death, actual disk-full/save failure and telephony interruption remain NOT_RUN; draft delivery is not full device/parent acceptance. The source correction is committed and all final applicable gates above actually passed.
 
 ## Predecessor readiness-fix context (preserved during reconciliation)
 
