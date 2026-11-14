@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs operationRecovery.test.mjs",
-    "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs"
+    "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs ui/libraryHandoff.test.mjs",
+    "test": "npm run test:transcript && npm run test:navigation"
   },
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",

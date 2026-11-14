@@ -1,5 +1,35 @@
+# Recorder Library handoff — Labs #58
+
+Stacked on draft PR #57 at a139eab543734719e1673fccd114d3b9f4772cb2; parent #56 remains open. Owner reserves merge. No deployment or remote CI.
+
+- [x] Install locked dependencies offline; verify SDK58 installed component inventory and native declarations.
+- [x] Build unchanged Android debug candidate; capture actual BEFORE record/save/Library and explicit play/pause on a clean task-local API36 emulator at 1080×2400, 420dpi. Source was unchanged until captures were saved and hashed. Host microphone/audio disabled; no physical-device/audio-quality claim.
+- [x] Implement native saved-result View in Library, URI-bound location and five-second text-labeled highlight; preserve top-level audio state and user-triggered playback.
+- [x] Reorder Library to identity/playback/progress followed by compact native Transcript; compact native Import.
+- [x] Add guarded capture/import/playback callbacks, token-safe handoff state and bounded cancellable virtual-list retries with focused regressions.
+- [x] Final code 723ffbb: 31 tests, typecheck, standalone Release build and full Android Release lint PASS; matching actual AFTER journey captured with SHA256 manifest.
+- [x] Fresh independent exact-source Sol6.1 medium review: no actionable findings; tests/typecheck independently rerun. Native runtime/evidence review remains explicitly distinct.
+- [x] Verify background/root continuity, repeated capture/save/handoff taps, no autoplay, expiry/leave cancellation, picker cancel/M4A/WAV rejection, relaunch, paused seek, 150% font and bottom scroll reachability.
+- [x] Draft PR59 stacked on PR57; evidence e521999 contains all30 actual screenshot originals and manifest. Remote final source, every PNG hash and all4 embedded raw URLs read back successfully. No Actions run triggered.
+
+Existing execution-tool approval route resolved initial sandbox-only tooling failures without adding product/device capabilities or changing manifest, SDK or discovery links. All fixture data is synthetic/local; no uploads or billable calls.
+
+Initial regression run: 31/31 tests pass under existing Node24; typecheck caught an unavailable React Native ViewToken re-export. Use the callback's structural item type instead; final gates will run on the corrected source commit. Default shell Node22 rejected the existing experimental transform flag; it is not the supported test invocation.
+
+Final results and provenance: examples/ai-recorder/docs/library-handoff/README.md and manifest.json. Physical microphone/audible listening, TalkBack, active-capture process death, actual disk-full/save failure and telephony interruption remain NOT_RUN; draft delivery is not full device/parent acceptance. The source correction is committed and all final applicable gates above actually passed.
+
+## Bounded readiness continuation — 2026-11-14
+
+Stack unchanged after read-only dependency analysis; PR57 acceptance recommended before PR59 delta. Actual installed TalkBack hardware-touch focus/activation, handoff, playback/progress, paused seek, root/stale return and import cancellation exercised on frozen723ffbb Release. Spoken announcements/listening remain NOT_VERIFIED; large-text/bounds checks not rerun. Exact accessibility settings restored and task emulator stopped. No source changes or new build/test run; prior gates remain scoped to723ffbb. See examples/ai-recorder/docs/library-handoff/readiness-20261114/README.md. No merge/acceptance/session closure.
+
+## Predecessor readiness-fix context (preserved during reconciliation)
+
 # PR57 authorized readiness fixes — 2026-11-14
 
 Owner authorized squash merges of57/59/Hub462 with final checks and independent review. Fresh review of a139eab found stalled status recovery could indefinitely lock Back and known authorization failures were mislabeled offline. Add a30-second abort deadline to the same-operation read, retain known provider/service messages, and cover deadline/cancellation/success/error classification with local mocks. No new request/upload/permission/dependency or navigation change. Run final typecheck, transcript/navigation aggregates, native Release/full lint and fresh read-only review before merge. Real remote recovery, physical audio and spoken feedback remain unverified; no live service call.
 
 Follow-up final-source review found automatic polling overwrote the manual authorization guidance after busy cleared. Apply the same classification to the polling catch and add a real-handler mock transition regression; rerun final gates/review.
+
+## Owner-authorized mainline reconciliation — 2026-11-14
+
+Owner approved squash merges57/59/Hub462. PR57 merged6cf9c604 from final reviewed936925e with bounded status recovery/access-guidance fixes and five regressions. Rebased59-only commits froma139 onto6cf9c604; preserved both task contexts and combined tests. App/Library/native/state/theme/lockfile bytes match original723ffbb; intentional recovery delta exactly matches merged57. All screenshots preserved with original provenance. Final-head gates/review recorded in merge handoff; parent56/issue58 remain open. No deployment/session closure/new device acceptance claim.
