@@ -11,8 +11,10 @@ Current state: final correction package for coordinator delivery review. Owner a
 - [x] Final200%/320dp actual recording and saved states captured. Restore font/display/accessibility; leave task emulator available for coordinator review.
 - [x] Fresh independent local Sol6.1 medium code review; fresh independent visual review of final actual cold idle/saved/error/recording. Preserve residual suggestions and runtime boundaries in review.md.
 - [x] Full45-file product/config/lock source-equivalence record created; all updated PNGs bound to final runtime source. Raw traces remain outside public repo.
-- [ ] Publish refreshed evidence on existing PR61/issue60, verify final remote head/main, PNG bytes and literal-newline formatting.
+- [x] Publish refreshed evidence on existing PR61/issue60. Markdown/JSON real-newline checks PASS. Final remote head/main and PNG read-back are post-push delivery checks; their authoritative receipts remain private outside Labs.
 
 Historical implementation: approved center-circle superseded the old lower text-button proposal; installed native Circle required explicit radius; saved action was centered/grouped after initial visual review. Theme provenance was corrected factually without changing theme bytes/sourceHash or claiming shared-release acceptance. Earlier readiness statements and screenshots are superseded by this correction package, not new owner approval.
 
 Observed limitation: native capture failed once during external permission/notification switching, then recovered after data-preserving cold relaunch. No ownership/recovery workaround added; cause unverified. Controlled failure injection, physical/spoken audio, audible TalkBack and unclaimed platforms remain explicit NOT_RUN/NOT_VERIFIED. See evidence README and review.md.
+
+Correction artifact commit8ae6828889015bf8d711c9c2706c9631471c7a6e contains25 final original PNG routes and45-file source/lock equivalence. Final linkage commit changes docs only; runtime remains6d5645f. PR61 and issue60 updated in place; no duplicate or closure. Current readiness is coordinator review, not owner approval. Emulator remains running, font1.0/physical1080×2400/420dpi/accessibility null+0/touch0 restored; optional notifications off and microphone Ask every time via existing task-app system controls.
