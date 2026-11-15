@@ -1,14 +1,9 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
-  RecordingPresets,
-  requestNotificationPermissionsAsync,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus,
-  useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
 import { Host, Slider } from '@expo/ui/jetpack-compose';
@@ -19,14 +14,15 @@ import { AppHeader, RootNavigation } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
 import { RecordControl } from './ui/RecordControl.android';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
-import { hasSavedFeedback, microphonePermissionMessage, recordingSavedMessage } from './ui/recordFeedback';
-import { canSwitchDestination, type CapturePhase, type RootDestination } from './ui/navigation';
+import { hasSavedFeedback } from './ui/recordFeedback';
+import { canSwitchDestination, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
 import { services } from './ServiceConfig';
 import { Directory, File, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
+import { getCaptureSession } from './captureOwner';
 
 const recordings = new Directory(Paths.document, 'recordings');
 
@@ -58,12 +54,11 @@ function RecorderScreen() {
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
-  const [phase, setPhase] = useState<CapturePhase>('idle');
-  // Native callbacks can arrive before React commits a disabled button.
-  const phaseRef = useRef<CapturePhase>('idle');
-  function setCapturePhase(next: CapturePhase) { phaseRef.current = next; setPhase(next); }
-  const activeCapture = useRef(false);
-  const finishedUrls = useRef(new Set<string>());
+  const session = getCaptureSession();
+  const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const { phase, message } = capture;
+  const setCapturePhase = session.setPhase;
+  const setMessage = session.setMessage;
   const playRequest = useRef(0);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
   const library = useRef<FlatList<File>>(null);
@@ -72,37 +67,22 @@ function RecorderScreen() {
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: { item: File }[] }) => {
     visibleUris.current = new Set(viewableItems.map(token => token.item.uri));
   }).current;
-  const [message, setMessage] = useState('');
   const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
+  // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
+  useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
   const [transcriptRecording, setTranscriptRecording] = useState<File>();
   const [playingFile, setPlayingFile] = useState<string>();
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
   const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, async (status) => {
-    if (!status.isFinished || !activeCapture.current || (status.url && finishedUrls.current.has(status.url))) return;
-    activeCapture.current = false;
-    if (status.url) finishedUrls.current.add(status.url);
-    setCapturePhase('saving');
-    try {
-      if (status.hasError || !status.url) throw new Error('Recording did not finish.');
-      const source = new File(status.url);
-      if (!source.exists || !source.size) throw new Error('Recording file is empty.');
-      recordings.create({ idempotent: true });
-      const saved = new File(recordings, `Recording-${Date.now()}-${source.name}`);
-      await source.move(saved);
-      setFiles(listRecordings());
-      dispatchHandoff({ type: 'saved', uri: saved.uri });
-      setMessage(recordingSavedMessage);
-    } catch {
-      dispatchHandoff({ type: 'reset' });
-      setMessage('Could not save the recording.');
-    } finally {
-      setCapturePhase('idle');
-    }
-  });
+  const recorder = session.recorder;
+  useEffect(() => {
+    if (!capture.savedUri) return;
+    setFiles(listRecordings());
+    dispatchHandoff({ type: 'saved', uri: capture.savedUri });
+  }, [capture.savedUri, capture.saveVersion]);
   const { durationMillis } = useAudioRecorderState(recorder, 500);
 
   useEffect(() => {
@@ -112,7 +92,7 @@ function RecorderScreen() {
   }, [showPro]);
 
   function navigate(next: RootDestination) {
-    if (!canSwitchDestination(phaseRef.current) || next === destination) return;
+    if (!canSwitchDestination(session.getSnapshot().phase) || next === destination) return;
     dispatchHandoff({ type: 'leave' });
     visibleUris.current.clear();
     setLibraryReady(false);
@@ -121,7 +101,7 @@ function RecorderScreen() {
   }
 
   function viewSavedRecording() {
-    if (phaseRef.current !== 'idle' || !handoff.savedUri) return;
+    if (session.getSnapshot().phase !== 'idle' || !handoff.savedUri) return;
     if (!files.some(file => file.uri === handoff.savedUri && file.exists)) {
       dispatchHandoff({ type: 'reset' });
       setMessage('This recording is no longer available on this device.');
@@ -157,7 +137,7 @@ function RecorderScreen() {
 
 
   async function importAudio() {
-    if (phaseRef.current !== 'idle') return;
+    if (session.getSnapshot().phase !== 'idle') return;
     setCapturePhase('importing');
     dispatchHandoff({ type: 'reset' });
     setMessage('');
@@ -200,45 +180,18 @@ function RecorderScreen() {
   }
 
   async function start() {
-    if (phaseRef.current !== 'idle') return;
-    setCapturePhase('starting');
+    if (session.getSnapshot().phase !== 'idle') return;
     dispatchHandoff({ type: 'reset' });
     ++playRequest.current;
-    setMessage('');
-    try {
-      const permission = await requestRecordingPermissionsAsync();
-      if (!permission.granted) {
-        setMessage(microphonePermissionMessage(permission.canAskAgain));
-        setCapturePhase('idle');
-        return;
-      }
-      await requestNotificationPermissionsAsync();
-      player.pause();
-      await setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
-      activeCapture.current = true;
-      recorder.record();
-      setCapturePhase('recording');
-    } catch {
-      activeCapture.current = false;
-      setMessage('Could not start recording. Return to the app and try again.');
-      setCapturePhase('idle');
-    }
+    await session.start();
   }
 
   async function stop() {
-    if (phaseRef.current !== 'recording') return;
-    setCapturePhase('saving');
-    try {
-      await recorder.stop();
-    } catch {
-      setMessage('Could not stop the recording.');
-      setCapturePhase(recorder.getStatus().isRecording ? 'recording' : 'idle');
-    }
+    await session.stop();
   }
 
   async function togglePlayback(file: File) {
-    if (phaseRef.current !== 'idle') return;
+    if (session.getSnapshot().phase !== 'idle') return;
     const request = ++playRequest.current;
     try {
       if (playingFile === file.uri) {
@@ -256,14 +209,14 @@ function RecorderScreen() {
         player.replace(file.uri);
         setPlayingFile(file.uri);
       }
-      if (request === playRequest.current && phaseRef.current === 'idle') player.play();
+      if (request === playRequest.current && session.getSnapshot().phase === 'idle') player.play();
     } catch {
       setMessage('Could not play the recording.');
     }
   }
 
   async function finishSeek() {
-    if (phaseRef.current !== 'idle') return;
+    if (session.getSnapshot().phase !== 'idle') return;
     const target = pendingSeek.current;
     if (target === undefined) return;
     pendingSeek.current = undefined;
@@ -393,7 +346,7 @@ function RecorderScreen() {
               ) : null}
               <ActionButton title="Transcript" fullWidth={false} accessibilityLabel={`Transcript for ${label}`} variant="text"
                 disabled={phase !== 'idle'} onPress={() => {
-                  if (phaseRef.current !== 'idle') return;
+                  if (session.getSnapshot().phase !== 'idle') return;
                   ++playRequest.current;
                   player.pause(); dispatchHandoff({ type: 'leave' }); setTranscriptRecording(item);
                 }} />

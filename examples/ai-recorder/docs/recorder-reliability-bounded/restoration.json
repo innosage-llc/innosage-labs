@@ -1,0 +1,61 @@
+{
+  "restoration": {
+    "at_utc": "2026-11-15T01:09:20.165346+00:00",
+    "initial_settings_equal": true,
+    "initial_grants_flags_equal": true,
+    "production_apk_sha256": "1d3581f6f19773a5122647c11916d867608fda91672cfd0abfa48640819b5dee",
+    "production_js_sha256": "ceb030d7262c0e68a7734201ddd512e9a966b1edc8daa95854d40847685a9a0f"
+  },
+  "data": {
+    "original_display_identities": 17,
+    "final_display_identities": 24,
+    "new_saved": 7,
+    "AAC_files": 27,
+    "saved_files": 24,
+    "cache_files": 3,
+    "C3_saved_hash_unchanged": true,
+    "C1_C2_valid_unlisted_cache_retained": true,
+    "all_old_playability": "NOT_TESTED",
+    "all24_pre_fix_files_hash_bytes_unchanged": true
+  },
+  "shutdown": {
+    "at_utc": "2026-11-15T01:11:28.915726+00:00",
+    "owned_ports_closed": true,
+    "owned_profile_closed": true,
+    "other_profiles_no_handles": true,
+    "shared_adb_unchanged": true,
+    "working_copy_boot_writes_retained": true
+  },
+  "protected_files": {
+    "original_file_count": 22,
+    "cold_backup_file_count": 22,
+    "total_hash_comparisons": 44,
+    "mismatches": 0
+  },
+  "private_receipt_identities": {
+    "final-protected-data-audit.json": {
+      "sha256": "947e1ace8234e4531fe907641f31373b8daaf0a5b46cb72adba5c3d8a75c5a26",
+      "bytes": 450
+    },
+    "owned-closed-confirmed.json": {
+      "sha256": "a5016cf058fc8542469f2f0de76db2ee7750c85f4164658339b853de0a43105f",
+      "bytes": 423
+    },
+    "restored-settings-permissions.json": {
+      "sha256": "0ff41fc5de4b3082600be3b30b993782c185fa5b22bae0f1c1b55ca47b4182c1",
+      "bytes": 862
+    },
+    "production-library-all24.json": {
+      "sha256": "e827e4a364c887c14bee1e3d329d05ea681d49ee8141f363b93e0b92bfda1b30",
+      "bytes": 1116
+    },
+    "exact-production-restored.json": {
+      "sha256": "c1b65a4f16559428d73dba01531be4e74f698ae7a38b792bc5bd2ed0e7820908",
+      "bytes": 612
+    }
+  },
+  "S_actual": 5,
+  "C_actual": 5,
+  "unused_slots": [],
+  "final_review": "Independent read-only exact-source/code/visual review completed; owner acceptance pending. See review.md."
+}

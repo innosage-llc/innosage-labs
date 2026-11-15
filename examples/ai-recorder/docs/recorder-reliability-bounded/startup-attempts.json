@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "base_commit": "9bb86d2f8e56c58375c9247dcf5dc1e72405e2c3",
+  "scope": "Baseline product logic, before any candidate fix installation; private app-owned logging-only diagnostics",
+  "S_used": 5,
+  "S_cap": 5,
+  "unused_S_slots": [],
+  "disposition": "no consistent reproduction",
+  "prior_generic_failure": "unexplained; not disproven or fixed",
+  "environment": "Existing task-owned isolated same-data copy; emulator37.2.13; per-process E1 -feature -WiFiPacketStream; no global changes, no additional boot",
+  "copy_attribution_correction": "Open-file and inode proof identified the earlier independent task working copy as active; the extra recovery copy was prepared but unused. Earlier exact-copy attribution was wrong, retained as history; selection cause unproven. Recovery/reconciliation completed within25m18s, E1 only.",
+  "limitations": [
+    "Diagnostic logging/native getters and synchronous metadata scans add overhead; timing not identical to production",
+    "Four successful captures plus one expected denied-Start case; not five successful microphone captures",
+    "No playback/acoustic-quality test in these S cases",
+    "Setup/automation failures before input did not count as product attempts",
+    "C1/C2 font-only interruptions are separate C cases; not S startup reproduction"
+  ],
+  "attempts": [
+    {
+      "slot": "S1",
+      "started_at_utc": "2026-11-15T00:11:03.436759+00:00",
+      "completed_at_utc": "2026-11-15T00:13:59.758724+00:00",
+      "scenario": "Foreground start current restored permission flags; accept microphone Only this time if shown; preserve existing notification denial if shown; one start only, advance timer then stop/save",
+      "outcome": "SUCCEEDED",
+      "start_inputs": 1,
+      "stop_inputs": 1,
+      "input_times_utc": [
+        {
+          "action": "Start recording",
+          "at_utc": "2026-11-15T00:11:03.437650+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "at_utc": "2026-11-15T00:13:13.961350+00:00"
+        }
+      ],
+      "diagnostic_apk_sha256": "5788bd2f3bfccf0d5ea0ae804198a8d178e074a9e2d2a5b10b1e2bd14f720b2e",
+      "diagnostic_js_sha256": "beb9029554aa0f4ba399a91d455385c822ce1d132cf78ce5d09d7db4a38ec6c0",
+      "native_log_sha256": "f7f1a08c2abd54711da02ab47dd828a5f3d854322240810211de099fc3993ab1",
+      "timer_ms_range": [
+        277,
+        82427
+      ],
+      "saved_bytes": 1035302,
+      "container_duration_us": 82541200,
+      "startup_stage_error": false,
+      "normal_completion_and_save": true,
+      "permission_denial_expected": false,
+      "playback_tested": false
+    },
+    {
+      "slot": "S2",
+      "started_at_utc": "2026-11-15T00:27:03.455456+00:00",
+      "completed_at_utc": "2026-11-15T00:28:30.614053+00:00",
+      "scenario": "Foreground repeat on baseline release-probe; same process after restored font from C2; no configuration during recording",
+      "outcome": "SUCCEEDED",
+      "start_inputs": 1,
+      "stop_inputs": 1,
+      "input_times_utc": [
+        {
+          "action": "Start recording",
+          "at_utc": "2026-11-15T00:27:03.456139+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "at_utc": "2026-11-15T00:28:21.693429+00:00"
+        }
+      ],
+      "diagnostic_apk_sha256": "3e8a9dbfdd0ea7364a357031ecaf5cd0a617ec2683a3acf6d6dbd07d5beeb8f4",
+      "diagnostic_js_sha256": "786810930af05f23796e0237f9f2e139ddc8f21ad4957693900aa4140d40ace1",
+      "native_log_sha256": "78083478621f9a295a8ad7194ae126224590aec07e19c73fe960227a238eaa43",
+      "timer_ms_range": [
+        7,
+        77502
+      ],
+      "saved_bytes": 975446,
+      "container_duration_us": 77811100,
+      "startup_stage_error": false,
+      "normal_completion_and_save": true,
+      "permission_denial_expected": false,
+      "playback_tested": false
+    },
+    {
+      "slot": "S3",
+      "started_at_utc": "2026-11-15T00:30:45.225199+00:00",
+      "completed_at_utc": "2026-11-15T00:31:18.418043+00:00",
+      "scenario": "Cold app process, return from actual notification Settings with denial unchanged, then one Start; microphone Only this time if real dialog",
+      "outcome": "SUCCEEDED",
+      "start_inputs": 1,
+      "stop_inputs": 1,
+      "input_times_utc": [
+        {
+          "action": "Start recording",
+          "at_utc": "2026-11-15T00:30:45.226012+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "at_utc": "2026-11-15T00:31:09.514791+00:00"
+        }
+      ],
+      "diagnostic_apk_sha256": "3e8a9dbfdd0ea7364a357031ecaf5cd0a617ec2683a3acf6d6dbd07d5beeb8f4",
+      "diagnostic_js_sha256": "786810930af05f23796e0237f9f2e139ddc8f21ad4957693900aa4140d40ace1",
+      "native_log_sha256": "5acb717fd965ccf94db2ba6199c6a413714c934a39dd7b0864d359ff2e6c39e0",
+      "timer_ms_range": [
+        321,
+        23571
+      ],
+      "saved_bytes": 301939,
+      "container_duration_us": 23875800,
+      "startup_stage_error": false,
+      "normal_completion_and_save": true,
+      "permission_denial_expected": false,
+      "playback_tested": false
+    },
+    {
+      "slot": "S4",
+      "started_at_utc": "2026-11-15T00:32:24.848311+00:00",
+      "completed_at_utc": "2026-11-15T00:33:15.237829+00:00",
+      "scenario": "Microphone revoked before trial; one Start followed by actual microphone denial if prompted; no allow/retry in this slot",
+      "outcome": "EXPECTED_PERMISSION_DENIAL",
+      "start_inputs": 1,
+      "stop_inputs": 0,
+      "input_times_utc": [
+        {
+          "action": "Start recording",
+          "at_utc": "2026-11-15T00:32:24.849186+00:00"
+        }
+      ],
+      "diagnostic_apk_sha256": "3e8a9dbfdd0ea7364a357031ecaf5cd0a617ec2683a3acf6d6dbd07d5beeb8f4",
+      "diagnostic_js_sha256": "786810930af05f23796e0237f9f2e139ddc8f21ad4957693900aa4140d40ace1",
+      "native_log_sha256": "8be6867cc336908faa6f1147a28eee197227bf8c71ac79f8001c482c109dff22",
+      "timer_ms_range": null,
+      "saved_bytes": null,
+      "container_duration_us": null,
+      "startup_stage_error": false,
+      "normal_completion_and_save": false,
+      "permission_denial_expected": true,
+      "playback_tested": false
+    },
+    {
+      "slot": "S5",
+      "started_at_utc": "2026-11-15T00:36:40.688120+00:00",
+      "completed_at_utc": "2026-11-15T00:37:48.284044+00:00",
+      "scenario": "Microphone allowed via actual app permission Settings and return, then one foreground Start; no config change",
+      "outcome": "SUCCEEDED",
+      "start_inputs": 1,
+      "stop_inputs": 1,
+      "input_times_utc": [
+        {
+          "action": "Start recording",
+          "at_utc": "2026-11-15T00:36:40.689353+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "at_utc": "2026-11-15T00:37:39.398609+00:00"
+        }
+      ],
+      "diagnostic_apk_sha256": "3e8a9dbfdd0ea7364a357031ecaf5cd0a617ec2683a3acf6d6dbd07d5beeb8f4",
+      "diagnostic_js_sha256": "786810930af05f23796e0237f9f2e139ddc8f21ad4957693900aa4140d40ace1",
+      "native_log_sha256": "63dad38392527a8301abdf84c875d19697d522c7fe5e933e4cc7774c47a8cd2a",
+      "timer_ms_range": [
+        437,
+        58302
+      ],
+      "saved_bytes": 732474,
+      "container_duration_us": 58377100,
+      "startup_stage_error": false,
+      "normal_completion_and_save": true,
+      "permission_denial_expected": false,
+      "playback_tested": false
+    }
+  ]
+}
