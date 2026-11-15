@@ -1,5 +1,7 @@
 # Native iOS defaults candidate · issue51
 
+Current delivery2026-11-15: actual source36edd2e includes merged main2dd7d341; native Release signed Simulator build and5/5default captures PASS, Penpot saved/reopened, independent review PASS. See IOS_DEFAULTS.md. Combined Android/iOS Recorder lifecycle remains unverified: Android task emulator pre-app QEMU hangs/exit139; iOS app microphone permission dialog pending. No owner acceptance/merge/provider/physical device claim. Earlier checkpoints below are historical.
+
 State: BLOCKED_ON_HUMAN for native UI observation; candidate36edd2e native Release BUILT, installed and cold-launched / 0 of 5 qualified captures. One actual Record PNG remains pending; combined Android/iOS Recorder lifecycle unverified.
 
 Owner authorized a separate default-only iOS task following Android approval, then official Xcode/Simulator installation. No physical phone, signing/account/security change, deployment/TestFlight, paid provider calls or broader issue51 closure.
