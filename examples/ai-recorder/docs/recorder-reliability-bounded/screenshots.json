@@ -1,0 +1,50 @@
+[
+  {
+    "file": "screenshots/C4-later-post-size.png",
+    "sha256": "ef2331ef153e6aab838bca5d93254009504b20cd16e44b23c46112690e73b347",
+    "bytes": 79313,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-current-before-font.png",
+    "sha256": "201b41a0c2d98dcf77862d9e196111b9297409f63d29d7fc9c88c2b0ab9544f3",
+    "bytes": 89375,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-immediate-post-font.png",
+    "sha256": "4ffecfbb8dd7fff3df4dab51e48d0d8ca7f8d5cff43947348e7896b533655080",
+    "bytes": 124461,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-later-post-font.png",
+    "sha256": "e07aa746bf075db9a7d7fc70402c8c57b087b3facb681528e2b8f0a320efdb33",
+    "bytes": 125318,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-after-stop-ui.png",
+    "sha256": "febd71e8680c050c25a06e32712e2692829713959db7dab07623ac8732d744b9",
+    "bytes": 116168,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-explicit-playing.png",
+    "sha256": "87b0006b4c33c72bf5ed813645dad41df6bd2d9f02f90abe0474446b4a69909e",
+    "bytes": 130629,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-explicit-paused.png",
+    "sha256": "2f050243a4e2a9bcb2f697f25f1f0ac12b31568a9cd08da4457033e06577a695",
+    "bytes": 129605,
+    "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C5-library-handoff.png",
+    "sha256": "e0308e7569bdd66b02adcf86eef9f52b1a2269ecffc51e6db6fcb8af8216e80b",
+    "bytes": 136524,
+    "original_unmodified": true
+  }
+]

@@ -21,3 +21,5 @@ Environment recovery/reconciliation completed within 25m18s using E1 only; no E2
 Automation limits retained: an S1 pre-input receipt-name collision consumed no slot; live UIAutomator could not obtain idle hierarchy while the timer updated; local OCR failed, so fresh screenshots were visually inspected for Stop. None was relabeled as an app failure.
 
 Only scoped #65 is eligible for the owner-authorized “no consistent reproduction” closure. Do not close #66, umbrella #60, #56 or #58 on this evidence.
+
+Later readback on 2026-11-15 confirmed #65 CLOSED with `not_planned` and the explicit **no consistent reproduction** disposition. The coordinator published that bounded disposition; the worker's earlier connector write was rejected and was not retried through another route. #66 remains OPEN.

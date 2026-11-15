@@ -1,0 +1,472 @@
+{
+  "counts": {
+    "S": 5,
+    "C": 5
+  },
+  "cap_each": 5,
+  "unused_slots": [],
+  "one_start_per_slot": true,
+  "attempts": [
+    {
+      "slot": "S1",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:11:03.436759+00:00",
+      "completed_utc": "2026-11-15T00:13:59.758724+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:11:03.437650+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:13:13.961350+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 1035302,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 82541200
+          }
+        ]
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "64deddff7ea36451ef4bf565f2f6bf07a02294d91bc6970aa48dad91aca0b53d",
+          "bytes": 30110
+        },
+        {
+          "sha256": "f7f1a08c2abd54711da02ab47dd828a5f3d854322240810211de099fc3993ab1",
+          "bytes": 77764
+        },
+        {
+          "sha256": "81dcbfd9e54580093e02066927e1714e955ca60c2b33861e13824f7f97978a48",
+          "bytes": 27934
+        },
+        {
+          "sha256": "81dcbfd9e54580093e02066927e1714e955ca60c2b33861e13824f7f97978a48",
+          "bytes": 27934
+        },
+        {
+          "sha256": "f5109b724bbf9a3ad23d0464ef792ebe074fbc46632d65415d6c08f6afb0114a",
+          "bytes": 28738
+        },
+        {
+          "sha256": "4108fbab34d4495ba807194205c172aaa5d58ab87a9549b4160e2529cbb0bc53",
+          "bytes": 53080
+        }
+      ]
+    },
+    {
+      "slot": "S2",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:27:03.455456+00:00",
+      "completed_utc": "2026-11-15T00:28:30.614053+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:27:03.456139+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:28:21.693429+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 975446,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 77811100
+          }
+        ]
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "78083478621f9a295a8ad7194ae126224590aec07e19c73fe960227a238eaa43",
+          "bytes": 119441
+        },
+        {
+          "sha256": "142c0e17467e189f79a1053d40af29ff5ab230b58e62be754b6572156aa6e84e",
+          "bytes": 70634
+        },
+        {
+          "sha256": "d59261c46bb4c24bc2f186a51215d625194e91235f7cdfd417da16ca76b13763",
+          "bytes": 79148
+        }
+      ]
+    },
+    {
+      "slot": "S3",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:30:45.225199+00:00",
+      "completed_utc": "2026-11-15T00:31:18.418043+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:30:45.226012+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:31:09.514791+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 301939,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 23875800
+          }
+        ]
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "5acb717fd965ccf94db2ba6199c6a413714c934a39dd7b0864d359ff2e6c39e0",
+          "bytes": 54616
+        },
+        {
+          "sha256": "78083478621f9a295a8ad7194ae126224590aec07e19c73fe960227a238eaa43",
+          "bytes": 119441
+        },
+        {
+          "sha256": "4d9f3adaf4fe3376dc53734e9800660cd29a9193b89a458150cd1220a5dbf572",
+          "bytes": 30080
+        },
+        {
+          "sha256": "931903b52e33295a2427e38f209d2258022ced512600a6a7d9b3dc989f67b1c3",
+          "bytes": 28686
+        },
+        {
+          "sha256": "6e0269c9b8e38039dc95a9831eeda854c0babdd1e9fa69145ed50e8e2be682c4",
+          "bytes": 38691
+        }
+      ]
+    },
+    {
+      "slot": "S4",
+      "status": "EXPECTED_PERMISSION_DENIAL",
+      "start_utc": "2026-11-15T00:32:24.848311+00:00",
+      "completed_utc": "2026-11-15T00:33:15.237829+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:32:24.849186+00:00"
+        }
+      ],
+      "saved_output": null,
+      "private_scoped_log_identities": [
+        {
+          "sha256": "8be6867cc336908faa6f1147a28eee197227bf8c71ac79f8001c482c109dff22",
+          "bytes": 30855
+        },
+        {
+          "sha256": "3b2da37b612210c32b5d30f5efb864b74d0b78c609829d74198bbea59bb5e9aa",
+          "bytes": 29108
+        },
+        {
+          "sha256": "c35042bbab6f8a951a3871d503687786a108e1357d6b320381dadef3cf270135",
+          "bytes": 29910
+        },
+        {
+          "sha256": "3b471070f4d46dc39870498118d177695ee4710e3ace243b00ff9cee0e72cad6",
+          "bytes": 28995
+        },
+        {
+          "sha256": "5acb717fd965ccf94db2ba6199c6a413714c934a39dd7b0864d359ff2e6c39e0",
+          "bytes": 54616
+        }
+      ]
+    },
+    {
+      "slot": "S5",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:36:40.688120+00:00",
+      "completed_utc": "2026-11-15T00:37:48.284044+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:36:40.689353+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:37:39.398609+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 732474,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 58377100
+          }
+        ]
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "63dad38392527a8301abdf84c875d19697d522c7fe5e933e4cc7774c47a8cd2a",
+          "bytes": 72749
+        },
+        {
+          "sha256": "8be6867cc336908faa6f1147a28eee197227bf8c71ac79f8001c482c109dff22",
+          "bytes": 30855
+        },
+        {
+          "sha256": "1113123b0d63e83036d8724082491f240b232785368b2ef5e51856a3ff37534b",
+          "bytes": 32518
+        },
+        {
+          "sha256": "b99a5758bf2593a4790865207f830ec00374697d8a79930ff7abed5c4b4d0f72",
+          "bytes": 40873
+        }
+      ]
+    },
+    {
+      "slot": "C1",
+      "status": "REPRODUCED_INTERRUPTION",
+      "start_utc": "2026-11-15T00:17:06.020359+00:00",
+      "completed_utc": "2026-11-15T00:19:13.363191+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:17:06.021192+00:00"
+        }
+      ],
+      "saved_output": null,
+      "private_scoped_log_identities": [
+        {
+          "sha256": "179627b463b625463d6c464f090f232019aa1e23a207002b41855e009bd0dd21",
+          "bytes": 60550
+        },
+        {
+          "sha256": "817b960e786fc480f6230ce728b6d7ca65541ecf6c66e33da2ceb9b8158ad0d8",
+          "bytes": 28189
+        },
+        {
+          "sha256": "8a2e14c612b911eccabd369b68f0af0db985b2edcda34ddf6d8cab0cc49ed0b9",
+          "bytes": 36800
+        },
+        {
+          "sha256": "179627b463b625463d6c464f090f232019aa1e23a207002b41855e009bd0dd21",
+          "bytes": 60550
+        },
+        {
+          "sha256": "352d849ef975bbdeb68e7939f65b0b895327a855fe49acfcd4c1bc6d3ef09b98",
+          "bytes": 50772
+        }
+      ],
+      "interrupted_cache_output": {
+        "bytes": 492377,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 39126500
+          }
+        ]
+      },
+      "claim": "valid unlisted cache; not permanent loss or recovered save"
+    },
+    {
+      "slot": "C2",
+      "status": "REPRODUCED_INTERRUPTION",
+      "start_utc": "2026-11-15T00:22:03.807044+00:00",
+      "completed_utc": "2026-11-15T00:23:32.459860+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:22:03.807628+00:00"
+        }
+      ],
+      "saved_output": null,
+      "private_scoped_log_identities": [
+        {
+          "sha256": "d372f3e3f0a21d4421c53ba3e08674ac4d1a922d18d63bd4d2e6ac8415712257",
+          "bytes": 61605
+        },
+        {
+          "sha256": "9cc1c2f8b9edd12c690353e533b72c5f1396b4647e13c683cb6ea54ad1e310b5",
+          "bytes": 28470
+        },
+        {
+          "sha256": "661fe524ae16c8518a56686559d135c0fb1dffa2e58333ebf77c15e7c7fc5f39",
+          "bytes": 37081
+        },
+        {
+          "sha256": "d372f3e3f0a21d4421c53ba3e08674ac4d1a922d18d63bd4d2e6ac8415712257",
+          "bytes": 61605
+        },
+        {
+          "sha256": "624e45098b840cd2221d885223e9dca80f98369f74cd335ff348cadb4b2d499e",
+          "bytes": 51286
+        }
+      ],
+      "interrupted_cache_output": {
+        "bytes": 501976,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 39898800
+          }
+        ]
+      },
+      "claim": "valid unlisted cache; not permanent loss or recovered save"
+    },
+    {
+      "slot": "C3",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:50:52.643231+00:00",
+      "completed_utc": "2026-11-15T00:52:35.765403+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:50:52.645334+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:52:26.753307+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 1174281,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 93765400
+          }
+        ],
+        "sha256": "e7cd415158ce05a7b0feffd7798b33a236b0444f2c60b6f0ae26d4c288e5f0e3"
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "520337b5ddc10bb6990541d65f021ac81a64c81e1a0ae5c880e39b858ef81bdd",
+          "bytes": 104345
+        },
+        {
+          "sha256": "21ffe94f5fce55a3d731fa6df2b929661dc9e7f8691c8e5adaa683c33914827c",
+          "bytes": 31106
+        },
+        {
+          "sha256": "b88b0ae0284c90ba38f3da70cdb6c295ec9407b5e6918a171da4951ffa7d30e3",
+          "bytes": 39841
+        },
+        {
+          "sha256": "5d9d78300bf216fc87b706cb0b6ac1b321d339502ab9e6a9171b1fc65008bce6",
+          "bytes": 60832
+        },
+        {
+          "sha256": "c19a99f302b18d171f0368bad2c2c7ce22240e3636b4551065de691ea3fd5a3d",
+          "bytes": 44008
+        },
+        {
+          "sha256": "47e684373a8635549e1d8de6976cb00a557e6fd9cfd466497f6bd4e9b7ab0427",
+          "bytes": 117626
+        }
+      ]
+    },
+    {
+      "slot": "C4",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:54:48.889595+00:00",
+      "completed_utc": "2026-11-15T00:56:56.094782+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:54:48.891131+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T00:56:47.169883+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 1476423,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 117942100
+          }
+        ],
+        "sha256": "71461b8c5ce63d078e449afb670bc85b9b286e0e7e3e3daedad0050cf3fc174d"
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "8aefbb84b3b6eefbcd803bd8f0ff71b6aa3cfd864b2e4c8ee9027db7f3440334",
+          "bytes": 25431
+        },
+        {
+          "sha256": "49627003b9cb0c24d0863646ebeb631c9a3c590fbecbe111f7622ad409662c75",
+          "bytes": 23677
+        },
+        {
+          "sha256": "5bae384a4aaed72c6c1890082946ba71d76ebb463b218f313d8f57a2d9d7751c",
+          "bytes": 25213
+        },
+        {
+          "sha256": "f96163c39f2c636f6f62baa781391347bcf17255dba7eefe5658b94875ffc19d",
+          "bytes": 25337
+        },
+        {
+          "sha256": "5bae384a4aaed72c6c1890082946ba71d76ebb463b218f313d8f57a2d9d7751c",
+          "bytes": 25213
+        },
+        {
+          "sha256": "8aefbb84b3b6eefbcd803bd8f0ff71b6aa3cfd864b2e4c8ee9027db7f3440334",
+          "bytes": 25431
+        }
+      ]
+    },
+    {
+      "slot": "C5",
+      "status": "SUCCEEDED",
+      "start_utc": "2026-11-15T00:58:24.780216+00:00",
+      "completed_utc": "2026-11-15T01:03:06.565819+00:00",
+      "input_reservations": [
+        {
+          "action": "Start recording",
+          "utc": "2026-11-15T00:58:24.781811+00:00"
+        },
+        {
+          "action": "Stop & save",
+          "utc": "2026-11-15T01:02:57.578606+00:00"
+        }
+      ],
+      "saved_output": {
+        "bytes": 3405344,
+        "tracks": [
+          {
+            "mime": "audio/mp4a-latm",
+            "durationUs": 272424900
+          }
+        ],
+        "sha256": "d8c51e63e3ac5a72679641c19698acdd104acf7222c12e45a919d79b0e3beaa6"
+      },
+      "private_scoped_log_identities": [
+        {
+          "sha256": "bad26a8c6c286388151c987683803eb5a0214c5a06f4e9184c805b9b3fb3822c",
+          "bytes": 30262
+        },
+        {
+          "sha256": "14fbee57ccbccd6ac225a26d9cd17eefe3ff7d01ebe3e4377e44cbcd2f3f64db",
+          "bytes": 26801
+        },
+        {
+          "sha256": "8aefbb84b3b6eefbcd803bd8f0ff71b6aa3cfd864b2e4c8ee9027db7f3440334",
+          "bytes": 25431
+        },
+        {
+          "sha256": "1990c95f3e476be28f8ccb70e43ddcbd5780878a5c173ae0fdf642349207ae60",
+          "bytes": 44936
+        },
+        {
+          "sha256": "14fbee57ccbccd6ac225a26d9cd17eefe3ff7d01ebe3e4377e44cbcd2f3f64db",
+          "bytes": 26801
+        },
+        {
+          "sha256": "9b87503f3e80dbbcfa6477c38efbf9863ab4e89e8a1f995a1242598567c03daf",
+          "bytes": 30168
+        }
+      ]
+    }
+  ]
+}
