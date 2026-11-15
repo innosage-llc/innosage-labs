@@ -46,5 +46,19 @@
     "sha256": "e0308e7569bdd66b02adcf86eef9f52b1a2269ecffc51e6db6fcb8af8216e80b",
     "bytes": 136524,
     "original_unmodified": true
+  },
+  {
+    "file": "screenshots/C1-immediate-pre-font.png",
+    "sha256": "f28832b99e1523038fee12e280d9a2157ccefd63dc77235d68d72e7ae9eea2ca",
+    "bytes": 88502,
+    "original_unmodified": true,
+    "kind": "baseline product logic with private observation diagnostics; C1, not production timing"
+  },
+  {
+    "file": "screenshots/C1-immediate-post-font.png",
+    "sha256": "b5239a75ee41e0a3c1f10f3aec4a1f6545e6a982b47371af92a36b0494941f37",
+    "bytes": 107641,
+    "original_unmodified": true,
+    "kind": "baseline product logic with private observation diagnostics; C1, not production timing"
   }
 ]

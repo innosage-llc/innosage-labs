@@ -39,10 +39,20 @@ The first private diagnostic had eager getter arguments that could alter product
 
 The environment recovery/reconciliation completed in 25m18s, E1 only; no E2 or later boot. The per-process `-feature -WiFiPacketStream` flag is an environment difference, **not a product fix or proven recording cause**. Open-file/inode evidence corrected an earlier copy attribution: the running guest used the earlier independent task working copy; the extra prepared recovery copy was unused. The wrong attribution is preserved historically; selection cause remains unproven. Other runtimes, protected original/backup and shared ADB were not modified by product operations.
 
-The [separate startup report](startup.md) supports only the owner-authorized **“no consistent reproduction”** disposition for #65 after five baseline Starts. The historical generic failure remains unexplained; it is neither fixed nor shown absent. #66 remains open pending new fix acceptance, and umbrella #60/#56/#58 remain open. Final independent code/visual review is requested separately; no review PASS, owner acceptance, merge or deployment is claimed here.
+The [separate startup report](startup.md) supports only the owner-authorized **“no consistent reproduction”** disposition for #65 after five baseline Starts. The historical generic failure remains unexplained; it is neither fixed nor shown absent. #66 remains open pending new fix acceptance, and umbrella #60/#56/#58 remain open. Independent exact-source code/visual review completed with no blocking findings; see [review record](review.md). Owner acceptance, merge and deployment remain pending.
 
 ## Final preservation and restoration
 
 [Final restoration and audit identities](restoration.json): all17 original +7new saved =24 Library identities were re-enumerated on the exact restored production artifact. All24 pre-fix audio files and the C3 output retained their SHA-256/byte sizes; all27 final containers had valid AAC metadata. C1/C2 cache files remain preserved and unlisted. Initial font/display/rotation/accessibility settings and microphone/notification grants plus flags match exactly. Only the owned task copy was gracefully stopped; its ports and handles closed. All22 protected files in each of original and cold backup were rehashed (44 comparisons), zero mismatches. Shared ADB remained unchanged; working-copy boot writes are retained.
 
-Permission revocation normally terminated the app during cleanup. The pid-dependent observation helper then stopped on process absence; its failure was preserved, and read-only package/foreground checks completed restoration proof before a fresh production launch. This was not a recording failure or extra trial. Final independent code/visual review remains pending.
+Permission revocation normally terminated the app during cleanup. The pid-dependent observation helper then stopped on process absence; its failure was preserved, and read-only package/foreground checks completed restoration proof before a fresh production launch. This was not a recording failure or extra trial. Final independent review found no blocking code/visual findings; owner acceptance remains pending.
+
+## Actual baseline comparison
+
+C1 images below are original baseline-product-logic captures with private diagnostic observations, at fixed1080×2400/density420. Font1→2 replaced Recording0:37 with idle Start recording. Compare C5 product images above: font1→2 retained Recording and timer progression. The artifacts/timing differ; this is a runtime behavior comparison, not matched production timing or proof of permanent audio loss.
+
+| C1 before font change | C1 after font change |
+|---|---|
+| <img src="screenshots/C1-immediate-pre-font.png" width="200"> | <img src="screenshots/C1-immediate-post-font.png" width="200"> |
+
+Independent data/restoration review matched all ten Start journal entries,27 metadata records, two24-identity Library enumerations and44 protected-file hash comparisons. Audio bytes/hash checking occurred at01:05Z before final production restoration; after restoration, artifact/settings/flags/display identities were verified, not a second per-audio hash pass. Protected original/cold-backup hashes were checked after shutdown. Shutdown receipts describe their observation time, not a perpetual host-state guarantee.
