@@ -184,10 +184,19 @@ class AdapterTests(unittest.TestCase):
         for source in ('clean', 'purge'):
             text = (BASE / ('evals/fixtures/' + source + '-1.54.0.synthetic.txt')).read_text()
             out = adapter.parse(source, text)
-            self.assertEqual(out['candidate_estimate_bytes'], 1048576)
+            self.assertEqual(out['candidate_estimate_bytes'], 1000000)
             self.assertEqual(out['completeness'], 'PARTIAL')
             self.assertFalse(out['exact_scope_available'])
             self.assertNotIn('PRIVATE', json.dumps(out))
+
+    def test_preview_units_match_upstream_si_formatter(self):
+        for token, expected in [('999B', 999), ('123KB', 123000),
+                                ('1.2MB', 1200000), ('1.25GB', 1250000000)]:
+            text = 'Dry run complete - no changes made\nPotential space: ' + token
+            out = adapter.parse('clean', text)
+            self.assertEqual(out['candidate_estimate_bytes'], expected)
+            self.assertEqual(out['completeness'], 'PARTIAL')
+        self.assertEqual(adapter.parse('clean', 'Dry run complete - no changes made\nPotential space: 1MiB')['completeness'], 'FAILED')
 
     def test_purge_stops_before_help_or_preview(self):
         with patch.object(adapter, 'capture', return_value=(0, 'Mole version 1.54.0', False)) as capture, \

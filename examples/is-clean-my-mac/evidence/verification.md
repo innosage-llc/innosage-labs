@@ -14,7 +14,7 @@ Applied Codex **skill-creator** from its actual installed `SKILL.md`: concise Ch
 
 | Check | Result | Provenance / limits |
 | --- | --- | --- |
-| Python unit suite | PASS, 22 tests at final code review | `PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v` |
+| Python unit suite | PASS, 23 tests in follow-up; prior pinned review had 22 | `PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v` |
 | Skill structure | PASS | Actual `skill-creator/scripts/quick_validate.py` against this Skill |
 | Skills CLI direct nested-path install | PASS | Actual `skills@1.8.1 add <canonical nested Skill directory> -a codex -g -y --copy` into isolated temporary HOME; see `direct-path-install.json` |
 | Shell entrypoint / installer preflight | PASS | Inspectable `sh install.sh --plan`; no writes/scans from plan |
@@ -56,3 +56,17 @@ No real user data was deleted, moved, renamed or cleaned; Trash untouched; no wo
 After the repeated Luna wrapper reported unmeasured actual freed as 0, commit `f510abc` added explicit audit-only null output to the helper and a narrow Skill instruction to preserve it. An actual Luna Medium baseline/wrapper pair re-ran all three synthetic cases; both sessions exited 0. The wrapper unknown-freed reporting assertion PASSED in this run. See `luna-reporting-regression.synthetic.json`; this does not erase the earlier failed assertion or establish universal model parity. No real Mole command or cleanup was part of the comparison.
 
 The targeted Luna baseline also returned the same synthetic counts/sizes, while still reporting unmeasured freed space as 0. The initial baseline omission is an observation of those runs, not evidence that the official Skill can never produce worktree measurements. The wrapper supplies an explicit deterministic inventory surface; these harness prompts request structured fields and do not replace the still-unverified short-request real-Mac acceptance.
+
+## Follow-up parser correction
+
+Static purge-boundary research also found an adapter unit error: Mole's official
+`bytes_to_human` formatter uses SI decimal display units (KB=1000 bytes), while
+this prototype initially converted summaries with powers of 1024. The adapter
+now uses Decimal and powers of 1000; focused tests cover B/KB/MB/GB and reject
+unknown MiB syntax. The synthetic 1.00MB preview fixture means approximately
+1,000,000 bytes, not 1,048,576. Earlier model/forward-test observations used the
+old parser and are historical observations, not current candidate-byte evidence.
+Worktree allocated bytes and analyze JSON bytes are unchanged. No costly model
+comparison was repeated for this local arithmetic correction.
+
+Follow-up investigation of supported purge/configuration isolation and clean installation environments is in [acceptance-gate-investigation.md](acceptance-gate-investigation.md). The workflow proposal is inert evidence, not an activated CI job or a claimed acceptance pass.

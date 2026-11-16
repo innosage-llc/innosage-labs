@@ -5,8 +5,8 @@
 | 来源 | 大小 | 覆盖与说明 |
 | --- | --- | --- |
 | Mole analyze | 8,192 字节 | 合成观察；1.54 schema 无完整覆盖证明，PARTIAL |
-| Mole clean preview | 1 MiB 候选估计 | 合成摘要，PARTIAL；不是确认可删除范围 |
-| Mole purge preview | 1 MiB 候选估计，另有未测量项 | 合成摘要，PARTIAL；实机调用目前被配置写入边界阻止 |
+| Mole clean preview | 1 MB（1,000,000 字节）候选估计 | 合成摘要，PARTIAL；不是确认可删除范围 |
+| Mole purge preview | 1 MB（1,000,000 字节）候选估计，另有未测量项 | 合成摘要，PARTIAL；实机调用目前被配置写入边界阻止 |
 | Codex worktree helper | 正常 fixture：1 个，12,288 字节 | 合成根 COMPLETE；这是占用，不是可回收量 |
 
 这些类别可能重叠，不能相加。确认候选总量、实际释放空间、废纸篓变化均为 UNKNOWN。worktree 的活动、dirty、untracked、ignored、unpushed、detached、locked 状态均 UNKNOWN，全部保留。

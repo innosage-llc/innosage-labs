@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Mole 1.54.0/1.72.0 read-only/preview adapter. Raw output never reaches stdout."""
 import argparse
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
@@ -21,7 +22,7 @@ def result(source, reason, completeness='FAILED', version=None):
                 completeness=completeness, reason=reason, occupied_bytes=None,
                 command='mo ' + source + (' --json' if source == 'analyze' else ' --dry-run'),
                 scope_verified=False, presence='UNKNOWN', duration_seconds=None, timeout_seconds=None,
-                measurement='Mole-reported bytes or rounded binary-unit preview estimate',
+                measurement='Mole-reported bytes or rounded SI decimal-unit preview estimate',
                 error_category=reason,
                 candidate_estimate_bytes=None, actual_freed_bytes=None,
                 exact_scope_available=False, overlapping_sources='UNKNOWN')
@@ -92,7 +93,9 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     out['has_unmeasured_or_incomplete_marker'] = bool(re.search(r'incomplete|unmeasured|At least|under-reported|timed out', text, re.I))
     groups = match.groups()
     number, unit = groups[-2:]
-    size = float(number) * 1024 ** ('B', 'KB', 'MB', 'GB', 'TB').index(unit)
+    if len(number) > 32:
+        return out
+    size = Decimal(number) * 1000 ** ('B', 'KB', 'MB', 'GB', 'TB').index(unit)
     if size > 2**63:
         return out
     out.update(candidate_estimate_bytes=int(size), completeness='PARTIAL',
