@@ -22,7 +22,7 @@ The wrapper source is canonical/reproducible code whose installed bytes are rece
 
 ## Verification
 
-Mac Studio, Python3.9, GPT-6.1 Sol Medium implementation/review; no remote CI. Full native-enabled local suite: **199/199 PASS, none skipped** before final review. Actual skill-creator quick_validate and final-head review results are recorded in the PR. Skill Creator guidance used: preserve narrow user intent, deterministic scripts for fragile updates, execute changed scripts, meaningful invariant tests and progressive instructions in the canonical llms entry. No Skill reinitialization or costly cross-model comparison was needed for this installer-only change.
+Mac Studio, Python3.9, GPT-6.1 Sol Medium implementation/review; no remote CI. Full native-enabled local suite: **200/200 PASS, none skipped** before final review. Actual skill-creator quick_validate and final-head review results are recorded in the PR. Skill Creator guidance used: preserve narrow user intent, deterministic scripts for fragile updates, execute changed scripts, meaningful invariant tests and progressive instructions in the canonical llms entry. No Skill reinitialization or costly cross-model comparison was needed for this installer-only change.
 
 Tests include:
 

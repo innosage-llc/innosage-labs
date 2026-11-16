@@ -125,7 +125,8 @@ def managed_files(path,expected,subset=False):
             fd=os.open(entry,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
             with os.fdopen(fd,'rb') as stream:
                 held=os.fstat(stream.fileno())
-                value=hashlib.sha256(stream.read()).hexdigest()
+                if identity(held)!=identity(info) or held.st_size>8388608:raise ValueError('Managed file replaced before verification; preserve recovery.')
+                value=hashlib.sha256(stream.read(8388609)).hexdigest()
                 if identity(os.fstat(stream.fileno()))!=identity(held) or identity(entry.lstat())!=identity(held):raise ValueError('Managed file changed while verifying.')
             actual[relative]=value
         else:raise ValueError('Unsupported managed object; preserve recovery.')
@@ -143,8 +144,8 @@ def retire_managed_tree(path,expected):
         fd=os.open(entry,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
         with os.fdopen(fd,'rb') as stream:
             held=os.fstat(stream.fileno())
-            if (held.st_nlink!=1 or held.st_uid!=os.getuid() or held.st_mode&0o022 or not stat.S_ISREG(held.st_mode)
-                or hashlib.sha256(stream.read()).hexdigest()!=expected[relative]
+            if (held.st_size>8388608 or held.st_nlink!=1 or held.st_uid!=os.getuid() or held.st_mode&0o022 or not stat.S_ISREG(held.st_mode)
+                or hashlib.sha256(stream.read(8388609)).hexdigest()!=expected[relative]
                 or identity(os.fstat(stream.fileno()))!=identity(held) or identity(entry.lstat())!=identity(held)):
                 raise ValueError('Retirement target changed; preserve recovery.')
             entry.unlink()

@@ -170,3 +170,15 @@ m.update_wrapper(target,record,state,planned,crash)
         self.assertEqual(extra.stat().st_size,9*1024*1024)
         self.assertTrue((self.active/'SKILL.md').exists())
         self.assertFalse(self.transaction.exists())
+
+    def test_concurrent_large_replacement_is_rejected_before_managed_file_read(self):
+        original=installer.os.open
+        candidate=self.active/'SKILL.md'
+        def changed(path,*args,**kwargs):
+            if Path(path)==candidate:
+                with candidate.open('wb') as output:output.truncate(9*1024*1024)
+            return original(path,*args,**kwargs)
+        with patch.object(installer.os,'open',side_effect=changed),self.assertRaises(ValueError):
+            installer.managed_files(self.active,self.old['is-clean-my-mac']['files'])
+        self.assertEqual(candidate.stat().st_size,9*1024*1024)
+        self.assertTrue((self.active/'removed.py').exists())

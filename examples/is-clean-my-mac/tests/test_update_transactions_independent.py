@@ -263,4 +263,3 @@ class UpdateTransactionTests(unittest.TestCase):
         with self.assertRaises(ValueError):invoke(False,'no')
         after={str(p.relative_to(self.home)):p.read_bytes() for p in self.home.rglob('*') if p.is_file()}
         self.assertEqual(before,after)
-
