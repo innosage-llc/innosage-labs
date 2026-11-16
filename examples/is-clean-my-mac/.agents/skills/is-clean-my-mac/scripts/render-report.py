@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Deterministic Chinese report from redacted aggregate schemas only."""
 LABELS = {
+ 'summary_only': '上游预览总览（分类未知）', 'downloads': '下载目录', 'documents': '文档目录', 'pictures': '图片/图库目录',
+ 'movies': '视频目录', 'music': '音乐目录', 'desktop': '桌面',
+ 'application_support': '应用支持数据', 'developer_data': '开发工具数据',
+ 'codex_data': 'Codex 数据', 'virtual_machines': '虚拟机数据',
  'home': '用户目录', 'user_library': '用户 Library', 'applications': '应用程序',
  'system_library': '系统 Library', 'other': '其他/未分类', 'logs': '日志',
  'caches': '缓存', 'homebrew_cache': 'Homebrew 缓存', 'xcode_derived_data': 'Xcode DerivedData',
@@ -30,6 +34,7 @@ REASONS = {
  'unsupported_mole_version_no_upgrade_attempted': '版本不受支持；未升级',
  'write_boundary_unavailable': '写入拒绝边界不可用', 'command_failed': '受保护命令失败',
  'scan_unavailable': '扫描不可用', 'unrecognized_output': '核心输出形状未知',
+ 'drilldown_failed_or_timed_out': '官方目录下钻失败或超时，保留顶层测量',
  'source_process_failed_or_timed_out': '来源进程失败或超时'}
 REASONS.update(output_encoding_invalid='输出编码无法识别，保留已知退出/诊断',
                upstream_no_candidates_scope_unverified='官方本次范围未找到候选；完整范围未验证',
@@ -123,7 +128,8 @@ def render(data):
     sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict) and s.get('source') in SOURCES}
     lines = ['# Mac 磁盘审核与清理计划', '',
       '仅审核；本次未执行清理。实际释放：UNKNOWN（null）。来源及 insight 可能重叠，禁止相加；整个 worktree 不属于候选。', '']
-    lines += file_type_report(sources.get('mole-analyze', {}).get('file_type_inventory'))
+    if 'file_type_inventory' in sources.get('mole-analyze', {}):
+        lines += file_type_report(sources['mole-analyze']['file_type_inventory'])
     lines += ['## 四源覆盖与候选', '',
       '| 来源 | 覆盖 | 范围验证 | 占用/已测下界 | 候选舍入估算 | 说明 |',
       '| --- | --- | --- | --- | --- | --- |']
@@ -151,6 +157,8 @@ def render(data):
             key = key if isinstance(key, str) and key in LABELS else 'other'
             value = group.get('observed_bytes') if name == 'mole-analyze' else group.get('observed_candidate_estimate_bytes')
             count = group.get('measured_entries') if name == 'mole-analyze' else group.get('candidate_entries')
+            if name == 'mole-analyze' and count == 0 and group.get('unknown_entries',0) > 0:
+                value = count = None
             uncertainty = (('' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/已测子集）')
                            if name == 'mole-analyze' else '（PARTIAL/舍入估算，可能重叠）')
             lines.append(f"| {SOURCES[name]} | {LABELS[key]} | {size(value)}{uncertainty} | {number(count)} | {risk(key)} |")
@@ -170,8 +178,8 @@ def render_summary(data, plan):
     """Numbered core answer delivered inline; no file click required for types."""
     sources = {s.get('source'):s for s in data.get('sources',[]) if isinstance(s,dict) and s.get('source') in SOURCES}
     types = sources.get('mole-analyze',{}).get('file_type_inventory',{})
-    lines = ['## 文件类型与候选决策表', '',
-      f"方案 {plan['plan_id'][:12]}，10 分钟有效。文件类型范围：本机 Home 已测子集，{STATUS.get(types.get('completeness'),'UNKNOWN')}；按文件名/stat 分类，不读内容，不代表全盘完整类型或可回收空间。", '',
+    lines = ['## Mole 磁盘占用与候选决策表', '',
+      f"方案 {plan['plan_id'][:12]}，10 分钟有效。占用来自官方 Mole；目录用途是固定路径规则的解释，不是文件内容/可删除性证明。下钻与父项重叠，不能相加；PARTIAL 为已测下界。", '',
       '| 行 | 类型/候选 | 占用或候选估算 | 条目数 | 风险/恢复与操作 |', '| --- | --- | --- | --- | --- |']
     for row in plan['rows']:
         key = row['category']
@@ -185,6 +193,10 @@ def render_summary(data, plan):
             label = '文件类型：' + FILE_TYPES.get(key,'其他/未知')
             value = '已测占用 ' + size(row.get('occupied_bytes'))
             decision = '仅复核；可能个人/唯一内容，先核对用途与备份'
+        elif row['source'] in ('mole-analyze', 'mole-analyze-drilldown'):
+            label=('Mole 下钻：' if row['source']=='mole-analyze-drilldown' else 'Mole 占用：')+LABELS.get(key,'其他/未分类')
+            value='已测占用/下界 '+size(row.get('occupied_bytes'))+'（'+STATUS.get(row.get('completeness'),'UNKNOWN')+'）'
+            decision='仅复核；'+risk(key)
         elif row['source']=='codex-worktree-inventory':
             label='Codex worktree';value='占用 '+size(row.get('occupied_bytes'));decision='保留；Git/活动未知，禁止整棵删除'
         else:
@@ -210,9 +222,12 @@ def render_summary(data, plan):
     for name,label in SOURCES.items():
         source=sources.get(name,{})
         lines.append(f"| {label} | {STATUS.get(source.get('completeness'),'UNKNOWN')}；{failure_detail(source)} |")
+    for detail in sources.get('mole-analyze',{}).get('drilldowns',[]):
+        label=LABELS.get(detail.get('scope_label'),'未分类目录')
+        lines.append(f"| Mole 下钻（{label}） | {STATUS.get(detail.get('completeness'),'UNKNOWN')}；{failure_detail(detail)} |")
     actionable=any(row.get('actionable') for row in plan['rows'])
     explanation=('仅标记“可执行”的独立下载缓存对象支持按本方案编号批准：永久删除，无成功后的自动备份；格式按目录/文件名约定识别，不保证内容。失败捕获仅用于回退/保留恢复。其他行仍只复核；绝不扩大到整类、未选对象、Trash或worktree。每个方案只能执行一批，后续需新方案。'
                  if actionable else '当前行是复核证据，**均没有已验证的精确清理操作**。即使回复“同意第 1、2 行”，也不能改为 mo clean 或 purge --yes；它们会扩大范围，可能涉及未批准的 Trash/新候选。需要具体受支持对象并重新核验范围，才能开启执行。')
     lines += ['', explanation,
-      '本次未清理；实际释放 UNKNOWN（null），估算/占用/磁盘可用空间不混用；来源与目录用途可能重叠，不相加。先复核最大类型用途/备份，缓存与构建候选再确认活动任务、下载/编译成本。', '']
+      '本次未清理；实际释放 UNKNOWN（null），估算/占用/磁盘可用空间不混用；来源与目录用途可能重叠，不相加。先复核最大占用用途/备份，缓存与构建候选再确认活动任务、下载/编译成本。', '']
     return '\n'.join(lines)

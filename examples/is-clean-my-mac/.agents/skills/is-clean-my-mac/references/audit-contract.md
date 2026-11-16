@@ -26,7 +26,7 @@
 
 | 固定类别 | 证据与建议 | 风险/恢复成本 |
 | --- | --- | --- |
-| app/browser/homebrew/developer caches、logs | clean 新鲜预览中的条目数和舍入估算；有未测量条目时保留下界 | 可能重新下载、重新登录或丢失排障日志；活动应用/离线可用性需复核；下载大小/耗时未知 |
+| app/browser/homebrew/developer caches、logs | clean 新鲜预览中的条目数和舍入估算；有未测量条目时保留 PARTIAL 舍入估算，不称下界 | 可能重新下载、重新登录或丢失排障日志；活动应用/离线可用性需复核；下载大小/耗时未知 |
 | xcode_derived_data、build_and_dependencies | analyze 占用只是复核信号；purge 预览才是构建候选估算 | 需重新编译/下载依赖，可能影响当前任务；源码、整个仓库/worktree 不属于候选 |
 | container_data、xcode_simulators | 仅表示占用，不自动归类可删除 | 可能包含数据库、卷、模拟器状态；先确认官方支持的精确范围与备份 |
 | ios_backups、old_downloads、xcode_archives | 只列占用与人工复核需求 | 可能是唯一备份、用户文件或发布归档；不能仅凭年龄或体积建议删除 |
@@ -37,15 +37,13 @@
 
 运行边界禁止网络和除私有 scratch、`/dev/null`、clean 精确预览文件之外的写入；禁止 sudo 和系统管理工具。HOME 保持真实值；继承的 MO_ANALYZE_PATH、BASH_ENV 和 Mole 测试/跳过变量不传给子进程。Apple Bash 临时文件回退需要拒绝固定系统临时根 metadata，所以 /tmp 下的软件/审核根可能失败；失败时不扩大权限。clean 的物理父目录缺失或目标为链接/硬链接时失败关闭，不创建配置目录。运行时结果只有聚合候选，不足以授权精确删除。
 
-## 文件类型与可执行行
+## 默认 Mole-first 审核与可选模式
 
-目录/insight 分类不是文件类型。analyze 证据附带独立有界 Home 文件名/stat 枚举，固定扩展名类与目录用途是同一批文件的两个维度，不能相加。分类不读内容、不验证真实格式，未覆盖系统、其他用户/卷/链接目标；PARTIAL 比例仅针对已测普通文件的分配字节。
+默认只采集四源，Mole 官方 Skill 负责解释和建议。analyze overview 后最多对两个最大、非 insight、物理目录运行官方 `analyze --json <path>`；仅允许本机 Home/Library、Applications、系统 Library，保留同一总预算，每次最多30秒。不跟链接、不扩展为任意返回路径。固定目录组件映射只解释用途，不验证内容；unknown/other 不猜测。下钻与父项重叠，绝不相加；下钻失败不丢弃 overview。
 
-对话直接呈现编号 summary_markdown；完整报告链接不能替代核心类型表。每次方案有新 plan_id、固定行号与10分钟展示绑定有效期，这不是实际目标新鲜度证明。当前聚合行无精确目标/官方选择操作，全部 review-only。行号批准只绑定该方案，不能扩大到 mo clean/purge --yes；stale、重叠、未知ID、缺范围或不支持的操作均阻塞。批准响应说明每行阻塞、statvfs前后磁盘可用空间及下一步；未执行实际释放null。磁盘可用差值含并发变化，不能归功于清理。
+`--include-file-types` 是可选旧元数据普查；`--precise-candidates` 是可选已有精确缓存能力。默认不调用两者，不写私有删除清单。只有另行请求相关模式时使用，不靠它们代替官方 Mole。
 
-Mole 1.72 clean 无选择列表且重新扫描，可能清空未选Trash；purge无人值守覆盖全部适合项。对于这些聚合行，仍需官方精确接口才能执行，不能改配置、调用私有函数或猜TUI索引。旧协议模拟executor仅在tests里；用户新明确授权的独立精确adapter只处理两类单文件下载缓存，见下文。
-
-硬链接若有不同扩展名，类型按首次遇到的名字归属；总字节去重，但分类归属可能变化。未知格式保留other类别，不能靠读取内容补齐。
+直接呈现编号 summary_markdown。默认聚合行没有精确目标，均 review-only。用户批准编号不能扩大到 `mo clean` / `purge --yes`；后者不支持把本表作为精确选择清单，clean 还可能清空 Trash。不得改配置、调用私有函数或解析 TUI。
 
 ## 新授权的独立精确缓存能力
 

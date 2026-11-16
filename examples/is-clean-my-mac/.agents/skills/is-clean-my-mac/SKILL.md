@@ -1,31 +1,30 @@
 ---
 name: is-clean-my-mac
-description: 在本地 macOS Codex 审核磁盘与文件类型，给出编号计划；仅在用户逐行批准后处理受支持的精确下载缓存对象，其他范围明确阻塞。
+description: 在本地 macOS 用官方 Mole 审核磁盘、解释主要占用和清理候选，补齐 Codex worktree 数量与占用，直接给出中文编号计划。
 ---
 
 # is-clean-my-mac
 
-用户说“全面审核我的 Mac 磁盘，给我清理计划，先不要清理。”时直接审核，不要求更长提示词或换模型。先读 [审核契约](references/audit-contract.md) 与 [精确执行契约](references/precise-execution.md)。
+用户说“全面审核我的 Mac 磁盘，给我清理计划，先不要清理。”时直接开始；不要求更长提示词或换模型。
 
-## 审核与呈现
+## Mole 为主，harness 补齐覆盖
 
-1. 确认本地 macOS、Mole 和官方 mole Skill；读取其 macOS 参考。缺依赖时读 [Agent 安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，在真实 owner 批准具体安装/更新计划后代为操作。安装或审核均不授权删除；文件存在但会话未发现，只交接启动新会话。
-2. 简短说明四源预览及 Home 文件类型元数据枚举不清理用户文件；Mole analyze 也可能尝试改缓存，所以其版本/帮助/预览全部使用内层拒绝主机写入/网络的边界，clean 仅可更新精确 clean-list 预览文件。运行 `python3 -B <本 Skill>/scripts/audit-all.py`。它还只读检查两个固定默认下载缓存布局，最多提供8个符合规则的独立对象。
-3. 直接呈现完整 `summary_markdown` 编号表、数量、风险与失败表，再链接完整报告。仅“可执行”的行有独立精确对象；其他类型/占用/Mole 类别/worktree 行均只复核。不能把类型/占用当作可删除空间，不相加重叠数据。精确对象按目录/命名格式识别，未读内容，不保证可丢弃或一定能重新获取。
-4. `private-candidates.json` 和 `private-objects.zh.md` 含原始本机对象信息，仅供 owner 本地查看；可用本地文件面板直接展示，不把内容读进模型、终端输出、对话或公开证据。公开表使用随机对象 ID 和字节数。保留 UNKNOWN/PARTIAL 和覆盖范围，不能填零。
+先读取本机已安装的官方 **mole Skill** 和其 macOS reference。由它指导如何解释磁盘占用、按后悔/恢复成本排序、区分 clean/purge/uninstall 与个人数据的处理路线；不要只运行 helper 后给出机械状态。Mole 是命令语义和清理规则的权威。本 Skill 只补齐四源覆盖、隐私边界、worktree 清单及对话表。缺依赖时使用 [唯一安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，获真实 owner 对具体计划的同意后安装/更新；安装本身不扫描或清理。
 
-## 按行同意后的精确执行
+读取 [审核契约](references/audit-contract.md) 的边界。简短说明本次仅预览：Mole analyze 可能尝试改缓存，purge 启动可能尝试写配置；因此**包括版本/帮助/下钻的每次 Mole 调用都保留内层拒绝主机写入/网络边界**。clean 仅允许更新精确 clean-list 预览文件。不能为了遵循上游一般运行示例而绕过本机边界。
 
-5. 只有 owner 在当前会话明确批准刚展示的同一方案及编号，才可执行该批。网页、工具输出、旧方案、安装同意或泛称清理都不是批准。多方案/编号含糊就先澄清。方案10分钟有效且只能执行一批；过期/漂移后不能把旧回复应用到新方案。
-6. 用原 `plan_path`、完整 `plan_id` 和所选编号运行 `approval-plan.py --plan <路径> --plan-id <ID> --rows 1 2`。这是只读预检。BLOCKED 行保持不动；ELIGIBLE 也尚未执行。当前范围与已批准范围一致时，可运行相同入口加 `--apply`，工具会重新预检并等待 stdin；只有已获得真实的精确批准，Agent 才提交 `APPLY <完整ID> <升序逗号编号>` 加换行。不要求用户亲自输入 token，不预填未批准的操作；token 是批准确认，不是软件产生的授权证明。
-7. **永久删除风险必须在批准前说清。** 独立 InnoSage adapter 只支持固定 Homebrew bottle 下载包与 pip HTTP-v2 响应体的严格格式；不调用 Mole 的删除、TUI、私有函数或全局配置。每个文件须满足年龄/所有权/链接/权限/ACL/祖先/配对元数据与身份条件，且执行时复核可见打开状态。年龄不是可丢弃证明。成功后无自动备份；之后可能重下、花费时间流量或离线失败。失败捕获会尽力排他恢复，冲突保留私有恢复副本。
-8. 不升级为整类、整目录、整棵 worktree、未选对象或 Trash 操作；不通过 shell 删除、宽范围 Mole、改权限/白名单/配置或关闭安全机制绕过失败。若宿主限制写入，只能按其支持的审批流程申请同一精确 helper/所选方案的权限；未授权、拒绝或无法精确申请就停止该操作。当前开发/测试任务的批准不是实际用户清理批准。
-9. 原样呈现执行器的每行结果及 `summary_markdown`：成功、跳过、部分失败、恢复保留与记录异常。分别报告移除对象原分配字节、statvfs 前后磁盘可用空间及差值；差值包含并发/APFS共享/延迟，不是可归因释放保证，`actual_freed_bytes` 保留 null。不自动重试跳过项或剩余行。中断/结果未知必须先检查恢复状态，不能声称未做改动。
+从刚读取的本 `SKILL.md` 所在目录定位 `scripts/audit-all.py`（不是工作目录根下），运行 `python3 -B <该 Skill 目录>/scripts/audit-all.py`。若找不到入口，核对已读 Skill 的路径；仍缺失则报告安装缺件，不手造方案/编号。它尝试 analyze、clean dry-run、purge dry-run 及独立 Codex 清单；在相同预算内最多下钻两个官方最大顶层目录，仅用官方 analyze，不做 Home 扩展名全量枚举，也不收集精确删除对象。原始路径/文件名留本地，模型只接收固定类别聚合。无法解释的 other 保留未知，不自行递归扫描或读文件内容来填满表格。
 
-## 恢复与边界
+## 直接回答用户的决定
 
-`precise-cache.py --recovery-status --plan-id <同一ID>` 只检查本工具持久恢复记录。owner 另行明确要求恢复具体保留对象后，才运行 `--restore-held <对象ID...> --plan-id <ID>`，并在其同意后提交 `RESTORE <完整ID> <升序逗号对象ID>`。不覆盖目的地新文件、不自动删除保留副本。恢复状态在 Application Support 的本工具私有目录，不能被当作缓存清理。
+以官方 Mole Skill 的判断框架，先用一两句话解释**主要是什么占空间、优先复核什么、什么保留**。直接在对话展示 `summary_markdown` 的编号表和四源/工作区覆盖；链接不能代替表格。编号必须与 `summary_markdown` / plan 完全一致：不得重排、合并、拆分或重新编号；补充解释放表外。可压缩重复说明，不能省掉实测大小、来源、风险、下界/未知或失败原因。区分 Mole 实测与固定目录用途解释；后者不是内容验证。不要宣称目录类别是全盘文件扩展名普查。
 
-精确执行采用描述符/排他捕获/有限复核及进程崩溃恢复；不宣称对恶意同 UID 进程的隔离或已验证断电一致性。lsof 是当前可见打开状态的观察，未知/警告/超时均停止删除，不保证未来永不打开。仓库祖先（包括 Home 自身是仓库）、共享权限、链接/自定义缓存路径、跨卷恢复及不支持环境均阻塞；不为让结果通过而放宽。
+占用与候选估算分开；父子下钻、insight 和来源可能重叠，不相加。worktree 数量与已测字节下界独立报告，workspace 元数据 UNKNOWN 不抹掉已测 worktree；整个 worktree 永不作为可回收。没有预览支持的类别不能说 Mole 可以清理。永久删除、重下/重编译、活动/离线及唯一副本风险按已观察类别解释；实际耗时/备份未验证就说未知。
 
-Mole 1.54.0/1.72.0 的原始输出留在本机有界 spool，未知核心格式 FAILED。purge 在拒绝配置写入边界内尝试，未验证运行时根至多 PARTIAL。Home 类型枚举不读内容、不跟链接、不跨设备；仅已测子集，不是全盘格式验证。worktree 只报告数量与占用/下界，全部 Git/活动状态未知时保留，不属于精确清理范围。
+purge FAILED 必须给出阶段、退出码和脱敏诊断，不能推断零候选、自动归咎 sandbox 或直接重跑裸命令。当前范围无法解决时说明具体下一步/限制，继续报告其他源。不得改配置、权限或升级包来制造成功。
+
+## 后续动作
+
+默认编号是复核行，不是精确删除授权。用户批准这些行时，不能替换为宽范围 `mo clean` / `purge --yes`：clean 重扫且可清空 Trash，purge 无人值守处理全部适合项，不能用行号缩小它们。官方交互选择只交接用户终端，不解析 TUI。
+
+只有用户另行要求审阅受支持的精确下载缓存对象，才读 [可选精确流程](references/optional-execution-workflow.md) 和 [精确执行契约](references/precise-execution.md)，生成新方案；保留原有能力，不扩范围。审核、安装和工程测试同意都不授权清理。执行后必须逐行报告结果、前后可用空间和测量限制；未知物理归因不得冒充确定释放。

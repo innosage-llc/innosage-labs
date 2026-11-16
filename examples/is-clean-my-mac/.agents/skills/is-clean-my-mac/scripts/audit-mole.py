@@ -69,6 +69,20 @@ def category(path, name='', overview=False):
             'Gradle Cache': 'developer_caches', 'CocoaPods Cache': 'developer_caches'}
         if isinstance(name, str) and name in insights:
             return insights[name]
+    # Fixed path components only; names are never returned or interpreted as instructions.
+    parts = Path(path).parts
+    fixed = {'Downloads': 'downloads', 'Documents': 'documents', 'Pictures': 'pictures',
+             'Movies': 'movies', 'Music': 'music', 'Desktop': 'desktop',
+             'Application Support': 'application_support', '.codex': 'codex_data',
+             'Virtual Machines.localized': 'virtual_machines', 'Developer': 'developer_data'}
+    for component in ('Caches', '.cache', 'Logs', 'node_modules', 'DerivedData'):
+        if component in parts:
+            return {'Caches':'caches', '.cache':'caches', 'Logs':'logs',
+                    'node_modules':'build_and_dependencies', 'DerivedData':'xcode_derived_data'}[component]
+    if not overview:
+        for component in reversed(parts):
+            if component in fixed:
+                return fixed[component]
     if '/node_modules' in path or '/build' in path or '/target' in path or '/DerivedData' in path:
         return 'build_and_dependencies'
     if '/Caches' in path or '/.cache' in path:
@@ -125,6 +139,8 @@ def analyze(text, stderr, version):
                    completeness='COMPLETE' if complete else 'PARTIAL',
                    reason='upstream_reports_complete' if complete else 'coverage_or_extension_unverified',
                    categories_may_overlap=True, overview=data['overview'])
+        if groups and all(g['measured_entries'] == 0 and g['unknown_entries'] > 0 for g in groups.values()):
+            out.update(occupied_bytes=None, file_count=None)
         if data.get('scan_status') == 'unavailable':
             out.update(occupied_bytes=None, file_count=None, completeness='FAILED', reason='scan_unavailable')
         else:
@@ -133,6 +149,63 @@ def analyze(text, stderr, version):
         return out
     except (ValueError, TypeError, KeyError):
         return out
+
+
+def largest_entry_drilldowns(raw, version, deadline):
+    """At most two official directory scans selected locally from overview evidence.
+
+    No filenames/paths cross the aggregate boundary. Never follow links or scan
+    arbitrary upstream paths. Failures are independent of the overview result.
+    """
+    details = []
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict) or data.get('overview') is not True:
+            return details
+        home = Path.home().resolve(strict=True)
+        allowed = {home, home / 'Library', Path('/Applications'), Path('/Library')}
+        entries = data.get('entries', [])
+        if not isinstance(entries, list):
+            return details
+        candidates = []
+        for entry in entries:
+            if (not isinstance(entry, dict) or entry.get('is_dir') is not True
+                    or entry.get('insight') is True or type(entry.get('size')) is not int
+                    or entry['size'] <= 0 or not isinstance(entry.get('path'), str)):
+                continue
+            path = Path(entry['path'])
+            try:
+                if path not in allowed or path != path.resolve(strict=True) or not path.is_dir():
+                    continue
+            except OSError:
+                continue
+            candidates.append((entry['size'], str(path)))
+        seen = set()
+        for _, path in sorted(candidates, reverse=True):
+            if path in seen:
+                continue
+            seen.add(path)
+            if len(details) >= 2:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                details.append(result('analyze', 'command_timeout', version=version))
+                break
+            try:
+                rc, text, diagnostics = guarded_capture(['mo', 'analyze', '--json', path], min(30, remaining), 'analyze')
+                detail = parse('analyze', text, rc, diagnostics, version)
+                detail.update(command_exit_code=rc, diagnostic_categories=list(diagnostics.categories))
+            except (OSError, ValueError) as error:
+                detail = result('analyze', 'drilldown_failed_or_timed_out', version=version)
+                if isinstance(error, CaptureFailure):
+                    detail.update(command_exit_code=error.returncode,
+                                  diagnostic_categories=list(getattr(error.diagnostics, 'categories', ())))
+            detail['scope_label'] = 'home' if Path(path) == home else 'user_library' if Path(path) == home / 'Library' else 'applications' if path == '/Applications' else 'system_library'
+            detail['overlaps_parent'] = True
+            details.append(detail)
+    except (ValueError, OSError):
+        pass
+    return details
 
 
 def result(source, reason, completeness='FAILED', version=None):
@@ -358,6 +431,8 @@ def main():
         stage, rc, diagnostics = 'audit', None, False
         rc, raw, diagnostics = guarded_capture(command, args.timeout, args.source)
         out = parse(args.source, raw, rc, diagnostics, version=match[1])
+        if args.source == 'analyze' and args.analyze_root is None and out['completeness'] != 'FAILED':
+            out['drilldowns'] = largest_entry_drilldowns(raw, version_id, started + args.timeout)
         out['runtime_boundary'] = 'macOS_sandbox_deny_network_and_host_writes'
         out['allowed_host_writes'] = ['official_clean_preview_only'] if args.source == 'clean' else []
         if args.source == 'clean':

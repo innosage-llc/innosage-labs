@@ -1,10 +1,10 @@
-# is-clean-my-mac — 编号审核与精确缓存处理
+# is-clean-my-mac — Mole-first 中文磁盘审核
 
 在本地 Codex 中输入：
 
 > 全面审核我的 Mac 磁盘，给我清理计划，先不要清理。
 
-Agent 直接展示编号表：文件类型占用、缓存候选、Codex workspace/worktree 数量与覆盖、准确失败原因。大多数行只用于复核；只有符合严格条件的**独立下载缓存文件**标记为可执行。审核/安装本身不删除文件。
+官方 Mole Skill 负责解释磁盘和清理规则；薄 harness 补齐四源覆盖、隐私聚合和 Codex worktree 清单。Agent 在对话直接展示编号表：主要目录用途/占用、缓存和构建候选、数量/覆盖、风险和准确失败原因。默认最多对两个官方最大顶层目录做 Mole 下钻，不做 Home 扩展名普查，也不准备删除对象。占用不是可回收；审核不清理。
 
 ## 安装或更新
 
@@ -14,9 +14,9 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 更新后启动新会话发现两个 Skills，使用上面原来的短审核句即可。安装同意不授权任何缓存处理。
 
-## 批准编号后会发生什么
+## 可选精确缓存流程（不在默认审核路径）
 
-新范围由 owner 明确批准：独立 InnoSage adapter 处理两个固定默认布局的单文件对象，**不通过 Mole 宽范围删除**：
+仅当用户另行要求审阅精确下载缓存对象时，Agent 加载可选流程并生成新方案。默认聚合编号全部复核/阻塞，批准这些编号不能触发宽范围 Mole 命令。已有范围由 owner 明确批准开发：独立 InnoSage adapter 处理两个固定默认布局的单文件对象，**不通过 Mole 宽范围删除**：
 
 | 可执行类别 | 严格范围 | 批准前应理解 |
 | --- | --- | --- |
@@ -33,9 +33,11 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 ## 证据与限制
 
-最新 MacBook 实际审核仍未达到用户目标；历史记录不等于当前验收。本次仅改善升级/备份UX，不声称审核已可用或模型效果一致；架构方向另行审核。当前自主执行范围经新增明确批准，不再局限于 Mole-only。详见 [精确执行证据](evidence/precise-cache-execution.md)、[执行契约](.agents/skills/is-clean-my-mac/references/precise-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
+最新 MacBook 实际审核尚未达到用户目标；本次按已批准 Mole-first 方向修复，真实验收仍待 Jim。历史测试不证明当前可用或模型效果一致。见 [本次证据](evidence/mole-first-harness.md)、[精确执行证据](evidence/precise-cache-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
 
-四源仍为 Mole analyze、clean/purge预览及worktree清单；原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole版本支持1.54.0/1.72.0，未知版本不升级。Home文件类型使用只读文件名/stat有界枚举，PARTIAL只代表已测子集；不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
+四源仍为 Mole analyze、clean/purge预览及worktree清单。原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole支持1.54.0/1.72.0，未知版本不升级。目录用途来自固定元数据规则，不是内容分类；未知项不猜测。不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
+
+purge 在官方1.72受保护运行中仍可失败；本次真实复现了临时文件/写入拒绝及存储错误文本，不能据此声称磁盘真的已满或已确定 Jim 的原因。不得移除边界、写配置或假报零候选。其他源继续呈现，下钻失败保留顶层证据。
 
 精确执行是普通并发下的有限复核与经过fixture验证的进程崩溃恢复，不是恶意同UID隔离、未来永无写入保证或断电一致性证明。真实MacBook清理验收仍待owner逐行决定；#70保持打开。
 

@@ -25,7 +25,7 @@ def collect_file_types(timeout=30):
                     observed_allocated_bytes=None, actual_freed_bytes=None)
 
 
-def run_all(timeout=180, worktree_timeout=30, file_type_timeout=30):
+def run_all(timeout=180, worktree_timeout=30, file_type_timeout=30, include_file_types=False):
     scripts = Path(__file__).resolve().parent
     sources = []
     commands = [('codex-worktree-inventory', [str(scripts / 'audit-codex-worktrees.py'),
@@ -49,10 +49,11 @@ def run_all(timeout=180, worktree_timeout=30, file_type_timeout=30):
                 duration_seconds=round(time.monotonic() - started, 6)))
     # Supplemental metadata measurement inside the analyze evidence, not a
     # replacement or invented fifth Mole source. It can succeed if Mole fails.
-    file_types = collect_file_types(file_type_timeout)
-    for data in sources:
-        if data['source'] == 'mole-analyze':
-            data['file_type_inventory'] = file_types
+    if include_file_types:
+        file_types = collect_file_types(file_type_timeout)
+        for data in sources:
+            if data['source'] == 'mole-analyze':
+                data['file_type_inventory'] = file_types
     return dict(schema_version=1, mode='audit_only', sources=sources,
                 actual_freed_bytes=None, combined_reclaimable_bytes=None,
                 source_sizes_must_not_be_added=True,
@@ -64,18 +65,22 @@ def main():
     parser.add_argument('--timeout', type=float, default=180)
     parser.add_argument('--worktree-timeout', type=float, default=30)
     parser.add_argument('--file-type-timeout', type=float, default=30)
+    parser.add_argument('--include-file-types', action='store_true', help='Optional Home extension census, not the Mole-first audit')
+    parser.add_argument('--precise-candidates', action='store_true', help='Optional existing exact-cache workflow; never applies cleanup')
     args = parser.parse_args()
     if not (0 < args.timeout <= 300 and 0 < args.worktree_timeout <= 60 and 0 < args.file_type_timeout <= 60):
         parser.error('bounded timeout required')
-    data = run_all(args.timeout, args.worktree_timeout, args.file_type_timeout)
+    data = run_all(args.timeout, args.worktree_timeout, args.file_type_timeout, args.include_file_types)
     directory = Path(tempfile.mkdtemp(prefix='is-clean-my-mac-report-', dir='/tmp'))
-    try:
-        collected=subprocess.run([sys.executable,'-B',str(Path(__file__).with_name('precise-cache.py')),
-            '--collect-to',str(directory/'private-candidates.json')],capture_output=True,timeout=6,stdin=subprocess.DEVNULL)
-        precise=json.loads(collected.stdout)
-        if not isinstance(precise,dict) or precise.get('source')!='precise-cache-candidates':raise ValueError('invalid aggregate')
-    except (OSError,ValueError,subprocess.TimeoutExpired):
-        precise=dict(source='precise-cache-candidates',completeness='FAILED',candidates=[],reasons=['precise_candidate_collection_failed'])
+    precise = None
+    if args.precise_candidates:
+        try:
+            collected=subprocess.run([sys.executable,'-B',str(Path(__file__).with_name('precise-cache.py')),
+                '--collect-to',str(directory/'private-candidates.json')],capture_output=True,timeout=6,stdin=subprocess.DEVNULL)
+            precise=json.loads(collected.stdout)
+            if not isinstance(precise,dict) or precise.get('source')!='precise-cache-candidates':raise ValueError('invalid aggregate')
+        except (OSError,ValueError,subprocess.TimeoutExpired):
+            precise=dict(source='precise-cache-candidates',completeness='FAILED',candidates=[],reasons=['precise_candidate_collection_failed'])
     spec = importlib.util.spec_from_file_location('report', Path(__file__).with_name('render-report.py'))
     renderer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(renderer)
