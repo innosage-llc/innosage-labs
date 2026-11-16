@@ -1,6 +1,6 @@
 # Mole-first harness revision — 2026-11-16
 
-Implementation in progress; real MacBook acceptance remains pending and #70 stays open. Execution: Mac Studio, GPT-6 Astra low as requested. This supersedes the earlier mandatory Home census / precise-candidate audit path, not the safety boundaries or optional precise executor.
+Implementation delivery candidate; real MacBook acceptance remains pending and #70 stays open. Execution: Mac Studio, GPT-6 Astra low as requested. This supersedes the earlier mandatory Home census / precise-candidate audit path, not the safety boundaries or optional precise executor.
 
 ## Change and authority
 
@@ -20,11 +20,11 @@ The existing boundary still rejects host cache overwrite/unlink/rename/create, s
 
 ## Checks and limitations
 
-- 206 local tests PASS with both native fixture opt-ins enabled, none skipped; prior updater/precise-execution tests retained.
+- 207 local tests PASS with both native fixture opt-ins enabled, none skipped; prior updater/precise-execution tests retained.
 - Actual skill-creator `quick_validate.py`: `Skill is valid!` (structure only, not behavior proof).
 - Synthetic runtime boundary proof PASS; no Mole invoked by that proof.
 - No remote CI, installation/update of host packages/Skills, real cleanup, new permissions or security/config changes.
-- Models/evaluation and final exact-head review are recorded below when complete. Synthetic source observations do not establish live MacBook usefulness or full four-source success.
+- Models/evaluation and final exact-head review are recorded below and on PR #77. Synthetic source observations do not establish live MacBook usefulness or full four-source success.
 
 Real acceptance still pending: useful same-short-prompt Luna result on Jim's MacBook, successful guarded purge scope if supported, genuine missing-CLI installation and Intel/macOS12 compatibility. Do not claim universal model parity, full disk coverage or reclaimed space.
 
@@ -32,12 +32,14 @@ Real acceptance still pending: useful same-short-prompt Luna result on Jim's Mac
 
 Fresh independent agents used the exact same short Chinese request and shared [synthetic observations](../evals/fixtures/mole-first.shared.synthetic.json), on this Mac Studio: official Mole baseline with **gpt-6-luna xhigh**, baseline with **gpt-6.1-sol medium**, and official Mole + harness with **gpt-6-luna xhigh**. The agent interface exposes model/reasoning, not Fast-mode selection; Fast was not reproduced or claimed. Raw evaluation transcripts remain local.
 
-All three preserved synthetic provenance, no cleanup, worktree11/observed17GB/workspace UNKNOWN, overlap and purge failure. Harness Luna returned a numbered inline table with 90/40/30/20/6GB occupied evidence, 7.14GB preview and 6.399GB developer-cache estimate, independent count/byte coverage, and purge audit/exit1 markers. Sol also produced useful interpretation; baseline Luna used fewer aggregate rows. This limited case does **not** prove that the harness outperforms the baseline or achieves model parity. Baselines were deliberately given the same inventory observation, so this tests reporting rather than unaided root discovery. Deterministic source invocation/root coverage is tested separately.
+All three preserved synthetic provenance, no cleanup, worktree11/observed17GB/workspace UNKNOWN, overlap and purge failure. Harness Luna returned a numbered inline table with 90/40/30/20/6GB occupied evidence, 7.14GB preview and 6.399GB developer-cache estimate, independent count/byte coverage, and purge audit/exit1 markers. Sol also produced useful interpretation; baseline Luna used fewer aggregate rows. Harness Luna did read both official Skill and macOS reference, but regrouped the renderer rows (7 into8); exact row-identity fidelity therefore FAILED in this pass. The Skill now explicitly preserves row IDs and puts interpretation outside the table. A later targeted attempt guessed the helper location and could not run it, so Skill-relative lookup and no hand-built-plan fallback were made explicit. This limited case does **not** prove that the harness outperforms the baseline or achieves model parity. Baselines were deliberately given the same inventory observation, so this tests reporting rather than unaided root discovery. Deterministic source invocation/root coverage is tested separately.
 
-The first trial accidentally used a purge-style clean-summary string; the adapter correctly returned FAILED. That fixture was corrected to the official clean summary shape and all three trials rerun with fresh agents. No intended answer or prior findings were supplied. The harness command was a fixed observation stub with the real renderer output, not a live scan. See [sanitized checks](mole-first-model-comparison.synthetic.json) and [sample renderer artifact](mole-first.sample.synthetic.zh.md).
+The first trial accidentally used a purge-style clean-summary string; the adapter correctly returned FAILED. The fixture also needed the official two-space clean-list delimiter; both were corrected. A missing-category regression exposed a real inline gap: summary-only previews now retain a blocked total row. No intended answer or prior findings were supplied to fresh agents. The harness command was a fixed observation stub with the real renderer output, not a live scan. See [sanitized checks](mole-first-model-comparison.synthetic.json) and [sample renderer artifact](mole-first.sample.synthetic.zh.md).
+
+The final Luna xhigh harness session read official Mole Skill/reference and ran the permitted observation stub. Its first execution hit a fixture-only Python3.9 source-encoding error; ASCII-escaped stub source fixed it, then the same session reran successfully. The final answer preserved all **9 renderer row identities**, key measurements, unknown workspace/total worktree bytes, measured17GB lower bound, purge audit/exit1, overlap and no-cleanup limits. It did not infer approval. This is one successful corrected synthetic continuation, not proof of all fresh sessions or real Mac behavior. The final baselines use the same corrected shared source artifact.
 
 ## Independent review and final verification
 
-Initial independent Astra-low review of `7a14f03` found an unavailable-only category falsely displayed as zero and a whitespace defect. Corrected overview/drilldown rows retain UNKNOWN with per-row completeness/unknown counts; source total and detailed rendering also preserve unknown when no entry was measured. Added a regression. 206/206 native-enabled tests pass, none skipped; actual validator and full-branch whitespace pass. Official digest-verified1.72 adapter on the existing synthetic8KiB directory returns COMPLETE/8192B/one file with no host writes allowed; this is not full-host coverage.
+Initial independent Astra-low review of `7a14f03` found an unavailable-only category falsely displayed as zero and a whitespace defect. Corrected overview/drilldown rows retain UNKNOWN with per-row completeness/unknown counts; source total and detailed rendering also preserve unknown when no entry was measured. Added a regression. 207/207 native-enabled tests pass, none skipped; actual validator and full-branch whitespace pass. Official digest-verified1.72 adapter on the existing synthetic8KiB directory returns COMPLETE/8192B/one file with no host writes allowed; this is not full-host coverage.
 
 Final exact-head review and merge readback are recorded in PR #77. Real MacBook acceptance remains pending; #70 stays open.

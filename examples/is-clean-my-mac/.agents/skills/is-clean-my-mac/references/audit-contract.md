@@ -26,7 +26,7 @@
 
 | 固定类别 | 证据与建议 | 风险/恢复成本 |
 | --- | --- | --- |
-| app/browser/homebrew/developer caches、logs | clean 新鲜预览中的条目数和舍入估算；有未测量条目时保留下界 | 可能重新下载、重新登录或丢失排障日志；活动应用/离线可用性需复核；下载大小/耗时未知 |
+| app/browser/homebrew/developer caches、logs | clean 新鲜预览中的条目数和舍入估算；有未测量条目时保留 PARTIAL 舍入估算，不称下界 | 可能重新下载、重新登录或丢失排障日志；活动应用/离线可用性需复核；下载大小/耗时未知 |
 | xcode_derived_data、build_and_dependencies | analyze 占用只是复核信号；purge 预览才是构建候选估算 | 需重新编译/下载依赖，可能影响当前任务；源码、整个仓库/worktree 不属于候选 |
 | container_data、xcode_simulators | 仅表示占用，不自动归类可删除 | 可能包含数据库、卷、模拟器状态；先确认官方支持的精确范围与备份 |
 | ios_backups、old_downloads、xcode_archives | 只列占用与人工复核需求 | 可能是唯一备份、用户文件或发布归档；不能仅凭年龄或体积建议删除 |

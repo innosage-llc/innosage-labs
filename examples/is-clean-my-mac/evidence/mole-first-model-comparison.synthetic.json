@@ -36,7 +36,11 @@
       "workspace_unknown": true,
       "purge_failure_reported": true,
       "purge_stage_and_exit_reported": true,
-      "overlap_and_no_cleanup_preserved": true
+      "overlap_and_no_cleanup_preserved": true,
+      "exact_row_identity": true,
+      "renderer_row_count": 9,
+      "official_skill_and_reference_read": true,
+      "helper_stub_executed": true
     }
   ],
   "limitations": [
@@ -44,6 +48,9 @@
     "Baselines were supplied the same inventory observations; this does not test their ability to discover worktrees unaided",
     "Harness audit command was a fixture stub using the actual current renderer; actual collectors covered separately by tests",
     "Initial trial used malformed clean summary; adapter failed closed; corrected fixture rerun with fresh agents",
-    "No live MacBook usefulness or cleanup acceptance; no Fast-mode reproduction"
+    "No live MacBook usefulness or cleanup acceptance; no Fast-mode reproduction",
+    "An earlier targeted Luna pass looked in the wrong helper location and manually regrouped rows; Skill-relative lookup and no hand-built-plan rule added",
+    "Final harness session initially hit fixture-only Python3.9 stub encoding error; corrected to ASCII-escaped source, then successfully reran",
+    "No live discovery comparison: all models receive the same synthetic inventory observation"
   ]
 }

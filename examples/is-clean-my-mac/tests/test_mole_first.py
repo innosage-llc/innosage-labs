@@ -74,3 +74,9 @@ class MoleFirstTests(unittest.TestCase):
         text=report.render_summary(data,plan)
         self.assertNotIn('0 B',text);self.assertIn('UNKNOWN',text)
         self.assertNotIn('| 0 B',report.render(data))
+
+    def test_summary_only_preview_keeps_estimate_in_inline_row(self):
+        data=dict(sources=[dict(source='mole-clean',completeness='PARTIAL',candidate_estimate_bytes=7140000000,categories=[])])
+        plan=plans.build_plan(data);text=report.render_summary(data,plan)
+        self.assertEqual(len(plan['rows']),1);self.assertFalse(plan['rows'][0]['actionable'])
+        self.assertIn('7,140,000,000',text);self.assertIn('分类未知',text)

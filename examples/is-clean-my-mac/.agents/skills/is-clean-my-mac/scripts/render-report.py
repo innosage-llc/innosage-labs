@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic Chinese report from redacted aggregate schemas only."""
 LABELS = {
- 'downloads': '下载目录', 'documents': '文档目录', 'pictures': '图片/图库目录',
+ 'summary_only': '上游预览总览（分类未知）', 'downloads': '下载目录', 'documents': '文档目录', 'pictures': '图片/图库目录',
  'movies': '视频目录', 'music': '音乐目录', 'desktop': '桌面',
  'application_support': '应用支持数据', 'developer_data': '开发工具数据',
  'codex_data': 'Codex 数据', 'virtual_machines': '虚拟机数据',

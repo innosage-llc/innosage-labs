@@ -53,7 +53,7 @@
     ]
   },
   "clean_preview": "Dry run complete - no changes made\nPotential space: 7.14GB | Items: 2 | Categories: 2",
-  "clean_list": "=== Developer tools ===\n/SYNTHETIC/cache # 6.399GB\n=== User caches ===\n/SYNTHETIC/cache2 # 741MB\n",
+  "clean_list": "=== Developer tools ===\n/SYNTHETIC/cache  # 6.399GB\n=== User essentials ===\n/SYNTHETIC/cache2  # 741MB\n",
   "purge": {
     "exit_code": 1,
     "diagnostics": [

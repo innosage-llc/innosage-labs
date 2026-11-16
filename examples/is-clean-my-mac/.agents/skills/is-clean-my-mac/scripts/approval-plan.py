@@ -95,6 +95,9 @@ def build_plan(data, now=None, precise=None):
             for row in source.get('file_type_inventory', {}).get('categories', []):
                 add('file-type-metadata', row['category'], occupied=row.get('allocated_bytes'), count=row.get('file_count'))
         if source.get('source') in ('mole-clean','mole-purge'):
+            if not source.get('categories') and source.get('completeness') != 'FAILED':
+                add(source['source'], 'summary_only', estimate=source.get('candidate_estimate_bytes'),
+                    blocker='official_selected_scope_api_unavailable')
             for row in source.get('categories', []):
                 add(source['source'], row['category'], estimate=row.get('observed_candidate_estimate_bytes'),
                     blocker='official_selected_scope_api_unavailable', count=row.get('candidate_entries'))
