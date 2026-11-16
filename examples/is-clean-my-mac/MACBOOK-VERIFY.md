@@ -85,7 +85,7 @@ sh examples/is-clean-my-mac/install.sh
 PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v
 ```
 
-当前预期 26 个测试通过，包括独立 `du` 尺寸比对、配置默认/自定义根、缺失根、权限拒绝模拟、预算/超时、符号链接交换、重复 inode、隐私输出、未知状态和安装冲突。测试创建自己的临时合成 fixture，不扫描你的真实 worktree 或清理真实数据。
+当前预期 27 个测试通过，包括独立 `du` 尺寸比对、配置默认/自定义根、缺失根、权限拒绝模拟、预算/超时、符号链接交换、重复 inode、隐私输出、未知状态和安装冲突。测试创建自己的临时合成 fixture，不扫描你的真实 worktree 或清理真实数据。
 
 再运行未提供已验证根的 helper：
 

@@ -76,6 +76,12 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(receipt, (self.target.parent / 'is-clean-my-mac-install.json').read_bytes())
         self.assertFalse(any(c[0] in ('brew', 'npx') for c in self.commands))
 
+    def test_managed_noop_completes_without_stdin_or_package_commands(self):
+        self.invoke()
+        self.commands.clear()
+        self.invoke(answer=None, agent_stdin=True)
+        self.assertEqual([c[0] for c in self.commands], ['node', 'mo'])
+
     def test_missing_cli_uses_only_brew_install(self):
         self.invoke(missing_mole=True)
         self.assertIn(['brew', 'install', 'mole'], self.commands)
