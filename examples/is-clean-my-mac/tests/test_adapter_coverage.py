@@ -66,3 +66,23 @@ class CoverageTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 adapter.physical_file(root / 'alias')
             self.assertEqual(target.read_text(), 'preserve')
+
+    def test_covered_preview_rows_never_add_bytes_twice(self):
+        out = adapter.preview_categories('=== Developer tools ===\n/PRIVATE/cache  # 1MB\n/PRIVATE/cache/child  # 1MB, counted under /PRIVATE/cache\n')
+        self.assertEqual(out[0]['observed_candidate_estimate_bytes'], 1000000)
+        self.assertEqual(out[0]['covered_entries'], 1)
+        self.assertEqual(out[0]['candidate_entries'], 2)
+        self.assertNotIn('PRIVATE', json.dumps(out))
+
+    def test_negative_entry_with_complete_status_prevents_complete_source(self):
+        data = self.data()
+        data['entries'][0]['size'] = -1
+        out = adapter.parse('analyze', json.dumps(data), version='1.72.0')
+        self.assertEqual(out['completeness'], 'PARTIAL')
+        self.assertEqual(out['categories'][0]['unknown_entries'], 1)
+
+    def test_purge_public_artifact_categories_and_estimates(self):
+        out = adapter.parse('purge', 'Dry run complete - no changes made\n[DRY RUN] /PRIVATE/repo/node_modules, 1MB\nWould free approximately: 1MB')
+        self.assertEqual(out['categories'][0]['category'], 'node_modules')
+        self.assertEqual(out['categories'][0]['observed_candidate_estimate_bytes'], 1000000)
+        self.assertNotIn('PRIVATE', json.dumps(out))

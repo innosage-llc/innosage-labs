@@ -12,9 +12,9 @@
 仅 helper 的聚合 stdout 可直接进入模型。Mole 来源必须由本地、版本固定、具备对应 fixtures 的适配器处理；未知格式失败关闭。本例适配器支持 1.54.0/1.72.0 聚合类别；预览摘要保守为 PARTIAL，不授权精确清理。
 
 `PRESENT`=确认根存在；`ABSENT`=已验证根确实不存在；`UNKNOWN`=无法确定。
-`COMPLETE`=已验证范围内枚举完毕；`PARTIAL`=仅下界；`FAILED`=未获得可靠结果。任何失败/超时/权限拒绝/未验证自定义根都不能变成零。helper 字节部分结果的 occupied_bytes 为 null，observed 字节为下界；数量有独立 worktree_count_completeness，浅层枚举完成时可保留精确数量。
+`COMPLETE`=已验证范围内枚举完毕；`PARTIAL`=覆盖未完成或估算/重叠尚未验证；只有精确测量子集才称下界；`FAILED`=未获得可靠结果。任何失败/超时/权限拒绝/未验证自定义根都不能变成零。helper 字节部分结果的 occupied_bytes 为 null，observed 字节为下界；数量有独立 worktree_count_completeness，浅层枚举完成时可保留精确数量。
 
-按实际已分配块计算，唯一 inode 去重；不跟随符号链接，发现链接标 PARTIAL。APFS 克隆/压缩、共享块不能推算成实际物理释放量；活动文件系统随时变化，COMPLETE 仅表示枚举覆盖，不是原子快照。根下一级 repo 或 slot/repo 的 `.git` 标记用于计数；无法识别的目录结构标 PARTIAL。helper 不读取文件内容，不执行 Git/网络/配置操作；全部 Git 和活动性字段保守为 UNKNOWN。无论 Git 是否干净，整个 worktree 都不是候选。
+按实际已分配块计算，唯一 inode 去重；不跟随符号链接，发现链接标 PARTIAL。APFS 克隆/压缩、共享块不能推算成实际物理释放量；活动文件系统随时变化，COMPLETE 仅表示枚举覆盖，不是原子快照。根下一级 repo 或 slot/repo 的 `.git` 标记用于计数；无法识别的目录结构标 PARTIAL。helper 不读取仓库文件、用户文档、对话或凭据内容；唯一内容读取是有大小边界的本机 .codex-global-state.json 根元数据，仅提取固定根列表并输出白名单聚合；不执行 Git/网络/配置修改；全部 Git 和活动性字段保守为 UNKNOWN。无论 Git 是否干净，整个 worktree 都不是候选。
 
 中文报告必须分别列出：worktree 总占用、purge 构建候选、clean 缓存候选、确认候选估计、条件性/未知潜力、覆盖状态。父子/不同来源可能重叠，缺少已验证消重信息时不相加。
 

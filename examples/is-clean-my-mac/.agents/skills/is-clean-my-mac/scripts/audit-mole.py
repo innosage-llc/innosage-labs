@@ -73,7 +73,8 @@ def analyze(text, stderr, version):
                 group['unknown_entries'] += 1
             if entry.get('cleanable') is True:
                 group['upstream_cleanable_entries'] += 1
-        complete = version == '1.72.0' and all(x == 'complete' for x in statuses) and not stderr and not extras
+        complete = (version == '1.72.0' and all(x == 'complete' for x in statuses)
+                    and not stderr and not extras and not any(g['unknown_entries'] for g in groups.values()))
         for group in groups.values():
             if complete and not group['unknown_entries']:
                 group.update(occupied_bytes=group['observed_bytes'], completeness='COMPLETE')
@@ -193,9 +194,13 @@ def preview_categories(text):
             current = labels.get(line[4:-4], 'other')
         elif line and not line.startswith('#') and '  # ' in line:
             item = groups.setdefault(current, dict(category=current, candidate_entries=0,
-                observed_candidate_estimate_bytes=0, unmeasured_entries=0, completeness='PARTIAL'))
+                observed_candidate_estimate_bytes=0, unmeasured_entries=0,
+                covered_entries=0, completeness='PARTIAL'))
             item['candidate_entries'] += 1
             suffix = line.rsplit('  # ', 1)[1]
+            if ', counted under ' in suffix:
+                item['covered_entries'] += 1
+                continue
             size = re.match(r'(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)\b', suffix)
             if size and len(size[1]) <= 32:
                 item['observed_candidate_estimate_bytes'] += int(Decimal(size[1]) * 1000 ** ('B','KB','MB','GB','TB').index(size[2]))

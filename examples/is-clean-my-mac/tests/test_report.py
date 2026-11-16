@@ -28,3 +28,8 @@ class ReportTests(unittest.TestCase):
         self.assertIn('FAILED', text)
         self.assertIn('UNKNOWN', text)
         self.assertNotIn('实际释放：0', text)
+
+    def test_failed_inventory_does_not_render_unmeasured_zero_counter_as_bytes(self):
+        text = renderer.render(dict(sources=[dict(source='codex-worktree-inventory', completeness='FAILED', observed_allocated_bytes=0)]))
+        self.assertNotIn('0 B', text)
+        self.assertNotIn('至少 0', text)

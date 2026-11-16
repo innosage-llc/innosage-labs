@@ -62,7 +62,7 @@ def render(data):
     for name, label in SOURCES.items():
         s = sources.get(name, {})
         occupied = size(s.get('occupied_bytes'))
-        if s.get('occupied_bytes') is None and type(s.get('observed_allocated_bytes')) is int:
+        if s.get('completeness') != 'FAILED' and s.get('occupied_bytes') is None and type(s.get('observed_allocated_bytes')) is int:
             occupied = '至少 ' + size(s['observed_allocated_bytes'])
         reason = REASONS.get(s.get('reason'), '见独立覆盖/计数状态；未测量不当作零')
         lines.append(f"| {label} | {STATUS.get(s.get('completeness'), 'UNKNOWN')} | {'已验证本次范围' if s.get('scope_verified') is True else '未验证完整范围'} | {occupied} | {size(s.get('candidate_estimate_bytes'))} | {reason} |")
@@ -70,7 +70,7 @@ def render(data):
     lines += ['', '## Codex workspace/worktree', '',
       f"- 保存的本机 workspace 根数量：{number(wt.get('workspace_count'))}；覆盖：{STATUS.get(wt.get('workspace_count_completeness'), 'UNKNOWN')}。仅本机保存根列表，未扫描这些 workspace。",
       f"- worktree 数量：{number(wt.get('worktree_count'))}；数量覆盖：{STATUS.get(wt.get('worktree_count_completeness'), 'UNKNOWN')}；已观察数量下界：{number(wt.get('observed_worktree_count'))}。",
-      f"- worktree 占用：{size(wt.get('occupied_bytes'))}；已测分配字节下界：{size(wt.get('observed_allocated_bytes'))}；字节覆盖：{STATUS.get(wt.get('completeness'), 'UNKNOWN')}。",
+      f"- worktree 占用：{size(wt.get('occupied_bytes'))}；已测分配字节下界：{size(wt.get('observed_allocated_bytes') if wt.get('completeness') != 'FAILED' else None)}；字节覆盖：{STATUS.get(wt.get('completeness'), 'UNKNOWN')}。",
       '- 其他主机/自定义根覆盖 UNKNOWN；Git、活动、未推送、未跟踪/忽略内容等阻塞均 UNKNOWN，保留所有 worktree。', '',
       '## 类别与候选证据', '', '| 来源 | 类别 | 已测大小/下界 | 条目 | 风险与恢复成本 |', '| --- | --- | --- | --- | --- |']
     rows = 0
@@ -82,7 +82,8 @@ def render(data):
             key = key if isinstance(key, str) and key in LABELS else 'other'
             value = group.get('observed_bytes') if name == 'mole-analyze' else group.get('observed_candidate_estimate_bytes')
             count = group.get('measured_entries') if name == 'mole-analyze' else group.get('candidate_entries')
-            uncertainty = '' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/下界）'
+            uncertainty = (('' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/已测子集）')
+                           if name == 'mole-analyze' else '（PARTIAL/舍入估算，可能重叠）')
             lines.append(f"| {SOURCES[name]} | {LABELS[key]} | {size(value)}{uncertainty} | {number(count)} | {risk(key)} |")
             rows += 1
     if not rows:

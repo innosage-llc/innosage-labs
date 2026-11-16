@@ -272,9 +272,30 @@ def main():
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     started = time.monotonic()
-    if args.timeout <= 0 or args.max_entries <= 0:
+    if not (0 < args.timeout <= 60 and 0 < args.max_entries <= 1000000):
         print(json.dumps(empty('invalid_budget')))
         return 2
+    if not args.worker:
+        # Root discovery itself can touch an unavailable filesystem. Keep every
+        # filesystem operation on configured roots/metadata inside this worker.
+        command = [sys.executable, '-B', os.path.abspath(__file__), '--worker',
+                   '--timeout', str(args.timeout), '--max-entries', str(args.max_entries)]
+        if args.root is not None:
+            command += ['--root', str(args.root)]
+        if args.confirm_default_root:
+            command.append('--confirm-default-root')
+        try:
+            run = subprocess.run(command, capture_output=True, timeout=args.timeout + 1)
+            result = json.loads(run.stdout)
+            if not isinstance(result, dict) or result.get('source') != 'codex-worktree-inventory':
+                raise ValueError('invalid worker result')
+        except subprocess.TimeoutExpired:
+            result = empty('worker_timeout')
+        except (OSError, ValueError):
+            result = empty('worker_failed')
+        result.update(timeout_seconds=args.timeout, duration_seconds=round(time.monotonic() - started, 6))
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result['completeness'] == 'COMPLETE' else 2
     root = args.root
     discovery = dict(root_source='explicit_verified_override', workspace_count=None,
                      workspace_count_source='UNKNOWN', workspace_count_completeness='UNKNOWN',
@@ -295,18 +316,7 @@ def main():
     if not root.is_absolute() or '..' in root.parts or root == Path('/'):
         print(json.dumps(empty('root_requires_verified_absolute_path')))
         return 2
-    if args.worker:
-        result = inventory(root, args.timeout, args.max_entries)
-    else:
-        command = [sys.executable, '-B', str(Path(__file__).resolve()), '--worker',
-                   '--root', str(root), '--timeout', str(args.timeout), '--max-entries', str(args.max_entries)]
-        try:
-            run = subprocess.run(command, capture_output=True, timeout=args.timeout + 1, check=True)
-            result = json.loads(run.stdout)
-        except subprocess.TimeoutExpired:
-            result = empty('worker_timeout')
-        except (OSError, subprocess.CalledProcessError, ValueError):
-            result = empty('worker_failed')
+    result = inventory(root, args.timeout, args.max_entries)
     result.update(timeout_seconds=args.timeout, scope_verified=result['presence'] != 'UNKNOWN',
                   duration_seconds=round(time.monotonic() - started, 6),
                   **discovery,
