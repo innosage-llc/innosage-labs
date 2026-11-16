@@ -10,7 +10,7 @@ Agent 直接展示编号表：文件类型占用、缓存候选、Codex workspac
 
 > 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
 
-Agent 获取新检出、检查源码和唯一安装器，展示具体计划并在 owner 同意后操作；无需你亲自输入 INSTALL 或执行清单。保留现有 Mole CLI/官方 Skill，不升级。受管理 wrapper 用 `--update-managed --plan` 检查，再以同样标志/批准确认更新，旧文件保留在 Skills 外备份。未知/修改/链接/legacy 冲突停止。初始 URL/网络或宿主执行限制只能走准确范围审批，不关闭安全机制。
+Agent 获取新检出、检查源码和唯一安装器，展示具体计划并在 owner 同意后操作；无需你亲自输入 INSTALL 或执行清单。保留现有 Mole CLI/官方 Skill，不升级。受管理 wrapper 用 `--update-managed --plan` 检查，再以同样标志/批准确认更新，事务期间保留临时回滚；新wrapper和收据验证提交后，仅退役该事务内未改动的旧受管理副本，不再积累永久新备份。既有历史备份不处理，也不只因备份目录存在就把它报告成当前活动版本；[更新机制与上游对比](evidence/managed-update-lifecycle.md)。未知/修改/链接/legacy 冲突停止。中断时普通安装停止；Agent用同一入口的 `--recover-update --plan` 展示回滚/完成事务计划，获同意后处理，不运行包命令。未知或改动的部分副本保留诊断；仅与清单匹配的剩余子集可在恢复同意后处理。初始 URL/网络或宿主执行限制只能走准确范围审批，不关闭安全机制。
 
 更新后启动新会话发现两个 Skills，使用上面原来的短审核句即可。安装同意不授权任何缓存处理。
 

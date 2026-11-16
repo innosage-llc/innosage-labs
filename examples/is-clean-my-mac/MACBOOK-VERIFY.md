@@ -6,7 +6,7 @@
 
 > 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
 
-Agent完成受管理来源/收据核验、展示更新计划，取得同意后更新wrapper并保留旧版备份；现有Mole CLI/官方Skill不升级。网络/宿主限制仅申请该确切操作，不关闭安全机制。
+Agent完成受管理来源/收据核验、展示更新计划，取得同意后事务更新wrapper：临时回滚仅保留到新副本/收据验证提交，成功后只有一个活动版本，不积累新的永久备份；既有历史备份保持原样。中断需另行同意明确恢复计划，未知/改动副本不删；现有Mole CLI/官方Skill不升级。网络/宿主限制仅申请该确切操作，不关闭安全机制。
 
 新会话中保持原Luna设置，仍发送：
 
