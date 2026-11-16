@@ -166,6 +166,7 @@ class PrecisePlanIntegrationTests(unittest.TestCase):
         self.assertIsNone(result['actual_freed_bytes'])
         self.assertTrue(all(row['actual_freed_bytes'] is None for row in result['rows']))
         self.assertIn('不能当作',result['summary_markdown'])
+        self.assertIn('-1,000 B',result['summary_markdown'])
 
     def test_repeated_apply_never_reexecutes_or_touches_unselected(self):
         self.assertEqual(self.request([1],apply=True)['status'],'SUCCEEDED')

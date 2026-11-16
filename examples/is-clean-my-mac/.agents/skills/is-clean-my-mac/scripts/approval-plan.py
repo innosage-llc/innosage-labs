@@ -190,7 +190,9 @@ def outcome_summary(result):
         value=result.get(key,{}).get('available_bytes')
         return f'{value:,} B' if type(value) is int and value>=0 else 'UNKNOWN'
     if 'disk_free_before' in result:
-        lines += ['', '磁盘可用空间：前 '+available('disk_free_before')+'，后 '+available('disk_free_after')+'；方法 statvfs f_bavail × f_frsize。差值可能来自并发活动/APFS共享/延迟，不能当作本次可归因释放。']
+        change=result.get('disk_free_change_bytes')
+        delta=f'{change:+,} B' if type(change) is int else 'UNKNOWN'
+        lines += ['', '磁盘可用空间：前 '+available('disk_free_before')+'，后 '+available('disk_free_after')+'；观察差值 '+delta+'；方法 statvfs f_bavail × f_frsize。差值可能来自并发活动/APFS共享/延迟，不能当作本次可归因释放。']
     if type(result.get('removed_scope_allocated_bytes')) is int:
         lines += ['已移除对象原有分配字节：'+str(result['removed_scope_allocated_bytes'])+' B；与卷实际新增可用空间分开。']
     lines += ['下一步：已跳过项不自动重试；有恢复保留时先检查同一 recovery_plan_id，恢复也不覆盖新文件。广泛 Mole 行仍受接口限制；不改用宽范围 clean/purge、不处理未选 Trash。']
