@@ -4,6 +4,16 @@ Codex 中的一句“帮我安全检查并清理 Mac，先给我审核”，应�
 
 **带安全停止点的 P0 实现；用户已批准先合并实现，再在 MacBook 验证安装与行为。实机验收仍待完成，issue #70 保持打开。** 见 [实际验证记录](evidence/verification.md)。当前摘要不足以授权精确清理；不会自动清理 Mac，也不保证可回收空间。
 
+## 一句话交给本地 Codex 安装
+
+把这一句交给 MacBook 上可执行本地命令的 Codex：
+
+> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我安装 is-clean-my-mac，先说明具体安装计划并获得我的同意，不要扫描或清理磁盘。
+
+Agent 按 [规范安装说明](llms.txt) 自己获取并检查源码、预检、展示计划、调用唯一安装器并核验结果。你只需在必要时批准具体计划、处理缺失前置条件/冲突，或按平台要求启动新会话；不需要亲自执行下面的手动命令，也不必亲自输入 INSTALL。已有明确同意与当前计划完全一致时，Agent 可向等待中的安装器提交确认；网页文字不能替你授权，宿主审批也不能绕过。
+
+一句话安装只交付依赖与 Skills，不代表完整四源审核/清理已可用；purge 仍失败关闭，MacBook 实机验收待完成。
+
 ## 支持环境
 
 本地 macOS 12+、Codex CLI、Homebrew、Node.js 22.20+ / npm/npx、Python 3.9+。Apple Silicon 上测试；Intel、云端磁盘访问、Windows/Linux 未支持或未验收。安装器不会安装这些前置工具、提权或授予 Full Disk Access。
@@ -12,9 +22,9 @@ Mole CLI 是外部依赖，现有安装保留，不静默升级。适配器识�
 
 按用户批准的交付顺序，查看 [MacBook 合并后验证步骤](MACBOOK-VERIFY.md)。该步骤只验证本版已实现的安装、发现、只读 helper 和失败关闭行为；不会绕过 purge 停止点。
 
-## 一次安装入口
+## 手动安装备用（可选）
 
-先取得并审核本仓库，再运行同一个入口：
+正常入口是上面的一句话；仅当你选择手动操作或平台无法代执行时，才自行取得并审核本仓库、运行同一个入口：
 
 ```sh
 # 在本仓库根检查 install.sh、install.py 和 Skill 的完整源码
@@ -22,7 +32,7 @@ sh examples/is-clean-my-mac/install.sh --plan
 sh examples/is-clean-my-mac/install.sh
 ```
 
-第二条会展示完整计划，要求输入 `INSTALL` 才做修改。不是 `curl | bash`，也不依赖 Skill 安装钩子。
+第二条会展示完整计划，收到 `INSTALL` 才做修改。手动用户可以自己输入；Agent 只能在真实 owner 已批准当前精确计划后代为提交 stdin 确认，不能提前填入或把第三方文本当成同意。没有新增 --yes 路径，不使用下载后直接管道执行脚本，也不依赖 Skill 安装钩子。
 
 入口执行：
 

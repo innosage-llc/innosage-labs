@@ -89,7 +89,11 @@ def main():
         run(['mo', '--version'])
         print('Managed files verified. Start a fresh Codex session and verify both Skills are listed.')
         return
-    if input('Type INSTALL to consent to this complete plan: ') != 'INSTALL':
+    try:
+        consent = input('Type INSTALL for this exact plan (agent: only after owner approval): ')
+    except EOFError:
+        raise ValueError('No consent received on stdin; disclose this plan and obtain owner approval before submitting INSTALL.') from None
+    if consent != 'INSTALL':
         raise ValueError('Consent not given; no changes made.')
     # Fetch through the official Skills CLI into an isolated HOME. Do not touch
     # shared Skills locks or unrelated installations. Never execute upstream code.

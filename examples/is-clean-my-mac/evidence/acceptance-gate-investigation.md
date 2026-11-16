@@ -46,7 +46,7 @@ A [standard GitHub-hosted macOS arm64 VM](https://docs.github.com/en/actions/ref
 
 ## Concrete skill-creator and reviewer provenance
 
-Applied the installed Codex `skill-creator/SKILL.md`: concise routing, progressive disclosure, deterministic scripts for fragile behavior, execution/validation of scripts, meaningful invariant tests and independent forward-testing. The actual built-in validator was executed from `${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py`; it returned `Skill is valid!`. The latest follow-up Python suite contains 23 passing tests, including the upstream SI-unit conversion correction found during this research. No costly model comparison was repeated.
+Applied the installed Codex `skill-creator/SKILL.md`: concise routing, progressive disclosure, deterministic scripts for fragile behavior, execution/validation of scripts, meaningful invariant tests and independent forward-testing. The actual built-in validator was executed from `${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py`; it returned `Skill is valid!`. The investigation-head Python suite contained 23 passing tests, including the upstream SI-unit conversion correction found during this research. No costly model comparison was repeated.
 
 The independent GPT-6.1 Sol Medium reviewer had no substantive findings at `a3add924`; it withheld merge approval under the earlier sequence; the subsequent user-approved delivery order allows implementation merge while preserving these acceptance gaps. Follow-up changes receive a new pinned review; earlier review is not represented as covering a later head.
 

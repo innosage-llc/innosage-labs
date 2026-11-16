@@ -1,8 +1,20 @@
-# MacBook：合并后验证护栏实现
+# MacBook：一句话安装与可选验证
 
 用户已选择先交付 main 上的实现，再在 MacBook 做安装与行为验证。**实现交付不等于 issue #70 验收完成。** 当前可以验证依赖安装、Skill 发现、合成只读清单和 purge 失败关闭；完整四源审核仍受上游配置写入边界限制，需要后续产品工作，不能通过换一台 Mac 或加一个确认参数解除。
 
-## 1. 获取 main 并检查源码、前置条件及计划
+## 默认入口：交给 Agent 执行
+
+在 MacBook 的本地 Codex 中只发这一句：
+
+> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我安装 is-clean-my-mac，先说明具体安装计划并获得我的同意，不要扫描或清理磁盘。
+
+由 Agent 阅读 [llms.txt](llms.txt)，自行获取安全检出、检查源码、预检并展示当前安装计划。若你尚未明确同意该精确范围，回复是否同意；同意后由 Agent 向等待中的安装器提交 INSTALL 并继续核验。无需你亲自输入 INSTALL 或逐项执行本页命令。缺少前置工具、来源冲突、凭据/平台能力不足时，Agent 应说明具体原因和最小必要交接，不应把整份手动清单退给你。
+
+Agent 的正常结果应简短说明三个组件的安装/保留状态、CLI 版本、两个 Skills 的新会话发现状态及准确剩余问题。安装过程中不运行任何磁盘扫描、预览或清理来证明成功。若平台必须由你启动新会话，只需要这一个必要交接；文件存在不等于已验证发现。
+
+以下是自愿核验或排障时的手动备用，不是正常一句话安装的必做步骤。
+
+## 手动备用 1：获取 main 并检查源码、前置条件及计划
 
 在自己的终端创建一个新检出，避免影响现有项目：
 
@@ -29,7 +41,7 @@ sh examples/is-clean-my-mac/install.sh --plan
 
 预期冲突行为：同名 Skill 来源未知、已修改、目标为符号链接或存在 legacy 同名 Skill 时停止；不覆盖。请先核对所有权，不要删除/重命名未知内容来强行通过。现有 Mole CLI 应保留，不能为制造“首次安装”结果而卸载它。未知 CLI 版本在运行时应停止，不升级或降级来绕过适配器。
 
-## 2. 明确同意安装，并验证重复运行
+## 手动备用 2：明确同意安装，并验证重复运行
 
 只有在你审核并同意计划后运行：
 
@@ -37,7 +49,7 @@ sh examples/is-clean-my-mac/install.sh --plan
 sh examples/is-clean-my-mac/install.sh
 ```
 
-在安装器提示处**亲自输入 `INSTALL`**。这仅同意展示的依赖安装，不同意任何磁盘扫描或清理。不要用管道自动填入同意。
+手动运行时在提示处输入 `INSTALL`；委托 Agent 时，Agent 可在你已明确批准当前精确计划后提交这一确认，无需你亲自键入。不得在真正批准前自动填入、伪造同意或绕过宿主审批。这仅覆盖展示的依赖安装，不同意磁盘扫描或清理。
 
 - Mole CLI 缺失时，安装器运行官方 `brew install mole`；此真实缺失分支此前仅有模拟覆盖，等待你的 MacBook 验证。
 - Mole CLI 已存在时仅检查版本，保留现有安装；该情况不能算作缺失分支验收。
@@ -52,7 +64,7 @@ sh examples/is-clean-my-mac/install.sh
 
 若发现本地修改或来源冲突，停止是预期行为。不要要求安装器覆盖来“修复”它。
 
-## 3. 启动全新的本地 Codex 会话
+## 手动备用 3：启动全新的本地 Codex 会话
 
 结束旧会话，按你平时的方式在本地 Codex CLI 启动新会话。确认可用 Skills 列表同时包含：
 
@@ -65,7 +77,7 @@ sh examples/is-clean-my-mac/install.sh
 
 文件存在不等于当前会话已发现。若其中一个缺失，先停在发现问题，不运行原始 Mole 命令作为替代。无需把登录信息、令牌或原始安装日志发给模型。
 
-## 4. 验证只读 helper 与不确定性护栏
+## 手动备用 4：验证只读 helper 与不确定性护栏
 
 从仓库根运行合成 fixture 测试：
 
@@ -73,7 +85,7 @@ sh examples/is-clean-my-mac/install.sh
 PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v
 ```
 
-当前预期 23 个测试通过，包括独立 `du` 尺寸比对、配置默认/自定义根、缺失根、权限拒绝模拟、预算/超时、符号链接交换、重复 inode、隐私输出、未知状态和安装冲突。测试创建自己的临时合成 fixture，不扫描你的真实 worktree 或清理真实数据。
+当前预期 26 个测试通过，包括独立 `du` 尺寸比对、配置默认/自定义根、缺失根、权限拒绝模拟、预算/超时、符号链接交换、重复 inode、隐私输出、未知状态和安装冲突。测试创建自己的临时合成 fixture，不扫描你的真实 worktree 或清理真实数据。
 
 再运行未提供已验证根的 helper：
 
@@ -85,7 +97,7 @@ python3 -B examples/is-clean-my-mac/.agents/skills/is-clean-my-mac/scripts/audit
 
 有实际根的后续只读测试仍只能把 `occupied_bytes` 当作占用。全部活动/Git 阻塞 UNKNOWN 必须保留，整个 worktree 不能成为删除候选。
 
-## 5. 验证 purge 安全停止，不直接运行上游 purge
+## 手动备用 5：验证 purge 安全停止，不直接运行上游 purge
 
 **不要直接运行上游 purge，连帮助和 dry-run 也不能当作无配置写入的安全检查。** 已检查的 Mole 在解析参数前加载项目配置，缺少可用配置时可能自动发现并保存根；它还可能初始化日志。当前示例没有经过验证的无配置写入隔离边界。
 
