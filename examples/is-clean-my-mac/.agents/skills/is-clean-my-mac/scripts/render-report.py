@@ -157,6 +157,8 @@ def render(data):
             key = key if isinstance(key, str) and key in LABELS else 'other'
             value = group.get('observed_bytes') if name == 'mole-analyze' else group.get('observed_candidate_estimate_bytes')
             count = group.get('measured_entries') if name == 'mole-analyze' else group.get('candidate_entries')
+            if name == 'mole-analyze' and count == 0 and group.get('unknown_entries',0) > 0:
+                value = count = None
             uncertainty = (('' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/已测子集）')
                            if name == 'mole-analyze' else '（PARTIAL/舍入估算，可能重叠）')
             lines.append(f"| {SOURCES[name]} | {LABELS[key]} | {size(value)}{uncertainty} | {number(count)} | {risk(key)} |")
@@ -193,7 +195,7 @@ def render_summary(data, plan):
             decision = '仅复核；可能个人/唯一内容，先核对用途与备份'
         elif row['source'] in ('mole-analyze', 'mole-analyze-drilldown'):
             label=('Mole 下钻：' if row['source']=='mole-analyze-drilldown' else 'Mole 占用：')+LABELS.get(key,'其他/未分类')
-            value='已测占用/下界 '+size(row.get('occupied_bytes'))
+            value='已测占用/下界 '+size(row.get('occupied_bytes'))+'（'+STATUS.get(row.get('completeness'),'UNKNOWN')+'）'
             decision='仅复核；'+risk(key)
         elif row['source']=='codex-worktree-inventory':
             label='Codex worktree';value='占用 '+size(row.get('occupied_bytes'));decision='保留；Git/活动未知，禁止整棵删除'

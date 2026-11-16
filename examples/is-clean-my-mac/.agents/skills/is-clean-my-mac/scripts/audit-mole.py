@@ -139,6 +139,8 @@ def analyze(text, stderr, version):
                    completeness='COMPLETE' if complete else 'PARTIAL',
                    reason='upstream_reports_complete' if complete else 'coverage_or_extension_unverified',
                    categories_may_overlap=True, overview=data['overview'])
+        if groups and all(g['measured_entries'] == 0 and g['unknown_entries'] > 0 for g in groups.values()):
+            out.update(occupied_bytes=None, file_count=None)
         if data.get('scan_status') == 'unavailable':
             out.update(occupied_bytes=None, file_count=None, completeness='FAILED', reason='scan_unavailable')
         else:

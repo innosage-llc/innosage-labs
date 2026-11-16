@@ -84,11 +84,14 @@ def build_plan(data, now=None, precise=None):
     sources = {s['source']:s for s in data.get('sources', [])}
     for source in (sources.get(key, {}) for key in ('mole-analyze','mole-clean','mole-purge','codex-worktree-inventory')):
         if source.get('source') == 'mole-analyze':
-            for row in source.get('categories', []):
-                add('mole-analyze', row['category'], occupied=row.get('observed_bytes'), count=row.get('measured_entries'))
-            for detail in source.get('drilldowns', []):
-                for row in detail.get('categories', []):
-                    add('mole-analyze-drilldown', row['category'], occupied=row.get('observed_bytes'), count=row.get('measured_entries'))
+            for name, groups in [('mole-analyze', source.get('categories', []))] + [
+                    ('mole-analyze-drilldown', detail.get('categories', [])) for detail in source.get('drilldowns', [])]:
+                for row in groups:
+                    unavailable = row.get('measured_entries') == 0 and row.get('unknown_entries', 0) > 0
+                    add(name, row['category'], occupied=None if unavailable else row.get('observed_bytes'),
+                        count=None if unavailable else row.get('measured_entries'))
+                    rows[-1].update(completeness=row.get('completeness', 'PARTIAL'),
+                                    unknown_entries=row.get('unknown_entries'))
             for row in source.get('file_type_inventory', {}).get('categories', []):
                 add('file-type-metadata', row['category'], occupied=row.get('allocated_bytes'), count=row.get('file_count'))
         if source.get('source') in ('mole-clean','mole-purge'):

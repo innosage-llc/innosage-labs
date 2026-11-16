@@ -63,3 +63,14 @@ class MoleFirstTests(unittest.TestCase):
         self.assertEqual(adapter.category('/PRIVATE/Movies/private-file'),'movies')
         self.assertEqual(adapter.category('/PRIVATE/unknown','PRIVATE'),'other')
         self.assertEqual(adapter.category('/PRIVATE/Library/Caches/item'),'caches')
+
+    def test_unavailable_mole_category_never_becomes_zero(self):
+        raw=json.dumps(dict(overview=True,total_size=0,scan_status='partial',entries=[dict(name='Home',path='/PRIVATE',size=-1,scan_status='unavailable')]))
+        source=adapter.parse('analyze',raw,version='1.72.0')
+        source['drilldowns']=[dict(categories=source['categories'])]
+        data=dict(sources=[source]);plan=plans.build_plan(data)
+        self.assertTrue(all(row['occupied_bytes'] is None and row['observed_count'] is None for row in plan['rows']))
+        self.assertTrue(all(row['unknown_entries']==1 for row in plan['rows']))
+        text=report.render_summary(data,plan)
+        self.assertNotIn('0 B',text);self.assertIn('UNKNOWN',text)
+        self.assertNotIn('| 0 B',report.render(data))
