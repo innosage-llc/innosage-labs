@@ -18,7 +18,7 @@ Host: Apple Silicon macOS, Python 3.9; engineering/review GPT-6.1 Sol Medium. Ex
 
 Local suite uses disposable, test-owned fixture homes under physical system TMPDIR. It covers public/private binding, exact selected rows, mixed blocked rows, expiry/replay, identity/permission/ACL/ancestor drift, metadata drift at final unlink intent, overlapping/duplicate scopes, protected configuration appearing after capture, unselected objects/Trash, BUSY/UNKNOWN visibility, failures after removal, torn journals and subprocess crashes at five transitions. No cache contents are read by production code.
 
-Native opt-in tests run real renameatx_np/ACL/unlink/lsof/statvfs, including complete CLI preflight/acknowledgement/apply workers and a real second process holding an unselected approved object open. Only the account-home resolver is substituted to a fixture in child processes; production confirmation, selection and mutation controls remain intact. Synthetic API tests inject CLEAR where appropriate and do not claim real lsof coverage.
+Native opt-in tests run real renameatx_np/ACL/unlink/lsof/statvfs, including complete CLI preflight/acknowledgement/apply workers and a real second process holding a selected-but-busy approved object open. Only the account-home resolver is substituted to a fixture in child processes; production confirmation, selection and mutation controls remain intact. Synthetic API tests inject CLEAR where appropriate and do not claim real lsof coverage.
 
 Commands:
 
