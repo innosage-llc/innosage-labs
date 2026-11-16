@@ -1,0 +1,20 @@
+{
+  "actual_freed_bytes": null,
+  "candidate_estimate_bytes": null,
+  "command": "mo analyze --json",
+  "completeness": "PARTIAL",
+  "duration_seconds": 0.498276,
+  "error_category": "upstream_schema_has_no_coverage_proof",
+  "exact_scope_available": false,
+  "file_count": 1,
+  "measurement": "Mole-reported bytes or rounded binary-unit preview estimate",
+  "occupied_bytes": 8192,
+  "overlapping_sources": "UNKNOWN",
+  "presence": "UNKNOWN",
+  "reason": "upstream_schema_has_no_coverage_proof",
+  "schema_version": 1,
+  "scope_verified": true,
+  "source": "mole-analyze",
+  "timeout_seconds": 60,
+  "version": "1.54.0"
+}
