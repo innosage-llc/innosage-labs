@@ -1,6 +1,6 @@
 # Managed wrapper update lifecycle — 2026-11-16
 
-Implementation evidence only; real MacBook update/discovery acceptance remains pending and #70 stays open. Engineering changed repository code and disposable fixtures, not installed Skills, packages, historical backups or user caches.
+Implementation evidence only; real MacBook update/discovery acceptance remains pending and #70 stays open. The latest real audit still does not meet the user job. This follow-up changes only update/backup UX; it is not an audit-architecture repair or Luna/Sol parity claim. Further architecture changes await separate review. Engineering changed repository code and disposable fixtures, not installed Skills, packages, historical backups or user caches.
 
 ## Upstream comparison
 

@@ -33,7 +33,7 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 ## 证据与限制
 
-此前 MacBook 实测两次暴露采集/呈现/范围问题；历史记录不等于当前验收。当前自主执行范围经新增明确批准，不再局限于 Mole-only。详见 [精确执行证据](evidence/precise-cache-execution.md)、[执行契约](.agents/skills/is-clean-my-mac/references/precise-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
+最新 MacBook 实际审核仍未达到用户目标；历史记录不等于当前验收。本次仅改善升级/备份UX，不声称审核已可用或模型效果一致；架构方向另行审核。当前自主执行范围经新增明确批准，不再局限于 Mole-only。详见 [精确执行证据](evidence/precise-cache-execution.md)、[执行契约](.agents/skills/is-clean-my-mac/references/precise-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
 
 四源仍为 Mole analyze、clean/purge预览及worktree清单；原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole版本支持1.54.0/1.72.0，未知版本不升级。Home文件类型使用只读文件名/stat有界枚举，PARTIAL只代表已测子集；不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
 
