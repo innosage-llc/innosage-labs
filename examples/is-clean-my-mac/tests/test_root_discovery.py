@@ -47,24 +47,104 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIsNone(meta['workspace_count'])
         self.assertEqual(meta['root_source'], 'CODEX_HOME_environment')
 
-    def test_invalid_metadata_stops_even_with_environment(self):
+    def test_invalid_optional_metadata_preserves_environment_root(self):
         self.metadata(['relative'])
-        with self.assertRaisesRegex(ValueError, '^unsupported_app_root_metadata$'):
-            helper.discover_root({'CODEX_HOME': str(self.codex)}, self.home)
+        root, meta = helper.discover_root({'CODEX_HOME': str(self.codex)}, self.home)
+        self.assertEqual(root, self.codex / 'worktrees')
+        self.assertIsNone(meta['workspace_count'])
+        self.assertEqual(meta['workspace_metadata_status'], 'unsupported_workspace_roots_format')
 
-    def test_symlink_metadata_is_never_followed(self):
+    def test_symlink_metadata_is_never_followed_or_used_to_corroborate(self):
         (self.home / 'outside').write_text('{}')
+        (self.codex / 'worktrees').mkdir()
         (self.codex / '.codex-global-state.json').symlink_to(self.home / 'outside')
-        with self.assertRaisesRegex(ValueError, '^app_root_metadata_unavailable_or_invalid$'):
+        with self.assertRaisesRegex(ValueError, '^root_configuration_not_verified$'):
+            helper.discover_root({}, self.home)
+        root, meta = helper.discover_root({'CODEX_HOME': str(self.codex)}, self.home)
+        self.assertIsNone(meta['workspace_count'])
+        self.assertEqual(meta['workspace_metadata_status'], 'missing_nonregular_or_link')
+
+    def test_oversize_and_malformed_metadata_need_physical_default_root(self):
+        file = self.codex / '.codex-global-state.json'
+        for raw in (b' ' * (4 * 1024 * 1024 + 1), b'malformed secret text'):
+            with self.subTest(size=len(raw)):
+                file.write_bytes(raw)
+                with self.assertRaisesRegex(ValueError, '^root_configuration_not_verified$'):
+                    helper.discover_root({}, self.home)
+        (self.codex / 'worktrees').mkdir()
+        root, meta = helper.discover_root({}, self.home)
+        self.assertEqual(root, self.codex / 'worktrees')
+        self.assertIsNone(meta['workspace_count'])
+        self.assertEqual(meta['discovery_metadata_completeness'], 'PARTIAL')
+        self.assertNotIn('secret', json.dumps(meta))
+
+    def test_unreadable_regular_metadata_with_physical_root_preserves_inventory(self):
+        self.metadata()
+        (self.codex / 'worktrees').mkdir()
+        real_open = helper.os.open
+        def deny_metadata(path, *args, **kwargs):
+            if path == '.codex-global-state.json':
+                raise PermissionError('private diagnostic must stay local')
+            return real_open(path, *args, **kwargs)
+        with patch.object(helper.os, 'open', deny_metadata):
+            root, meta = helper.discover_root({}, self.home)
+        self.assertEqual(root, self.codex / 'worktrees')
+        self.assertIsNone(meta['workspace_count'])
+        self.assertEqual(meta['workspace_metadata_status'], 'unreadable_invalid_or_over_budget')
+        self.assertNotIn('private', json.dumps(meta))
+
+    def test_unknown_workspace_formats_keep_actual_worktree_measurements(self):
+        repo = self.codex / 'worktrees/slot/synthetic'
+        repo.mkdir(parents=True)
+        (repo / '.git').write_text('marker')
+        (repo / 'payload').write_bytes(b'x' * 8192)
+        file = self.codex / '.codex-global-state.json'
+        env = dict(os.environ, HOME=str(self.home))
+        env.pop('CODEX_HOME', None)
+        for data in ({}, {'electron-saved-workspace-roots': None},
+                     {'electron-saved-workspace-roots': {'local': ['/private/synthetic']}}, []):
+            with self.subTest(metadata_type=type(data).__name__):
+                file.write_text(json.dumps(data))
+                run = subprocess.run([sys.executable, '-B', str(SCRIPT)], capture_output=True, text=True, env=env)
+                self.assertEqual(run.returncode, 0, run.stdout)
+                result = json.loads(run.stdout)
+                self.assertEqual(result['worktree_count'], 1)
+                self.assertEqual(result['worktree_count_completeness'], 'COMPLETE')
+                self.assertGreaterEqual(result['occupied_bytes'], 8192)
+                self.assertEqual(result['presence'], 'PRESENT')
+                self.assertIsNone(result['workspace_count'])
+                self.assertEqual(result['workspace_count_completeness'], 'UNKNOWN')
+                self.assertEqual(result['discovery_metadata_completeness'], 'PARTIAL')
+                self.assertEqual(result['other_host_or_custom_root_coverage'], 'UNKNOWN')
+                self.assertNotIn(str(self.home), run.stdout)
+                self.assertNotIn('/private/synthetic', run.stdout)
+
+    def test_metadata_swapped_to_link_cannot_corroborate_fallback(self):
+        self.metadata()
+        (self.codex / 'worktrees').mkdir()
+        marker = self.codex / '.codex-global-state.json'
+        outside = self.home / 'outside'
+        outside.write_text('{}')
+        real_open = helper.os.open
+        def swap_metadata(path, *args, **kwargs):
+            if path == '.codex-global-state.json':
+                marker.unlink()
+                marker.symlink_to(outside)
+            return real_open(path, *args, **kwargs)
+        with patch.object(helper.os, 'open', swap_metadata):
+            with self.assertRaisesRegex(ValueError, '^root_configuration_not_verified$'):
+                helper.discover_root({}, self.home)
+
+    def test_physical_root_without_app_metadata_is_not_authority(self):
+        (self.codex / 'worktrees').mkdir()
+        with self.assertRaisesRegex(ValueError, '^root_configuration_not_verified$'):
             helper.discover_root({}, self.home)
 
-    def test_oversize_and_malformed_metadata_fail_closed(self):
-        file = self.codex / '.codex-global-state.json'
-        file.write_bytes(b' ' * (4 * 1024 * 1024 + 1))
-        with self.assertRaisesRegex(ValueError, '^unsupported_app_root_metadata$'):
-            helper.discover_root({}, self.home)
-        file.write_text('malformed secret text')
-        with self.assertRaisesRegex(ValueError, '^app_root_metadata_unavailable_or_invalid$'):
+    def test_symlink_worktree_root_cannot_corroborate_unknown_metadata(self):
+        self.metadata(['relative'])
+        (self.home / 'outside').mkdir()
+        (self.codex / 'worktrees').symlink_to(self.home / 'outside', target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, '^root_configuration_not_verified$'):
             helper.discover_root({}, self.home)
 
     def test_default_cli_inventory_is_automatic_redacted_and_read_only(self):

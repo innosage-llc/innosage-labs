@@ -1,0 +1,9 @@
+{
+  "actual_release_not_false_zero": true,
+  "inline_numbered_rows": true,
+  "numbered_type_table": true,
+  "purge_exit23": true,
+  "purge_stage": true,
+  "workspace_count": true,
+  "worktree_count": true
+}

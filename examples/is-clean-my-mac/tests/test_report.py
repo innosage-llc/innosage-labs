@@ -33,3 +33,18 @@ class ReportTests(unittest.TestCase):
         text = renderer.render(dict(sources=[dict(source='codex-worktree-inventory', completeness='FAILED', observed_allocated_bytes=0)]))
         self.assertNotIn('0 B', text)
         self.assertNotIn('至少 0', text)
+
+    def test_numbered_inline_types_and_failure_diagnostics_not_only_artifact(self):
+        approvals = load('summary_approvals', SCRIPTS / 'approval-plan.py')
+        data = dict(sources=[dict(source='mole-analyze',completeness='PARTIAL',file_type_inventory=dict(completeness='PARTIAL',categories=[dict(category='video',allocated_bytes=91234567,file_count=4)])),
+            dict(source='mole-purge',completeness='FAILED',reason='command_failed',command_stage='audit',command_exit_code=7,diagnostic_categories=['permission_denied','PRIVATE']),
+            dict(source='codex-worktree-inventory',completeness='PARTIAL',worktree_count=3,worktree_count_completeness='COMPLETE',observed_allocated_bytes=987654)])
+        plan=approvals.build_plan(data,now=1000)
+        text=renderer.render_summary(data,plan)
+        self.assertIn('| 1 | 文件类型：视频 |',text)
+        self.assertIn('91,234,567',text)
+        self.assertIn('退出码：7',text)
+        self.assertIn('权限拒绝',text)
+        self.assertIn('worktree 3',text)
+        self.assertIn('均没有已验证的精确清理操作',text)
+        self.assertNotIn('PRIVATE',text)
