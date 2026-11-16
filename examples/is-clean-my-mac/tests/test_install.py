@@ -107,7 +107,7 @@ class InstallerTests(unittest.TestCase):
             self.invoke()
         self.assertEqual(path.read_text(), 'local modification')
 
-    def test_explicit_managed_update_preserves_old_copy_and_cli(self):
+    def test_explicit_managed_update_retires_only_transaction_copy_and_preserves_cli(self):
         self.invoke()
         source = self.home / 'new-canonical-wrapper'
         source.mkdir()
@@ -123,8 +123,8 @@ class InstallerTests(unittest.TestCase):
                 self.invoke(update=True, answer='no')
             self.invoke(update=True)
         backups = list(self.target.parent.glob('is-clean-my-mac-backup-*'))
-        self.assertEqual(len(backups), 1)
-        self.assertEqual(installer.digest(backups[0]), old)
+        self.assertEqual(backups, [])
+        self.assertFalse((self.target.parent/installer.UPDATE_DIR).exists())
         self.assertEqual(installer.digest(self.target / 'is-clean-my-mac'), installer.digest(source))
         self.assertFalse(any(c[0] in ('brew', 'npx') for c in self.commands))
 

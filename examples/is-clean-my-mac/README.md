@@ -10,7 +10,7 @@ Agent 直接展示编号表：文件类型占用、缓存候选、Codex workspac
 
 > 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
 
-Agent 获取新检出、检查源码和唯一安装器，展示具体计划并在 owner 同意后操作；无需你亲自输入 INSTALL 或执行清单。保留现有 Mole CLI/官方 Skill，不升级。受管理 wrapper 用 `--update-managed --plan` 检查，再以同样标志/批准确认更新，旧文件保留在 Skills 外备份。未知/修改/链接/legacy 冲突停止。初始 URL/网络或宿主执行限制只能走准确范围审批，不关闭安全机制。
+Agent 获取新检出、检查源码和唯一安装器，展示具体计划并在 owner 同意后操作；无需你亲自输入 INSTALL 或执行清单。保留现有 Mole CLI/官方 Skill，不升级。受管理 wrapper 用 `--update-managed --plan` 检查，再以同样标志/批准确认更新，事务期间保留临时回滚；新wrapper和收据验证提交后，仅退役该事务内未改动的旧受管理副本，不再积累永久新备份。既有历史备份不处理，也不只因备份目录存在就把它报告成当前活动版本；[更新机制与上游对比](evidence/managed-update-lifecycle.md)。未知/修改/链接/legacy 冲突停止。中断时普通安装停止；Agent用同一入口的 `--recover-update --plan` 展示回滚/完成事务计划，获同意后处理，不运行包命令。未知或改动的部分副本保留诊断；仅与清单匹配的剩余子集可在恢复同意后处理。初始 URL/网络或宿主执行限制只能走准确范围审批，不关闭安全机制。
 
 更新后启动新会话发现两个 Skills，使用上面原来的短审核句即可。安装同意不授权任何缓存处理。
 
@@ -33,7 +33,7 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 ## 证据与限制
 
-此前 MacBook 实测两次暴露采集/呈现/范围问题；历史记录不等于当前验收。当前自主执行范围经新增明确批准，不再局限于 Mole-only。详见 [精确执行证据](evidence/precise-cache-execution.md)、[执行契约](.agents/skills/is-clean-my-mac/references/precise-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
+最新 MacBook 实际审核仍未达到用户目标；历史记录不等于当前验收。本次仅改善升级/备份UX，不声称审核已可用或模型效果一致；架构方向另行审核。当前自主执行范围经新增明确批准，不再局限于 Mole-only。详见 [精确执行证据](evidence/precise-cache-execution.md)、[执行契约](.agents/skills/is-clean-my-mac/references/precise-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
 
 四源仍为 Mole analyze、clean/purge预览及worktree清单；原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole版本支持1.54.0/1.72.0，未知版本不升级。Home文件类型使用只读文件名/stat有界枚举，PARTIAL只代表已测子集；不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
 

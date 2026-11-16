@@ -48,10 +48,15 @@ permission changes.
 3. Run `sh <checkout>/examples/is-clean-my-mac/install.sh --plan` yourself.
    For an owner-requested update of a receipt-verified older wrapper, inspect
    `--update-managed --plan` and use the SAME flag for the consent execution.
-   This updates only the InnoSage wrapper, preserving the previous copy in a
-   unique sibling backup outside discoverable skills; Mole and its Skill stay
-   unchanged. Local edits, unknown receipts and conflicts still stop. Disclose
-   the backup, replacement and receipt writes in the exact update plan. Never
+   This updates only the receipt-verified InnoSage wrapper. A private temporary
+   rollback exists during the transaction; after the replacement and receipt are
+   verified, only that transaction's unchanged managed old copy is retired. One
+   active wrapper remains; historical backups are never touched or counted as
+   active installs merely because a backup directory exists. Verify actual Skill
+   discovery; a historical backup is not the current installation target. Mole and its
+   Skill stay unchanged. Local edits, unknown receipts and conflicts still stop.
+   Disclose replacement, receipt/recovery writes and temporary-copy retirement
+   in the exact update plan. Never
    overwrite/reset the source checkout or silently update existing Skills.
    Then start the SAME canonical entrypoint without --plan using a tool that lets
    you read its plan and withhold stdin. It repeats preflight. If it exits 0
@@ -70,6 +75,11 @@ permission changes.
    incomplete process that ended before consent and before installation began;
    repeat preflight and compare the new plan. Changed scope needs renewed approval.
    Never restart successful no-ops or blindly retry partial/failed installations.
+   A pending managed update blocks normal installation. Inspect the SAME entrypoint
+   with --recover-update --plan; it proposes rollback before commit or finishing a
+   verified committed update, without package commands. Obtain scoped consent for
+   that recovery before submitting INSTALL. Unknown or modified partial copies remain preserved for diagnosis; verified
+   manifest-matching remaining subsets may be reconciled after recovery consent; never manually remove a pending state or old backup.
    If the host cannot control stdin or safely run the command, explain that exact
    limitation; do not invent a --yes flag, self-approve, or weaken sandbox policy.
 5. Let the installer fetch the official Mole Skill using its pinned official
