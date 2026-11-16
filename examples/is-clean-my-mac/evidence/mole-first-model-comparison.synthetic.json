@@ -8,12 +8,14 @@
       "model": "gpt-6-luna",
       "reasoning": "xhigh",
       "mode": "official_skill_baseline",
-      "numbered_inline": true,
+      "numbered_inline": false,
       "worktree_count": 11,
       "worktree_observed_bytes": 17000000000,
       "workspace_unknown": true,
       "purge_failure_reported": true,
-      "overlap_and_no_cleanup_preserved": true
+      "overlap_and_no_cleanup_preserved": true,
+      "worktree_lower_bound_preserved": false,
+      "category_interpretation_issue": "User essentials preview heading interpreted as important user content; fixture category is user caches/logs"
     },
     {
       "model": "gpt-6.1-sol",
@@ -24,7 +26,8 @@
       "worktree_observed_bytes": 17000000000,
       "workspace_unknown": true,
       "purge_failure_reported": true,
-      "overlap_and_no_cleanup_preserved": true
+      "overlap_and_no_cleanup_preserved": true,
+      "worktree_lower_bound_preserved": true
     },
     {
       "model": "gpt-6-luna",
@@ -40,7 +43,8 @@
       "exact_row_identity": true,
       "renderer_row_count": 9,
       "official_skill_and_reference_read": true,
-      "helper_stub_executed": true
+      "helper_stub_executed": true,
+      "worktree_lower_bound_preserved": true
     }
   ],
   "limitations": [
