@@ -1,6 +1,6 @@
 # P0 audit repair — 2026-11-16
 
-Status: implementation verification in progress; repaired MacBook end-to-end acceptance pending. Issue #70 remains open. No real cleanup, package upgrade/removal, permission change, Mole configuration modification or remote CI run.
+Status: implementation tests pass; final independent exact-head review in progress; repaired MacBook end-to-end acceptance pending. Issue #70 remains open. No real cleanup, package upgrade/removal, permission change, Mole configuration modification or remote CI run.
 
 ## Real failure and scope
 
@@ -52,3 +52,10 @@ Initial independent review at 7b82e91 required changes: covered clean rows count
 Full host clean/purge dry-run compatibility and useful four-source reporting on Jim's MacBook are pending. Unknown versions, missing physical preview parent, nested sandbox denial or upstream cwd incompatibility may stop a source. No unguarded fallback, HOME substitution, config editing, package changes or permission broadening is authorized. Fresh MacBook installation where Mole is genuinely absent remains untested; do not remove its installed CLI to manufacture that test.
 
 User handoff: agent-driven managed update from main, fresh session, then the same prompt: **全面审核我的 Mac 磁盘，给我清理计划，先不要清理。** No internal synthetic checklist is required of Jim. See MACBOOK-VERIFY.md.
+
+## Final implementation checks
+
+- Python unit/fixture suite: **58/58 PASS**.
+- Actual local skill-creator `scripts/quick_validate.py`: **Skill is valid!**
+- `git diff --check`: PASS. No remote CI was run or enabled.
+- Final runtime proof and official full-adapter fixture repeated successfully after corrections; sanitized machine-readable results: [boundary proof](p0-runtime-boundary.synthetic.json), [official 1.72 fixture](p0-official-172.synthetic.json), [Luna artifact checks](p0-luna-renderer.synthetic.json). These are synthetic scope evidence, not MacBook acceptance.

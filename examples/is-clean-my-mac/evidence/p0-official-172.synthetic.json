@@ -1,0 +1,45 @@
+{
+  "adapter_exit": 0,
+  "aggregate": {
+    "actual_freed_bytes": null,
+    "allowed_host_writes": [],
+    "candidate_estimate_bytes": null,
+    "categories": [
+      {
+        "candidate_estimate_bytes": null,
+        "category": "other",
+        "completeness": "COMPLETE",
+        "measured_entries": 1,
+        "observed_bytes": 8192,
+        "occupied_bytes": 8192,
+        "unknown_entries": 0,
+        "upstream_cleanable_entries": 0
+      }
+    ],
+    "categories_may_overlap": true,
+    "command": "mo analyze --json",
+    "completeness": "COMPLETE",
+    "duration_seconds": 0.599104,
+    "error_category": null,
+    "exact_scope_available": false,
+    "file_count": 1,
+    "measurement": "Mole-reported bytes or rounded SI decimal-unit preview estimate",
+    "occupied_bytes": 8192,
+    "overlapping_sources": "UNKNOWN",
+    "overview": false,
+    "presence": "PRESENT",
+    "reason": "upstream_reports_complete",
+    "runtime_boundary": "macOS_sandbox_deny_network_and_host_writes",
+    "schema_version": 1,
+    "scope_verified": true,
+    "source": "mole-analyze",
+    "timeout_seconds": 30.0,
+    "unknown_field_count": 0,
+    "unknown_status_count": 0,
+    "version": "1.72.0"
+  },
+  "asset_sha256": "70567f8e1b067f8289b86ff705220274f486e97572e24aa3b5f262b827fb7efe",
+  "host_cleanup": false,
+  "installed_dependency_changed": false,
+  "provenance": "official V1.72.0 source+digest-verified arm64 release, temporary task assembly, synthetic 8KiB only"
+}
