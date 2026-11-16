@@ -171,7 +171,7 @@ def main():
                   root_source='explicit_verified_override' if args.root else 'confirmed_CODEX_HOME_convention',
                   error_category=None if result['completeness'] == 'COMPLETE' else result['reasons'][0])
     print(json.dumps(result, sort_keys=True))
-    return 0 if result['completeness'] == 'COMPLETE' else 2
+    return 0 if args.worker or result['completeness'] == 'COMPLETE' else 2
 
 
 if __name__ == '__main__':

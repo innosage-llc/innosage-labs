@@ -128,6 +128,19 @@ class InventoryTests(unittest.TestCase):
         (self.root / 'slot/unknown').mkdir(parents=True)
         self.assertEqual(helper.inventory(self.root)['completeness'], 'PARTIAL')
 
+    def test_cli_partial_preserves_worker_json(self):
+        self.fixture()
+        before = snapshot(self.root)
+        run = subprocess.run([sys.executable, '-B', str(SCRIPTS / 'audit-codex-worktrees.py'),
+                              '--root', str(self.root), '--max-entries', '1'], capture_output=True)
+        out = json.loads(run.stdout)
+        self.assertEqual(run.returncode, 2)
+        self.assertEqual(out['presence'], 'PRESENT')
+        self.assertEqual(out['completeness'], 'PARTIAL')
+        self.assertIn('scan_budget_exhausted', out['reasons'])
+        self.assertIsNone(out['occupied_bytes'])
+        self.assertEqual(snapshot(self.root), before)
+
     def test_cli_default_custom_and_unverified(self):
         script = str(SCRIPTS / 'audit-codex-worktrees.py')
         env = dict(os.environ, CODEX_HOME=str(Path(self.temp.name).resolve()))
