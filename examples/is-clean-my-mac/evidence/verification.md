@@ -54,3 +54,5 @@ No real user data was deleted, moved, renamed or cleaned; Trash untouched; no wo
 ## Targeted reporting regression
 
 After the repeated Luna wrapper reported unmeasured actual freed as 0, commit `f510abc` added explicit audit-only null output to the helper and a narrow Skill instruction to preserve it. An actual Luna Medium baseline/wrapper pair re-ran all three synthetic cases; both sessions exited 0. The wrapper unknown-freed reporting assertion PASSED in this run. See `luna-reporting-regression.synthetic.json`; this does not erase the earlier failed assertion or establish universal model parity. No real Mole command or cleanup was part of the comparison.
+
+The targeted Luna baseline also returned the same synthetic counts/sizes, while still reporting unmeasured freed space as 0. The initial baseline omission is an observation of those runs, not evidence that the official Skill can never produce worktree measurements. The wrapper supplies an explicit deterministic inventory surface; these harness prompts request structured fields and do not replace the still-unverified short-request real-Mac acceptance.
