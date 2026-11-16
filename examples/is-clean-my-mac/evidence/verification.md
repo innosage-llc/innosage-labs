@@ -14,7 +14,7 @@ Applied Codex **skill-creator** from its actual installed `SKILL.md`: concise Ch
 
 | Check | Result | Provenance / limits |
 | --- | --- | --- |
-| Python unit suite | PASS, 23 tests in follow-up; prior pinned review had 22 | `PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v` |
+| Python unit suite | PASS, 27 tests for agent-install follow-up; earlier heads had 22/23 | `PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v` |
 | Skill structure | PASS | Actual `skill-creator/scripts/quick_validate.py` against this Skill |
 | Skills CLI direct nested-path install | PASS | Actual `skills@1.8.1 add <canonical nested Skill directory> -a codex -g -y --copy` into isolated temporary HOME; see `direct-path-install.json` |
 | Shell entrypoint / installer preflight | PASS | Inspectable `sh install.sh --plan`; no writes/scans from plan |
@@ -74,3 +74,7 @@ Follow-up investigation of supported purge/configuration isolation and clean ins
 ## User-approved delivery sequence
 
 On 2026-11-16 the user chose their MacBook for post-merge verification and authorized autonomous implementation delivery to main after final checks and independent code review. [MACBOOK-VERIFY.md](../MACBOOK-VERIFY.md) gives the concrete steps and expected stop states. Earlier draft/merge-withheld decisions above describe the history, not a current unconditional merge prohibition. Safe fixture tests and structural validation remain implementation requirements; real installation and full workflow acceptance are not falsely marked passed.
+
+## One-prompt agent installation follow-up
+
+The default user route is now the raw canonical [llms.txt](../llms.txt) URL and a single Chinese prompt. The same installer accepts agent-submitted stdin only after real scoped owner approval; no --yes bypass or second installer was added. [Follow-up evidence](agent-install-entry.md) records 27 tests, actual Skill Creator validation and a two-stage independent synthetic forward test. Real MacBook installation/discovery and complete four-source acceptance remain pending.

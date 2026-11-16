@@ -7,7 +7,7 @@ description: 在本地 macOS Codex 中安全检查磁盘和 Codex worktree；用
 
 先审核，再由用户决定。读取 [审核契约](references/audit-contract.md) 和 [安全策略](references/safety-policy.md)。
 
-1. 预检本地 macOS、`mo --version`、当前会话可用的官方 `mole` Skill。缺依赖即停止，指向本例安装入口；文件已安装而会话未发现时，请用户启动新会话。读取官方 Mole Skill 及对应 macOS 参考；命令语义以安装版本的帮助为准，不能假设最新版兼容。
+1. 预检本地 macOS、`mo --version`、当前会话可用的官方 `mole` Skill。缺依赖时停止当前审核，读取 [Agent 安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt) 并在真实 owner 批准具体安装计划后代为安装，不把整份手动清单退给用户；安装不授权扫描或清理。文件已安装而会话未发现时，请用户启动新会话。读取官方 Mole Skill 及对应 macOS 参考；命令语义以安装版本的帮助为准，不能假设最新版兼容。
 2. 固定四个独立来源：Mole analyze、clean dry-run、purge dry-run、随附 worktree 清单。不得因模型认为“已覆盖”而跳过任何来源。执行前遵守下述本地隐私边界。
 3. 在本机确认 Codex 实际 worktree 根（包括 CODEX_HOME、自定义配置或主机覆盖）。运行 `python3 -B <本 Skill>/scripts/audit-codex-worktrees.py --root <已验证绝对物理根>`。没有已验证根时直接运行 helper，报告 UNKNOWN；不能猜路径、递归搜索整个用户目录或把找不到当作零。只有已确认没有主机覆盖，才可用 `--confirm-default-root`。
 4. 仅审核、未执行或未测量时，`actual_freed_bytes` 必须为 `null`（UNKNOWN）；直接保留适配器/helper 的字段，不填 0。按契约逐源报告，解释缓存重建、依赖下载、活动任务与恢复成本。worktree 占用不是可回收空间。Git 阻塞状态 UNKNOWN 是保护状态。

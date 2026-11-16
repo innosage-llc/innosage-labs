@@ -26,17 +26,19 @@ class InstallerTests(unittest.TestCase):
             (upstream / 'SKILL.md').write_text('Synthetic installer test fixture; not upstream code')
         return subprocess.CompletedProcess(command, 0, stdout='v26.13.0\n')
 
-    def invoke(self, answer='INSTALL', plan=False, missing_mole=False):
+    def invoke(self, answer='INSTALL', plan=False, missing_mole=False, agent_stdin=False):
         def which(command):
             return None if missing_mole and command == 'mo' else '/synthetic/' + command
         args = ['install.py', '--skills-dir', str(self.target)] + (['--plan'] if plan else [])
+        consent_input = (patch('sys.stdin', io.StringIO('' if answer is None else answer + '\n'))
+                         if agent_stdin else patch('builtins.input', return_value=answer))
         with patch('sys.argv', args), patch.object(installer.platform, 'system', return_value='Darwin'), \
              patch.object(installer.platform, 'mac_ver', return_value=('26.0', '', '')), \
              patch.object(installer.shutil, 'which', side_effect=which), \
              patch.object(installer, 'run', side_effect=self.fake_run), \
              patch.object(installer.Path, 'home', return_value=self.home), \
              patch.dict('os.environ', {'CODEX_HOME': str(self.home / '.codex')}), \
-             patch('builtins.input', return_value=answer), contextlib.redirect_stdout(io.StringIO()):
+             consent_input, contextlib.redirect_stdout(io.StringIO()):
             installer.main()
 
     def test_plan_and_denied_consent_no_writes(self):
@@ -47,6 +49,25 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.target.exists())
         self.assertFalse(any(c[0] == 'npx' for c in self.commands))
 
+    def test_agent_can_submit_approved_plan_acknowledgement_on_stdin(self):
+        # Synthetic owner approval fixture; never authorization for host installs.
+        self.invoke(agent_stdin=True)
+        self.assertTrue((self.target / 'mole/SKILL.md').is_file())
+        self.assertTrue((self.target / 'is-clean-my-mac/SKILL.md').is_file())
+        self.assertFalse(any(c[0] == 'brew' for c in self.commands))
+
+    def test_agent_decline_or_eof_never_installs(self):
+        for answer in ('no', None):
+            with self.assertRaises(ValueError):
+                self.invoke(answer=answer, agent_stdin=True)
+            self.assertFalse(self.target.exists())
+        self.assertFalse(any(c[0] in ('npx', 'brew') for c in self.commands))
+
+    def test_plan_does_not_require_stdin_or_write(self):
+        self.invoke(answer=None, agent_stdin=True, plan=True)
+        self.assertFalse(self.target.exists())
+        self.assertFalse(any(c[0] in ('npx', 'brew') for c in self.commands))
+
     def test_install_rerun_preserves_cli(self):
         self.invoke()
         receipt = (self.target.parent / 'is-clean-my-mac-install.json').read_bytes()
@@ -54,6 +75,12 @@ class InstallerTests(unittest.TestCase):
         self.invoke()
         self.assertEqual(receipt, (self.target.parent / 'is-clean-my-mac-install.json').read_bytes())
         self.assertFalse(any(c[0] in ('brew', 'npx') for c in self.commands))
+
+    def test_managed_noop_completes_without_stdin_or_package_commands(self):
+        self.invoke()
+        self.commands.clear()
+        self.invoke(answer=None, agent_stdin=True)
+        self.assertEqual([c[0] for c in self.commands], ['node', 'mo'])
 
     def test_missing_cli_uses_only_brew_install(self):
         self.invoke(missing_mole=True)
