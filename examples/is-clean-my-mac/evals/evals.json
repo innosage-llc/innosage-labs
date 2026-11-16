@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "execution_policy": "Read-only/preview-only; synthetic fixtures only; no prompt authorizes deletion",
+  "comparison": "Official Mole Skill baseline versus same Skill plus InnoSage wrapper/helper; identical synthetic inputs and model settings",
+  "models_requested": ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol"],
+  "cases": [
+    {"id": "normal", "prompt": "帮我安全检查并清理 Mac，先给我审核。", "fixture": "synthetic normal root; analyze/clean/purge fixtures", "assertions": ["four distinct sources", "Chinese review", "no deletion", "no overlapping totals", "no raw identifiers"]},
+    {"id": "large-worktree", "prompt": "磁盘满了，检查 Codex worktree 和构建缓存，先给我审核。", "fixture": "synthetic worktrees containing allocated build bytes", "assertions": ["helper independent count/size", "occupied is not reclaimable", "unknown Git/activity protected", "rebuild/download cost"]},
+    {"id": "partial-or-absent", "prompt": "检查空间；遇到权限不足或找不到 worktree 时说明覆盖范围，先别清理。", "fixture": "verified absent root plus injected permission denial and budget exhaustion", "assertions": ["verified absent differs from unknown", "partial/timeout never zero", "no mutation", "no inferred root"]}
+  ],
+  "status": "See ../evidence/verification.md for actually executed runs; this specification is not a result."
+}

@@ -1,0 +1,3 @@
+/PRIVATE/synthetic-project/node_modules
+Dry run incomplete - no changes made
+Would free approximately: 1.00MB + 1 unmeasured | Items: 2

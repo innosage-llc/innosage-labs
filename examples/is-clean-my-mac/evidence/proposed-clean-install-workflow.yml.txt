@@ -1,0 +1,63 @@
+# PROPOSAL ONLY. Not in .github/workflows; not activated or executed.
+# Requires explicit approval for this temporary CI scope addition.
+# Place in .github/workflows only after approval; remove after acceptance.
+name: Temporary issue-70 missing-CLI acceptance
+on:
+  pull_request:
+    paths:
+      - 'examples/is-clean-my-mac/**'
+      - '.github/workflows/issue-70-clean-install.yml'
+permissions:
+  contents: read
+jobs:
+  missing-cli:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_UPGRADE: '1'
+      HOMEBREW_NO_ANALYTICS: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Require genuine missing Mole and supported prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          command -v brew >/dev/null
+          command -v python3 >/dev/null
+          node -e 'const [a,b]=process.versions.node.split(".").map(Number);if(a<22||(a===22&&b<20))process.exit(1)'
+          if command -v mo >/dev/null || brew list --formula mole >/dev/null 2>&1; then
+            echo 'STOP: runner is not a genuine missing-Mole environment'
+            exit 1
+          fi
+      - name: Provision explicitly declared Codex prerequisite in runner scratch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/issue-70-codex" @openai/codex@0.163.0 --no-audit --no-fund
+          echo "$RUNNER_TEMP/issue-70-codex/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Run actual installer and idempotent rerun with local-only raw logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/issue-70/.agents/skills"
+          printf 'INSTALL\n' | sh examples/is-clean-my-mac/install.sh --skills-dir "$target" > "$RUNNER_TEMP/issue-70-install.log" 2>&1
+          cp "$RUNNER_TEMP/issue-70/.agents/is-clean-my-mac-install.json" "$RUNNER_TEMP/issue-70-before.json"
+          sh examples/is-clean-my-mac/install.sh --skills-dir "$target" > "$RUNNER_TEMP/issue-70-rerun.log" 2>&1
+          cmp "$RUNNER_TEMP/issue-70-before.json" "$RUNNER_TEMP/issue-70/.agents/is-clean-my-mac-install.json"
+          python3 - <<'PY'
+          import json, os, pathlib, re, subprocess
+          target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'issue-70/.agents/skills'
+          version = subprocess.check_output(['mo', '--version'], text=True)
+          match = re.search(r'Mole version (\d+\.\d+\.\d+)', version)
+          assert match
+          assert all((target / x / 'SKILL.md').is_file() for x in ('mole', 'is-clean-my-mac'))
+          assert subprocess.run(['brew', 'list', '--formula', 'mole'], capture_output=True).returncode == 0
+          print(json.dumps({'missing_cli_install': 'PASS', 'mole_version': match[1], 'skills_present': True, 'receipt_unchanged_on_rerun': True, 'real_mac_audit': 'NOT_RUN'}))
+          PY
+# No sudo, package removal/upgrade, configuration changes, mo purge/help,
+# disk audit, credentials, API authentication, or cleanup in this proposal.
