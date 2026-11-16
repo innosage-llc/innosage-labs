@@ -1,6 +1,6 @@
 # Acceptance-gate investigation — 2026-11-16 follow-up
 
-Status: **not resolved; no host purge/help invocation; no host configuration or package change**. This investigation did not lower issue #70's DoD.
+Capability status: **purge boundary unresolved; no host purge/help invocation; no host configuration or package change**. The user subsequently authorized merging the safe implementation before MacBook verification. That changes delivery order, not the remaining acceptance DoD.
 
 ## Purge boundary
 
@@ -32,7 +32,7 @@ No Tart, UTM, Parallels, VMware, Lima or VirtualBuddy environment/tool was found
 
 A [standard GitHub-hosted macOS arm64 VM](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) is a viable proposed clean test environment. The public repository is accessible, but it currently has no workflow for this acceptance test. The CLI credential's read of repository Actions policy returned HTTP 403; this says the policy lookup was denied, not that all Actions execution is disabled. No policy/settings change, credential replacement, workflow activation or denied-operation retry was performed.
 
-**Smallest proposed scope addition:** authorize one temporary, secret-free macOS arm64 Actions job, or provide an already provisioned disposable Mac with Homebrew, Node 22.20+, Python and Codex but no Mole. The reviewable [workflow proposal](proposed-clean-install-workflow.yml.txt) is deliberately outside `.github/workflows` and has not run. It proves only the actual missing-CLI branch, not Founder-Mac purge or a fresh authenticated one-line audit. It aborts if Mole is already present and never uninstalls/upgrades it to manufacture a clean state.
+**Historical option, not selected:** a temporary, secret-free macOS arm64 Actions job or an already provisioned disposable Mac could exercise the genuinely missing-CLI branch. The user has now selected their MacBook for post-merge verification; no CI activation or VM provisioning is authorized or planned. The reviewable [workflow proposal](proposed-clean-install-workflow.yml.txt) is deliberately outside `.github/workflows` and has not run. It proves only the actual missing-CLI branch, not Founder-Mac purge or a fresh authenticated one-line audit. It aborts if Mole is already present and never uninstalls/upgrades it to manufacture a clean state.
 
 ## Current gate disposition
 
@@ -42,13 +42,13 @@ A [standard GitHub-hosted macOS arm64 VM](https://docs.github.com/en/actions/ref
 | Genuine missing-CLI Homebrew installation | NOT RUN; needs the proposed disposable environment |
 | Fresh one-line real-Mac four-source workflow | NOT VERIFIED; purge dependency remains |
 | Existing Mole and user configuration | Preserved |
-| PR merge / issue closure | Withheld; draft PR and open issue retained |
+| Implementation merge / issue closure | Implementation merge authorized after final checks and code review; issue remains open for real acceptance |
 
 ## Concrete skill-creator and reviewer provenance
 
 Applied the installed Codex `skill-creator/SKILL.md`: concise routing, progressive disclosure, deterministic scripts for fragile behavior, execution/validation of scripts, meaningful invariant tests and independent forward-testing. The actual built-in validator was executed from `${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py`; it returned `Skill is valid!`. The latest follow-up Python suite contains 23 passing tests, including the upstream SI-unit conversion correction found during this research. No costly model comparison was repeated.
 
-The independent GPT-6.1 Sol Medium reviewer had no substantive findings at `a3add924`; it explicitly withheld merge approval for these material gates. Follow-up changes receive a new pinned review; earlier review is not represented as covering a later head.
+The independent GPT-6.1 Sol Medium reviewer had no substantive findings at `a3add924`; it withheld merge approval under the earlier sequence; the subsequent user-approved delivery order allows implementation merge while preserving these acceptance gaps. Follow-up changes receive a new pinned review; earlier review is not represented as covering a later head.
 
 ## Minimal safe user verification
 

@@ -2,13 +2,15 @@
 
 Codex 中的一句“帮我安全检查并清理 Mac，先给我审核”，应触发四个独立来源：Mole 磁盘分析、缓存预览、项目构建产物预览，以及确定性的 Codex worktree 清单。这个例子提供中文编排 Skill、只读聚合 helper 和可检查的依赖安装入口。
 
-**验证中的 P0 原型，尚未满足 issue #70 的全部合并门槛。** 见 [实际验证记录](evidence/verification.md)。当前摘要不足以授权精确清理；不会自动清理 Mac，也不保证可回收空间。
+**带安全停止点的 P0 实现；用户已批准先合并实现，再在 MacBook 验证安装与行为。实机验收仍待完成，issue #70 保持打开。** 见 [实际验证记录](evidence/verification.md)。当前摘要不足以授权精确清理；不会自动清理 Mac，也不保证可回收空间。
 
 ## 支持环境
 
 本地 macOS 12+、Codex CLI、Homebrew、Node.js 22.20+ / npm/npx、Python 3.9+。Apple Silicon 上测试；Intel、云端磁盘访问、Windows/Linux 未支持或未验收。安装器不会安装这些前置工具、提权或授予 Full Disk Access。
 
 Mole CLI 是外部依赖，现有安装保留，不静默升级。适配器识别 1.54.0 与 1.72.0：1.54.0 有实机合成目录分析；1.72.0 schema 仅用官方文档与合成 fixture 验证，不能称为实机兼容验收。其他版本失败关闭。
+
+按用户批准的交付顺序，查看 [MacBook 合并后验证步骤](MACBOOK-VERIFY.md)。该步骤只验证本版已实现的安装、发现、只读 helper 和失败关闭行为；不会绕过 purge 停止点。
 
 ## 一次安装入口
 
@@ -43,7 +45,7 @@ sh examples/is-clean-my-mac/install.sh
 
 > 帮我安全检查并清理 Mac，先给我审核。
 
-Skill 读取官方 Mole 的本版本指导，固定调用三个聚合适配器及 worktree helper。示例：
+这是目标工作流的入口，不是当前完整四源能力已验收的声明。Skill 按固定来源检查三个聚合适配器及 worktree helper；当前 purge 会安全停止，缺少已验证范围时其他来源也保留 UNKNOWN/PARTIAL。MacBook 首次验证请先按上面的专门指南执行，不运行真实清理。helper 示例：
 
 ```sh
 python3 -B examples/is-clean-my-mac/.agents/skills/is-clean-my-mac/scripts/audit-codex-worktrees.py --root /已本地确认的物理根
@@ -64,7 +66,7 @@ python3 -B examples/is-clean-my-mac/.agents/skills/is-clean-my-mac/scripts/audit
 
 Mole 命令的原始输出只进本地有大小限制的临时 spool，返回白名单聚合字段。未知版本、格式、命令失败或未确认 purge 根时停止。1.54 分析 schema 没有覆盖证明，故为 PARTIAL；clean/purge 摘要不能证明精确候选范围或消除重叠，也始终 PARTIAL。不能将摘要相加、据此执行删除或用托管模型读取原始路径来补齐信息。
 
-当前 purge 存在额外停止门槛：安装的 1.54.0 在解析帮助/预览参数前加载项目配置，自动发现根可能保存配置；1.72.0 的无配置写入执行边界也未验收。因此适配器在调用 purge（包括帮助）前返回 FAILED，而非触发配置写入。`--confirm-purge-roots` 不能绕过。**真实四源端到端门槛尚未通过，不能合并。**
+当前 purge 存在额外停止门槛：安装的 1.54.0 在解析帮助/预览参数前加载项目配置，自动发现根可能保存配置；1.72.0 的无配置写入执行边界也未验收。因此适配器在调用 purge（包括帮助）前返回 FAILED，而非触发配置写入。`--confirm-purge-roots` 不能绕过。**完整四源能力尚未交付：当前可验证安全停止行为，不能把实现合并当作实机验收完成。**
 
 查看 [合成演练报告](evidence/sample-report.zh.md)。它不是这台 Mac 的扫描报告。
 

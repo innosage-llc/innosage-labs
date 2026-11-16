@@ -1,6 +1,6 @@
 # Content handoff for innosage-ops #455
 
-Public artifact: `examples/is-clean-my-mac/`; the project README links source, installation, usage and exact verification limitations. This is a draft prototype and is not a publish-ready success story.
+Public artifact: `examples/is-clean-my-mac/`; the project README links source, installation, usage and exact verification limitations. This is a guarded prototype implementation, delivered separately from pending user MacBook acceptance. It is not a publish-ready full-capability success story.
 
 Supported observed claim: deterministic helper inventory added explicit worktree count/occupied bytes to the initial three controlled synthetic model comparisons where the official Mole Skill baseline reported unknown. All sizes are synthetic; occupied space is not reclaimable space. The privacy adapter publishes aggregate fields only and stops on unknown versions/unsupported boundaries.
 

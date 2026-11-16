@@ -1,6 +1,6 @@
 # Verification record — 2026-11-16
 
-Status: **DRAFT / ACCEPTANCE BLOCKED / NO REAL CLEANUP**. Passing unit tests or a completed model turn is not completion of issue #70. Do not merge until the outstanding material gates below pass.
+Status: **GUARDED IMPLEMENTATION / USER MACBOOK ACCEPTANCE PENDING / NO REAL CLEANUP**. The user explicitly approved merging the reviewed safe implementation before their MacBook installation/behavior checks. Implementation tests and independent code review gate the merge; real acceptance is tracked separately and remains incomplete. Issue #70 stays open. This sequence change does not waive the purge safety stop or establish complete four-source capability.
 
 ## Actual host and dependencies
 
@@ -29,7 +29,7 @@ Applied Codex **skill-creator** from its actual installed `SKILL.md`: concise Ch
 | Real Mole analysis on synthetic directory | PASS with honest PARTIAL | Actual `mo analyze --json <synthetic root>` through local adapter; 8192 bytes/1 file; raw path not published. See `real-mole-synthetic-analysis.json` |
 | Mole 1.72 schema | PASS synthetic only | Official V1.72.0 macOS reference + synthetic fixture; no real 1.72 CLI installed or executed |
 | Independent forward behavior | PASS within synthetic scope | Separate requested Sol Medium agent read Skill/references, parsed supplied synthetic observations, ran helper, protected unknowns and overlap; no actual Mole commands |
-| Independent code review | PASS code review at f6ae8f2; merge acceptance BLOCKED | Reviewer reproduced a path/symlink race, depth-1 false completeness, unbounded pre-worker path checks and discarded PARTIAL worker output; all corrected. Final review found no substantive code findings; this is not merge approval |
+| Independent code review | PASS historical pinned reviews; final implementation review required for current head | Reviewer reproduced a path/symlink race, depth-1 false completeness, unbounded pre-worker path checks and discarded PARTIAL worker output; all corrected. Historical reviews found no substantive code findings; the old acceptance-before-merge disposition is superseded by the user-approved sequence |
 | Diff whitespace | PASS at latest recorded run | `git diff --check` |
 
 ## Model comparison provenance
@@ -42,12 +42,12 @@ Initial comparisons used a pre-review snapshot. A repeat after the traversal cor
 
 ## Exact outstanding acceptance gates
 
-The independent reviewer re-reviewed pinned `f6ae8f22a1b4d63ff1af46f4fa63e57c88e1fb99`, found no remaining substantive code issues, and independently ran all 22 tests, structural validation and whitespace checks. It explicitly withheld merge approval for the product acceptance gates.
+The independent reviewer re-reviewed pinned `f6ae8f22a1b4d63ff1af46f4fa63e57c88e1fb99`, found no remaining substantive code issues, and independently ran all 22 tests, structural validation and whitespace checks. It withheld merge approval under the earlier acceptance-before-merge sequence. That historical disposition is retained as provenance; the user has since authorized implementation merge after final code review while acceptance remains pending.
 
 1. **Real four-source read-only Mac workflow is BLOCKED.** Installed Mole 1.54.0 `bin/purge.sh` sources `lib/clean/project.sh` before argument dispatch; that module calls `load_purge_config`, and empty/no usable configured roots may trigger `save_discovered_paths` → `write_purge_config`. Therefore even `purge --help` is not a verified no-configuration-write preflight. The adapter stops before any purge help/preview invocation, with `purge_configuration_write_boundary_unverified`. The 1.72.0 no-config-write execution boundary is unverified too. No configuration was changed to obtain an acceptance result. A proven immutable-config execution boundary or supported upstream behavior is required to unblock this test. A local system sandbox experiment denied a write to a synthetic protected configuration file without changing it; actual configured purge roots could not be verified, and this experiment did not establish full safe Mole behavior. No experimental fence was shipped or represented as acceptance.
 2. **Actual clean-environment missing-CLI installation is NOT RUN.** Real tests used empty temporary Skill directories but preserved the already installed Mole CLI. The `brew install mole` branch has only mocked coverage. No second Homebrew installation or host package removal was attempted.
 3. **Fresh one-line real-Mac workflow and final installed-version candidate scope remain NOT VERIFIED.** Fresh-session Skill discovery and synthetic comparisons passed; clean/purge actual user-data previews and real user worktree roots were not scanned. Preview summaries lack per-candidate scope/overlap evidence, so they cannot authorize exact execution.
-4. **No merge or closeout yet.** A draft PR may be reviewed, but the missing material gates cannot be replaced with unit tests or stronger model reasoning. Issue #70 must remain open until those gates pass. No deployment or social publication is authorized by this artifact.
+4. **Implementation delivery is separate from acceptance closeout.** The user will test on their MacBook after the reviewed guarded implementation reaches main. Missing-CLI installation is deferred to that verification when Mole is genuinely absent; if it is already installed, that branch remains unverified without removing it. Complete four-source capability still needs further product work on the purge boundary, and is not made available merely by testing another Mac. Keep issue #70 open; do not mark the acceptance DoD complete. No deployment, CI activation, VM setup or social publication is included.
 
 No real user data was deleted, moved, renamed or cleaned; Trash untouched; no worktree removal/pruning, system permission change, Full Disk Access grant or Mole configuration mutation. Temporary installation/evaluation fixtures were created only for this task. No guarantee is made about unobserved host activity.
 
@@ -70,3 +70,7 @@ Worktree allocated bytes and analyze JSON bytes are unchanged. No costly model
 comparison was repeated for this local arithmetic correction.
 
 Follow-up investigation of supported purge/configuration isolation and clean installation environments is in [acceptance-gate-investigation.md](acceptance-gate-investigation.md). The workflow proposal is inert evidence, not an activated CI job or a claimed acceptance pass.
+
+## User-approved delivery sequence
+
+On 2026-11-16 the user chose their MacBook for post-merge verification and authorized autonomous implementation delivery to main after final checks and independent code review. [MACBOOK-VERIFY.md](../MACBOOK-VERIFY.md) gives the concrete steps and expected stop states. Earlier draft/merge-withheld decisions above describe the history, not a current unconditional merge prohibition. Safe fixture tests and structural validation remain implementation requirements; real installation and full workflow acceptance are not falsely marked passed.
