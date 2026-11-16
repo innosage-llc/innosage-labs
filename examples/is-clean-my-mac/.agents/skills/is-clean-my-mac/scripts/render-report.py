@@ -175,7 +175,13 @@ def render_summary(data, plan):
       '| 行 | 类型/候选 | 占用或候选估算 | 条目数 | 风险/恢复与操作 |', '| --- | --- | --- | --- | --- |']
     for row in plan['rows']:
         key = row['category']
-        if row['source']=='file-type-metadata':
+        if row['source']=='precise-cache' and row.get('actionable') is True:
+            kind={'precise_homebrew_bottle':'Homebrew bottle下载缓存','precise_pip_http_body':'pip HTTP响应缓存'}.get(key,'UNKNOWN')
+            token=row.get('scope_tokens',['UNKNOWN'])[0][:8]
+            label='可执行：'+kind+' · 对象 '+token
+            value='原分配 '+size(row.get('occupied_bytes'))
+            decision='永久删除；可能需重下/离线不可用；'+number(row.get('age_days'))+'天，执行时复核'
+        elif row['source']=='file-type-metadata':
             label = '文件类型：' + FILE_TYPES.get(key,'其他/未知')
             value = '已测占用 ' + size(row.get('occupied_bytes'))
             decision = '仅复核；可能个人/唯一内容，先核对用途与备份'
@@ -188,12 +194,25 @@ def render_summary(data, plan):
         lines.append(f"| {row['row_id']} | {label} | {value} | {number(row.get('observed_count'))} | {decision} |")
     if not plan['rows']:
         lines.append('| — | UNKNOWN | UNKNOWN | UNKNOWN | 无可靠测量，不构造可批准操作 |')
+    precise=plan.get('precise_collection',{})
+    if precise:
+        labels={'precise_runtime_unavailable':'本机精确执行运行时不可用，转人工','repository_protected':'祖先为仓库，保留','unsafe_directory':'目录权限不安全，保留',
+                'mole_protection_configuration_present':'存在Mole保护配置，转人工',
+                'mole_protection_configuration_present_or_unverifiable':'Mole保护状态无法验证，转人工',
+                'custom_cache_overrides_uncovered':'自定义缓存位置未覆盖','candidate_budget_exhausted':'精确候选枚举达到预算',
+                'candidate_display_limit':'只展示最多8个精确对象','precise_candidate_collection_failed':'精确候选收集失败',
+                'cache_root_unavailable_or_unsafe':'默认缓存根不可用/不安全','candidate_entry_unavailable_or_unsafe':'部分候选不可用/不安全'}
+        reasons=[labels[x] for x in precise.get('reasons',[]) if isinstance(x,str) and x in labels]
+        lines += ['', '精确对象覆盖：'+STATUS.get(precise.get('completeness'),'UNKNOWN')+'；'+('；'.join(reasons) if reasons else '仅两个固定默认布局，未入选不表示没有缓存')+'。']
     wt=sources.get('codex-worktree-inventory',{})
     lines += ['', f"Codex workspace {number(wt.get('workspace_count'))}；worktree {number(wt.get('worktree_count'))}（数量 {STATUS.get(wt.get('worktree_count_completeness'),'UNKNOWN')}）；已测分配下界 {size(wt.get('observed_allocated_bytes') if wt.get('completeness')!='FAILED' else None)}（字节 {STATUS.get(wt.get('completeness'),'UNKNOWN')}）。", '',
       '| 来源 | 覆盖/准确失败信息 |', '| --- | --- |']
     for name,label in SOURCES.items():
         source=sources.get(name,{})
         lines.append(f"| {label} | {STATUS.get(source.get('completeness'),'UNKNOWN')}；{failure_detail(source)} |")
-    lines += ['', '当前行是复核证据，**均没有已验证的精确清理操作**。即使回复“同意第 1、2 行”，也不能改为 mo clean 或 purge --yes；它们会扩大范围，可能涉及未批准的 Trash/新候选。需要官方稳定候选 manifest/selected-ID 接口并重新核验范围，才能开启执行。',
+    actionable=any(row.get('actionable') for row in plan['rows'])
+    explanation=('仅标记“可执行”的独立下载缓存对象支持按本方案编号批准：永久删除，无成功后的自动备份；格式按目录/文件名约定识别，不保证内容。失败捕获仅用于回退/保留恢复。其他行仍只复核；绝不扩大到整类、未选对象、Trash或worktree。每个方案只能执行一批，后续需新方案。'
+                 if actionable else '当前行是复核证据，**均没有已验证的精确清理操作**。即使回复“同意第 1、2 行”，也不能改为 mo clean 或 purge --yes；它们会扩大范围，可能涉及未批准的 Trash/新候选。需要具体受支持对象并重新核验范围，才能开启执行。')
+    lines += ['', explanation,
       '本次未清理；实际释放 UNKNOWN（null），估算/占用/磁盘可用空间不混用；来源与目录用途可能重叠，不相加。先复核最大类型用途/备份，缓存与构建候选再确认活动任务、下载/编译成本。', '']
     return '\n'.join(lines)

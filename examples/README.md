@@ -6,7 +6,7 @@ This is an **index**, not a mirror. The original project README, code, versions,
 | --- | --- | --- | --- |
 | **AI Recorder** | Android screen-lock and background recording, with offline M4A playback | [Runnable Expo sample](ai-recorder/README.md) | Android first; recordings stay on the device |
 | **AI CMO Workbench (private-LAN lab)** | Expo Web/Android + Python single-process WAL + local Qwen + OpenAI CMO | [Isolated runnable example](ai-cmo-workbench/README.md) | Mac Studio/LAN only; APK first, iOS TODO; never commit real recordings/secrets |
-| **is-clean-my-mac (P0 prototype)** | 中文四源磁盘审核、只读 worktree 清单与依赖安装器 | [自包含示例](is-clean-my-mac/README.md) | 验收中；不自动清理、不保证可回收空间 |
+| **is-clean-my-mac (P0 prototype)** | 中文编号审核、只读 worktree 清单与批准后的窄范围缓存处理 | [自包含示例](is-clean-my-mac/README.md) | 实机验收中；仅精确批准对象、不保证物理释放 |
 | **Tibo Reset Post Generator** | From Tibo post evidence to a real Chinese poster and caption | [Project and Web quick start](tibo-reset-post-generator/README.md) | Checks reset claims, timestamps and image-output limitations; no bundled third-party assets |
 | **Draft Skills** | Install agent skills for Draft CLI page workflows | [Repository + installation](https://github.com/innosage-llc/draft-skills#readme) | Check the current skill version and CLI compatibility; a skill update does not automatically upgrade your runtime |
 | **InnoSage DevTools** | Run browser-based QR, document, audio, image and video tools | [Live collection](https://innosage.co/tools) · [Repository](https://github.com/innosage-llc/innosage-tools) | Browser-first/local processing where supported; review upstream privacy notes and tool-specific constraints |
