@@ -11,7 +11,7 @@ InnoSage Labs is a public collection of small tools, agent workflows, and engine
 | Artifact | When it helps | Try / read |
 | --- | --- | --- |
 | **AI CMO Workbench (LAN-only lab)** | Android capture → local Mac Qwen → OpenAI Intake → CMO → XHS review; requires private credentials, **not a hosted web tool** | [Isolated demo source](examples/ai-cmo-workbench/README.md) |
-| **is-clean-my-mac (P0 prototype)** | 中文编号审核 + 只读 worktree 清单 + 批准后的窄范围缓存处理；实机验收中 | [安装、边界与验证](examples/is-clean-my-mac/README.md) |
+| **is-clean-my-mac (P0 prototype)** | 官方 Mole 为主的中文编号审核 + 只读 worktree 清单；实机验收中 | [安装、边界与验证](examples/is-clean-my-mac/README.md) |
 | **Tibo Reset Post Generator** | Turn a sourced reset update into a genuine 3:4 Chinese poster + caption | [Try the Web-first project](examples/tibo-reset-post-generator/README.md) |
 | **Issue → PR workflow** | Give a coding agent a bounded task and demand a reviewable, evidence-backed PR | [Workflow + copy/paste prompt](workflows/issue-to-pr/README.md) |
 | **Draft Skills** | Work with Draft pages from supported agent/CLI environments | [Install and compatibility guide](https://github.com/innosage-llc/draft-skills#readme) |

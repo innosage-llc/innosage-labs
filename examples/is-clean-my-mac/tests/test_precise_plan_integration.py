@@ -200,7 +200,7 @@ class PrecisePlanIntegrationTests(unittest.TestCase):
             return subprocess.CompletedProcess(command,0,stdout=json.dumps(summary).encode())
         self.plan_path.unlink() # runner publishes a new exclusive plan in this owned fixture
         stdout=io.StringIO()
-        with patch.object(runner,'run_all',return_value=self.data),patch.object(runner.subprocess,'run',side_effect=collect),patch.object(runner.tempfile,'mkdtemp',return_value=str(self.artifacts)),patch('sys.argv',['audit-all.py']),contextlib.redirect_stdout(stdout):
+        with patch.object(runner,'run_all',return_value=self.data),patch.object(runner.subprocess,'run',side_effect=collect),patch.object(runner.tempfile,'mkdtemp',return_value=str(self.artifacts)),patch('sys.argv',['audit-all.py','--precise-candidates']),contextlib.redirect_stdout(stdout):
             runner.main()
         result=json.loads(stdout.getvalue())
         public=stdout.getvalue()+Path(result['report_path']).read_text()+Path(result['plan_path']).read_text()+Path(result['aggregate_path']).read_text()
