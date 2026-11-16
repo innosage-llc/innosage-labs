@@ -79,7 +79,7 @@ class InventoryTests(unittest.TestCase):
             out = helper.inventory(self.root, **kwargs)
             self.assertEqual(out['completeness'], 'PARTIAL')
             self.assertIsNone(out['occupied_bytes'])
-            self.assertIsNone(out['worktree_count'])
+            self.assertIn(out['worktree_count_completeness'], ('COMPLETE', 'PARTIAL'))
 
     def test_symlink_and_hardlink_duplicate(self):
         repo = self.fixture()
@@ -149,9 +149,9 @@ class InventoryTests(unittest.TestCase):
         for args in (['--confirm-default-root'], ['--root', str(self.root)]):
             out = subprocess.check_output([sys.executable, '-B', script, *args], env=env)
             self.assertEqual(json.loads(out)['worktree_count'], 1)
-        out = subprocess.run([sys.executable, '-B', script], capture_output=True)
-        self.assertEqual(json.loads(out.stdout)['presence'], 'UNKNOWN')
-        self.assertEqual(out.returncode, 2)
+        out = subprocess.run([sys.executable, '-B', script], capture_output=True, env=env)
+        self.assertEqual(json.loads(out.stdout)['worktree_count'], 1)
+        self.assertEqual(out.returncode, 0)
 
 
 class AdapterTests(unittest.TestCase):
@@ -173,7 +173,7 @@ class AdapterTests(unittest.TestCase):
         self.assertIsNone(out['occupied_bytes'])
         self.assertEqual(out['completeness'], 'FAILED')
         data['scan_status'] = 'unexpected'
-        self.assertEqual(adapter.parse('analyze', json.dumps(data), version='1.72.0')['completeness'], 'FAILED')
+        self.assertEqual(adapter.parse('analyze', json.dumps(data), version='1.72.0')['completeness'], 'PARTIAL')
 
     def test_unknown_formats_fail_closed(self):
         for source in ('analyze', 'clean', 'purge'):
@@ -198,15 +198,19 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(out['completeness'], 'PARTIAL')
         self.assertEqual(adapter.parse('clean', 'Dry run complete - no changes made\nPotential space: 1MiB')['completeness'], 'FAILED')
 
-    def test_purge_stops_before_help_or_preview(self):
-        with patch.object(adapter, 'capture', return_value=(0, 'Mole version 1.54.0', False)) as capture, \
-             patch('sys.argv', ['audit-mole.py', '--source', 'purge', '--confirm-purge-roots']), \
+    def test_purge_is_guarded_including_preflight(self):
+        fixture = (BASE / 'evals/fixtures/purge-1.54.0.synthetic.txt').read_text()
+        with patch.object(adapter, 'guarded_capture', side_effect=[
+                (0, 'Mole version 1.54.0', False), (0, '--dry-run', False),
+                (0, fixture, False)]) as capture, \
+             patch('sys.argv', ['audit-mole.py', '--source', 'purge']), \
              patch('builtins.print') as output:
-            self.assertEqual(adapter.main(), 2)
-        self.assertEqual(capture.call_count, 1)
+            self.assertEqual(adapter.main(), 0)
+        self.assertEqual(capture.call_count, 3)
         out = json.loads(output.call_args.args[0])
-        self.assertEqual(out['reason'], 'purge_configuration_write_boundary_unverified')
-        self.assertEqual(out['completeness'], 'FAILED')
+        self.assertEqual(out['completeness'], 'PARTIAL')
+        self.assertFalse(out['scope_verified'])
+        self.assertIsNone(out['actual_freed_bytes'])
 
     def test_capture_timeout_no_raw_error(self):
         with self.assertRaises(ValueError):

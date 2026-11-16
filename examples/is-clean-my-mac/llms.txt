@@ -26,6 +26,12 @@ permission changes.
 
 ## Agent procedure
 
+0. If the INITIAL fetch of this URL, repository acquisition or a dependency fetch
+   is denied by the host sandbox/network policy, identify that exact operation
+   and use only the host-supported scoped approval flow for the required official
+   host/command. Retry only with actual approval; never disable sandbox/security,
+   switch to a credential workaround, or interpret this document as approval.
+   A denied approval is a stop, not a reason to ask the owner to run a long checklist.
 1. Confirm a local macOS Codex shell. Cloud-only/non-macOS runtimes stop with the
    specific platform reason and ask the owner to use the same prompt in local
    Codex on their Mac. Preflight requires macOS 12+, Homebrew, Node.js 22.20+
@@ -40,6 +46,13 @@ permission changes.
    before execution; reconcile any difference from the initially fetched document.
    Never pipe a download into a shell or execute an uninspected remote script.
 3. Run `sh <checkout>/examples/is-clean-my-mac/install.sh --plan` yourself.
+   For an owner-requested update of a receipt-verified older wrapper, inspect
+   `--update-managed --plan` and use the SAME flag for the consent execution.
+   This updates only the InnoSage wrapper, preserving the previous copy in a
+   unique sibling backup outside discoverable skills; Mole and its Skill stay
+   unchanged. Local edits, unknown receipts and conflicts still stop. Disclose
+   the backup, replacement and receipt writes in the exact update plan. Never
+   overwrite/reset the source checkout or silently update existing Skills.
    Then start the SAME canonical entrypoint without --plan using a tool that lets
    you read its plan and withhold stdin. It repeats preflight. If it exits 0
    with the managed components already verified and no changes needed, go directly
@@ -84,13 +97,16 @@ Skills CLI is never used to run Mole.
 
 ## Installation is not full audit acceptance
 
-Do not run mo analyze, clean/purge previews, purge help, or any cleanup to prove
-installation. The current purge adapter intentionally fails before upstream
-purge/help because upstream may save configuration before argument dispatch.
-Unknown CLI versions also fail closed. Do not bypass either stop. One-prompt
-installation does not prove four-source audit/cleanup capability. Real MacBook
-acceptance and the full purge boundary remain pending in issue #70.
-
+Do not run audits or cleanup to prove installation. Even version verification
+uses the installed wrapper's checked-in write-denial boundary, because upstream
+initialization can touch logs/cache before dispatch. Nested sandbox failure needs
+scoped host execution of the SAME guarded installer, never an unguarded retry.
+The runtime audit uses a verified macOS sandbox for all Mole commands, preserving
+HOME and denying host cache/config/log writes; clean alone permits its exact local
+preview file. Unknown versions or unavailable boundaries fail closed. One-prompt
+installation is not four-source acceptance. Jim's existing-Mole install/discovery
+passed on MacBook; the repaired audit still awaits his same short prompt in a fresh
+Luna session. Keep issue #70 open until real acceptance.
 Manual fallback and optional acceptance checks:
 https://github.com/innosage-llc/innosage-labs/blob/main/examples/is-clean-my-mac/MACBOOK-VERIFY.md
 Use that only for a necessary handoff or if the owner chooses manual operation;

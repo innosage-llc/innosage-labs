@@ -1,3 +1,5 @@
+> Current P0 audit repair evidence is in [p0-audit-repair.md](p0-audit-repair.md). The records below describe earlier delivered heads. Their unconditional purge stop and older parser limits are historical, not current implementation claims. MacBook repair acceptance remains pending.
+
 # Verification record — 2026-11-16
 
 Status: **GUARDED IMPLEMENTATION / USER MACBOOK ACCEPTANCE PENDING / NO REAL CLEANUP**. The user explicitly approved merging the reviewed safe implementation before their MacBook installation/behavior checks. Implementation tests and independent code review gate the merge; real acceptance is tracked separately and remains incomplete. Issue #70 stays open. This sequence change does not waive the purge safety stop or establish complete four-source capability.
