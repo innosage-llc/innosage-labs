@@ -1,5 +1,7 @@
 # Native iOS defaults candidate · issue51
 
+2026-11-16: scoped owner approvals applied. Android bounded native tab/configuration-recreation/stop-save/playback PASS on exact36edd2e artifact;64tests/typecheck PASS and independent review PASS. iOS permission granted but Input None produces zero-channel native converter-50; valid-input lifecycle remains blocked/unverified. No code workaround, Penpot change, merge/closure/archive. See current IOS_DEFAULTS.md and private Hub lifecycle-approved-20261116 evidence.
+
 Android follow-up: existing task-only AVD booted after disabling its per-process netsim packet-stream features, based on actual crash stacks; exact candidate APK installed/cold-launched and installed hash matched. Runtime recording remains unexercised because microphone/notification permissions are false and new grants are outside the continuation. No iOS permission or gallery changes.
 
 Current delivery2026-11-15: actual source36edd2e includes merged main2dd7d341; native Release signed Simulator build and5/5default captures PASS, Penpot saved/reopened, independent review PASS. See IOS_DEFAULTS.md. Combined Android/iOS Recorder lifecycle remains unverified: Android task emulator pre-app QEMU hangs/exit139; iOS app microphone permission dialog pending. No owner acceptance/merge/provider/physical device claim. Earlier checkpoints below are historical.
