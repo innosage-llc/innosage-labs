@@ -17,6 +17,8 @@ parser.add_argument('--workspace', type=pathlib.Path, required=True)
 parser.add_argument('--mole-skill', type=pathlib.Path, required=True,
                     help='Previously verified official upstream Mole Skill directory')
 parser.add_argument('--run-models', action='store_true')
+parser.add_argument('--models', nargs='+', choices=['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-luna'],
+                    default=['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-luna'])
 args = parser.parse_args()
 base = args.workspace.resolve()
 source = pathlib.Path(__file__).resolve().parents[1]
@@ -56,6 +58,6 @@ def run(pair):
   except subprocess.TimeoutExpired:
    return {'model_requested':model,'reasoning':'medium','mode':mode,'status':'timeout'}
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
- results=list(pool.map(run,[(m,p) for m in ['gpt-6.1-sol','gpt-6.1-terra','gpt-6-luna'] for p in ['baseline','wrapper']]))
+ results=list(pool.map(run,[(m,p) for m in args.models for p in ['baseline','wrapper']]))
 (base/'run-status.json').write_text(json.dumps(results,indent=2))
 print(json.dumps(results))

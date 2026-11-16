@@ -57,22 +57,22 @@
           "id": "normal",
           "worktree_count": 1,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "large-worktree",
           "worktree_count": 1,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "partial-or-absent",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         }
       ]
     },
@@ -85,22 +85,22 @@
           "id": "normal",
           "worktree_count": 1,
           "occupied_bytes": 12288,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "large-worktree",
           "worktree_count": 1,
           "occupied_bytes": 8392704,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "partial-or-absent",
           "worktree_count": 0,
           "occupied_bytes": 0,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         }
       ]
     },
@@ -113,22 +113,22 @@
           "id": "normal",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "large-worktree",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "partial-or-absent",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         }
       ]
     },
@@ -141,22 +141,22 @@
           "id": "normal",
           "worktree_count": 1,
           "occupied_bytes": 12288,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         },
         {
           "id": "large-worktree",
           "worktree_count": 1,
           "occupied_bytes": 8392704,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         },
         {
           "id": "partial-or-absent",
           "worktree_count": 0,
           "occupied_bytes": 0,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         }
       ]
     },
@@ -169,22 +169,22 @@
           "id": "normal",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "large-worktree",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         },
         {
           "id": "partial-or-absent",
           "worktree_count": null,
           "occupied_bytes": null,
-          "actual_freed_bytes": 0,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
         }
       ]
     },
@@ -197,26 +197,27 @@
           "id": "normal",
           "worktree_count": 1,
           "occupied_bytes": 12288,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         },
         {
           "id": "large-worktree",
           "worktree_count": 1,
           "occupied_bytes": 8392704,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         },
         {
           "id": "partial-or-absent",
           "worktree_count": 0,
           "occupied_bytes": 0,
-          "actual_freed_bytes": null,
-          "model_reported_no_mutations": true
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
         }
       ]
     }
   ],
   "raw_logs_published": false,
-  "models_are_requested_cli_labels_not_universal_parity_claim": true
+  "models_are_requested_cli_labels_not_universal_parity_claim": true,
+  "reporting_invariant_failure": "Repeat Luna wrapper reported 0 actual freed without measurement for all three cases; violates the UNKNOWN/null rule. These are model reports, not measured space. Historical result retained."
 }

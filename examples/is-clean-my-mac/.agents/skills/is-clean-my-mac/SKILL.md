@@ -10,7 +10,7 @@ description: 在本地 macOS Codex 中安全检查磁盘和 Codex worktree；用
 1. 预检本地 macOS、`mo --version`、当前会话可用的官方 `mole` Skill。缺依赖即停止，指向本例安装入口；文件已安装而会话未发现时，请用户启动新会话。读取官方 Mole Skill 及对应 macOS 参考；命令语义以安装版本的帮助为准，不能假设最新版兼容。
 2. 固定四个独立来源：Mole analyze、clean dry-run、purge dry-run、随附 worktree 清单。不得因模型认为“已覆盖”而跳过任何来源。执行前遵守下述本地隐私边界。
 3. 在本机确认 Codex 实际 worktree 根（包括 CODEX_HOME、自定义配置或主机覆盖）。运行 `python3 -B <本 Skill>/scripts/audit-codex-worktrees.py --root <已验证绝对物理根>`。没有已验证根时直接运行 helper，报告 UNKNOWN；不能猜路径、递归搜索整个用户目录或把找不到当作零。只有已确认没有主机覆盖，才可用 `--confirm-default-root`。
-4. 按契约逐源报告，解释缓存重建、依赖下载、活动任务与恢复成本。worktree 占用不是可回收空间。Git 阻塞状态 UNKNOWN 是保护状态。
+4. 仅审核、未执行或未测量时，`actual_freed_bytes` 必须为 `null`（UNKNOWN）；直接保留适配器/helper 的字段，不填 0。按契约逐源报告，解释缓存重建、依赖下载、活动任务与恢复成本。worktree 占用不是可回收空间。Git 阻塞状态 UNKNOWN 是保护状态。
 5. 给出中文审核表，等待用户批准当前精确候选范围内的官方支持操作。仅讨论检查或泛称“清理”不是删除授权。不能安全限定范围就停止。评估始终只读/预览，任何评估提示都不授权删除。
 6. 实际操作后，用相同测量方法复核，分别报告估算、实际释放、移入废纸篓及失败/跳过项；不自动重试跳过项。
 

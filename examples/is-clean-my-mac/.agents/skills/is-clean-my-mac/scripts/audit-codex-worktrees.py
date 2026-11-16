@@ -17,7 +17,7 @@ def empty(reason, presence='UNKNOWN', completeness='FAILED'):
                 duration_seconds=None, timeout_seconds=None, error_category=reason,
                 worktree_count=None, occupied_bytes=None, observed_allocated_bytes=0,
                 measurement='unique inode st_blocks * 512; symlinks not followed',
-                reclaimable_bytes=None, whole_worktrees_are_candidates=False,
+                reclaimable_bytes=None, actual_freed_bytes=None, whole_worktrees_are_candidates=False,
                 blockers={k: 'UNKNOWN' for k in
                           ('active', 'dirty', 'untracked', 'ignored', 'unpushed', 'detached', 'locked')})
 
