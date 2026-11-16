@@ -26,10 +26,12 @@ class InstallerTests(unittest.TestCase):
             (upstream / 'SKILL.md').write_text('Synthetic installer test fixture; not upstream code')
         return subprocess.CompletedProcess(command, 0, stdout='v26.13.0\n')
 
-    def invoke(self, answer='INSTALL', plan=False, missing_mole=False, agent_stdin=False):
+    def invoke(self, answer='INSTALL', plan=False, missing_mole=False, agent_stdin=False, update=False):
         def which(command):
             return None if missing_mole and command == 'mo' else '/synthetic/' + command
         args = ['install.py', '--skills-dir', str(self.target)] + (['--plan'] if plan else [])
+        if update:
+            args.append('--update-managed')
         consent_input = (patch('sys.stdin', io.StringIO('' if answer is None else answer + '\n'))
                          if agent_stdin else patch('builtins.input', return_value=answer))
         with patch('sys.argv', args), patch.object(installer.platform, 'system', return_value='Darwin'), \
@@ -104,6 +106,36 @@ class InstallerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.invoke()
         self.assertEqual(path.read_text(), 'local modification')
+
+    def test_explicit_managed_update_preserves_old_copy_and_cli(self):
+        self.invoke()
+        source = self.home / 'new-canonical-wrapper'
+        source.mkdir()
+        (source / 'SKILL.md').write_text('synthetic new canonical wrapper')
+        old = installer.digest(self.target / 'is-clean-my-mac')
+        self.commands.clear()
+        with patch.object(installer, 'SOURCE', source):
+            with self.assertRaises(ValueError):
+                self.invoke()
+            self.invoke(update=True, plan=True)
+            self.assertEqual(installer.digest(self.target / 'is-clean-my-mac'), old)
+            with self.assertRaises(ValueError):
+                self.invoke(update=True, answer='no')
+            self.invoke(update=True)
+        backups = list(self.target.parent.glob('is-clean-my-mac-backup-*'))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(installer.digest(backups[0]), old)
+        self.assertEqual(installer.digest(self.target / 'is-clean-my-mac'), installer.digest(source))
+        self.assertFalse(any(c[0] in ('brew', 'npx') for c in self.commands))
+
+    def test_update_never_bypasses_local_modification_protection(self):
+        self.invoke()
+        path = self.target / 'is-clean-my-mac/SKILL.md'
+        path.write_text('local owner edits')
+        with self.assertRaises(ValueError):
+            self.invoke(update=True)
+        self.assertEqual(path.read_text(), 'local owner edits')
+        self.assertFalse(list(self.target.parent.glob('is-clean-my-mac-backup-*')))
 
 
 if __name__ == '__main__':

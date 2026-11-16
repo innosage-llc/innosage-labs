@@ -15,7 +15,7 @@ def empty(reason, presence='UNKNOWN', completeness='FAILED'):
                 presence=presence, completeness=completeness, reasons=[reason],
                 command='audit-codex-worktrees.py (root redacted)', scope_verified=False,
                 duration_seconds=None, timeout_seconds=None, error_category=reason,
-                worktree_count=None, occupied_bytes=None, observed_allocated_bytes=0,
+                worktree_count=None, worktree_count_completeness='FAILED', occupied_bytes=None, observed_allocated_bytes=0,
                 measurement='unique inode st_blocks * 512; symlinks not followed',
                 reclaimable_bytes=None, actual_freed_bytes=None, whole_worktrees_are_candidates=False,
                 blockers={k: 'UNKNOWN' for k in
@@ -37,6 +37,132 @@ def open_root(root):
         raise
 
 
+def discover_root(environ=None, home=None):
+    """Read only the supported local app root metadata, never sessions/config.
+
+    Coverage is the local CODEX_HOME convention, not all remote hosts or custom
+    roots. No paths or dynamic metadata keys leave this function in the report.
+    """
+    environ = os.environ if environ is None else environ
+    home = Path.home() if home is None else home
+    configured = environ.get('CODEX_HOME')
+    codex_home = Path(configured) if configured else home / '.codex'
+    if not codex_home.is_absolute() or '..' in codex_home.parts or codex_home == Path('/'):
+        raise ValueError('invalid_CODEX_HOME')
+    metadata = dict(root_source='CODEX_HOME_environment' if configured else 'local_app_metadata_default',
+                    discovery_scope='local_CODEX_HOME_worktrees_only',
+                    other_host_or_custom_root_coverage='UNKNOWN',
+                    workspace_count=None, workspace_count_source='UNKNOWN',
+                    workspace_count_completeness='UNKNOWN')
+    fd = None
+    try:
+        fd = open_root(codex_home)
+        file_fd = os.open('.codex-global-state.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                          dir_fd=fd)
+        with os.fdopen(file_fd, 'rb') as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 4 * 1024 * 1024:
+                raise ValueError('unsupported_app_root_metadata')
+            raw = stream.read(4 * 1024 * 1024 + 1)
+            if len(raw) > 4 * 1024 * 1024:
+                raise ValueError('app_root_metadata_budget_exceeded')
+            data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError('unsupported_app_root_metadata')
+        roots = data.get('electron-saved-workspace-roots')
+        if not isinstance(roots, list) or len(roots) > 10000:
+            raise ValueError('unsupported_app_root_metadata')
+        if any(not isinstance(r, str) or not Path(r).is_absolute() or '..' in Path(r).parts
+               for r in roots):
+            raise ValueError('unsupported_app_root_metadata')
+        metadata.update(workspace_count=len(set(roots)),
+                        workspace_count_source='local_app_saved_workspace_roots',
+                        workspace_count_completeness='METADATA_SNAPSHOT')
+    except FileNotFoundError:
+        if not configured:
+            raise ValueError('root_configuration_not_verified') from None
+        # Explicit CODEX_HOME is authoritative for this local convention even
+        # when the app is absent (CLI-only host); saved workspace count unknown.
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        raise ValueError('app_root_metadata_unavailable_or_invalid') from None
+    finally:
+        if fd is not None:
+            os.close(fd)
+    return codex_home / 'worktrees', metadata
+
+
+def count_layout(descriptor, seconds, max_entries=10000):
+    """Independent shallow marker pass before traversing any repository payload.
+
+    Count coverage has its own bounded 10,000-entry metadata budget. Opening is
+    descriptor-relative with inode checks; never follows links or reads .git.
+    """
+    deadline = time.monotonic() + min(seconds / 2, 2)
+    remaining = max_entries
+    count = 0
+    reasons = set()
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+    def visit(fd, depth):
+        nonlocal remaining, count
+        if depth in (1, 2):
+            if remaining <= 0 or time.monotonic() >= deadline:
+                reasons.add('count_budget_exhausted')
+                return
+            remaining -= 1
+            try:
+                marker = os.stat('.git', dir_fd=fd, follow_symlinks=False)
+            except FileNotFoundError:
+                marker = None
+            except OSError:
+                reasons.add('count_marker_inaccessible_or_changed')
+                return
+            if marker is not None:
+                if stat.S_ISREG(marker.st_mode) or stat.S_ISDIR(marker.st_mode):
+                    count += 1
+                else:
+                    reasons.add('count_invalid_or_symlink_git_marker')
+                return
+        children = []
+        with os.scandir(fd) as iterator:
+            for entry in iterator:
+                if remaining <= 0 or time.monotonic() >= deadline:
+                    reasons.add('count_budget_exhausted')
+                    return
+                remaining -= 1
+                try:
+                    children.append((entry.name, entry.stat(follow_symlinks=False)))
+                except OSError:
+                    reasons.add('count_entry_inaccessible_or_changed')
+        if depth == 2:
+            reasons.add('count_unrecognized_worktree_layout')
+            return
+        for name, info in children:
+            if stat.S_ISLNK(info.st_mode):
+                reasons.add('count_symlink_not_followed')
+            elif stat.S_ISDIR(info.st_mode):
+                child_fd = None
+                try:
+                    child_fd = os.open(name, flags, dir_fd=fd)
+                    current = os.fstat(child_fd)
+                    if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+                        reasons.add('count_entry_changed')
+                        continue
+                    visit(child_fd, depth + 1)
+                except OSError:
+                    reasons.add('count_entry_inaccessible_or_changed')
+                finally:
+                    if child_fd is not None:
+                        os.close(child_fd)
+            else:
+                reasons.add('count_unrecognized_root_contents')
+    try:
+        visit(descriptor, 0)
+    except OSError:
+        reasons.add('count_enumeration_failed')
+    return count, sorted(reasons)
+
+
 def inventory(root, seconds=10, max_entries=100000):
     out = empty('scan_started')
     deadline = time.monotonic() + seconds
@@ -50,11 +176,12 @@ def inventory(root, seconds=10, max_entries=100000):
         descriptor = open_root(root)
     except FileNotFoundError:
         out = empty('verified_root_absent', 'ABSENT', 'COMPLETE')
-        out.update(worktree_count=0, occupied_bytes=0, scope_verified=True)
+        out.update(worktree_count=0, occupied_bytes=0, scope_verified=True, worktree_count_completeness='COMPLETE')
         return out
     except OSError:
         return empty('root_inaccessible_or_symlink')
     out.update(presence='PRESENT', scope_verified=True)
+    layout_count, count_reasons = count_layout(descriptor, seconds)
 
     def visit(fd, depth, in_repo):
         nonlocal count, allocated, entries
@@ -122,11 +249,14 @@ def inventory(root, seconds=10, max_entries=100000):
         reasons.add('enumeration_failed')
     finally:
         os.close(descriptor)
+    reasons.update(count_reasons)
     complete = not reasons
     out.update(completeness='COMPLETE' if complete else 'PARTIAL',
                reasons=sorted(reasons) or ['enumerated'],
-               worktree_count=count if complete else None,
-               observed_worktree_count=count,
+               worktree_count=layout_count if not count_reasons else None,
+               worktree_count_completeness='PARTIAL' if count_reasons else 'COMPLETE',
+               worktree_count_reasons=count_reasons or ['layout_enumerated'],
+               observed_worktree_count=layout_count,
                occupied_bytes=allocated if complete else None,
                observed_allocated_bytes=allocated)
     return out
@@ -142,33 +272,54 @@ def main():
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     started = time.monotonic()
-    if args.timeout <= 0 or args.max_entries <= 0:
+    if not (0 < args.timeout <= 60 and 0 < args.max_entries <= 1000000):
         print(json.dumps(empty('invalid_budget')))
         return 2
+    if not args.worker:
+        # Root discovery itself can touch an unavailable filesystem. Keep every
+        # filesystem operation on configured roots/metadata inside this worker.
+        command = [sys.executable, '-B', os.path.abspath(__file__), '--worker',
+                   '--timeout', str(args.timeout), '--max-entries', str(args.max_entries)]
+        if args.root is not None:
+            command += ['--root', str(args.root)]
+        if args.confirm_default_root:
+            command.append('--confirm-default-root')
+        try:
+            run = subprocess.run(command, capture_output=True, timeout=args.timeout + 1)
+            result = json.loads(run.stdout)
+            if not isinstance(result, dict) or result.get('source') != 'codex-worktree-inventory':
+                raise ValueError('invalid worker result')
+        except subprocess.TimeoutExpired:
+            result = empty('worker_timeout')
+        except (OSError, ValueError):
+            result = empty('worker_failed')
+        result.update(timeout_seconds=args.timeout, duration_seconds=round(time.monotonic() - started, 6))
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result['completeness'] == 'COMPLETE' else 2
     root = args.root
+    discovery = dict(root_source='explicit_verified_override', workspace_count=None,
+                     workspace_count_source='UNKNOWN', workspace_count_completeness='UNKNOWN',
+                     discovery_scope='explicit_root_only', other_host_or_custom_root_coverage='UNKNOWN')
     if root is None:
-        if not args.confirm_default_root:
-            print(json.dumps(empty('root_configuration_not_verified')))
+        try:
+            if args.confirm_default_root:
+                root = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'worktrees'
+                discovery['root_source'] = 'confirmed_CODEX_HOME_convention'
+            else:
+                root, discovery = discover_root()
+        except ValueError as error:
+            # Only our fixed category strings; never include metadata/paths.
+            result = empty(str(error))
+            result.update(root_source='automatic_discovery_failed', workspace_count=None)
+            print(json.dumps(result, sort_keys=True))
             return 2
-        root = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'worktrees'
     if not root.is_absolute() or '..' in root.parts or root == Path('/'):
         print(json.dumps(empty('root_requires_verified_absolute_path')))
         return 2
-    if args.worker:
-        result = inventory(root, args.timeout, args.max_entries)
-    else:
-        command = [sys.executable, '-B', str(Path(__file__).resolve()), '--worker',
-                   '--root', str(root), '--timeout', str(args.timeout), '--max-entries', str(args.max_entries)]
-        try:
-            run = subprocess.run(command, capture_output=True, timeout=args.timeout + 1, check=True)
-            result = json.loads(run.stdout)
-        except subprocess.TimeoutExpired:
-            result = empty('worker_timeout')
-        except (OSError, subprocess.CalledProcessError, ValueError):
-            result = empty('worker_failed')
+    result = inventory(root, args.timeout, args.max_entries)
     result.update(timeout_seconds=args.timeout, scope_verified=result['presence'] != 'UNKNOWN',
                   duration_seconds=round(time.monotonic() - started, 6),
-                  root_source='explicit_verified_override' if args.root else 'confirmed_CODEX_HOME_convention',
+                  **discovery,
                   error_category=None if result['completeness'] == 'COMPLETE' else result['reasons'][0])
     print(json.dumps(result, sort_keys=True))
     return 0 if args.worker or result['completeness'] == 'COMPLETE' else 2

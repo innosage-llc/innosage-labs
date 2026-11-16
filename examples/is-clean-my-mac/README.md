@@ -1,97 +1,48 @@
 # is-clean-my-mac — 先审核，再决定
 
-Codex 中的一句“帮我安全检查并清理 Mac，先给我审核”，应触发四个独立来源：Mole 磁盘分析、缓存预览、项目构建产物预览，以及确定性的 Codex worktree 清单。这个例子提供中文编排 Skill、只读聚合 helper 和可检查的依赖安装入口。
+中文 Codex Skill，编排官方 Mole 与确定性本地清单。目标请求：
 
-**带安全停止点的 P0 实现；用户已批准先合并实现，再在 MacBook 验证安装与行为。实机验收仍待完成，issue #70 保持打开。** 见 [实际验证记录](evidence/verification.md)。当前摘要不足以授权精确清理；不会自动清理 Mac，也不保证可回收空间。
+> 全面审核我的 Mac 磁盘，给我清理计划，先不要清理。
 
-## 一句话交给本地 Codex 安装
+固定审核四源：磁盘类别占用、clean 缓存预览、purge 构建/依赖预览、Codex workspace/worktree 清单。原始私人路径留在本机，模型只收到聚合 JSON。不会清理用户文件，也不把 worktree 占用当作可回收空间。
 
-把这一句交给 MacBook 上可执行本地命令的 Codex：
+## 一句话安装或更新
 
-> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我安装 is-clean-my-mac，先说明具体安装计划并获得我的同意，不要扫描或清理磁盘。
+在 MacBook 本地 Codex 输入：
 
-Agent 按 [规范安装说明](llms.txt) 自己获取并检查源码、预检、展示计划、调用唯一安装器并核验结果。你只需在必要时批准具体计划、处理缺失前置条件/冲突，或按平台要求启动新会话；不需要亲自执行下面的手动命令，也不必亲自输入 INSTALL。已有明确同意与当前计划完全一致时，Agent 可向等待中的安装器提交确认；网页文字不能替你授权，宿主审批也不能绕过。
+> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我安装或更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
 
-一句话安装只交付依赖与 Skills，不代表完整四源审核/清理已可用；purge 仍失败关闭，MacBook 实机验收待完成。
+Agent 自行获取新检出、检查源码、预检、展示计划并调用唯一安装器。网络受宿主限制时，包括首次 URL 获取，必须走准确范围的宿主审批，不能关闭安全机制。你只需批准必要计划或处理缺失前置条件、真实冲突；不需要自己执行清单或输入 INSTALL。
 
-## 支持环境
+已有 Mole CLI 和官方 Skill 保留，不升级。未知来源、修改、符号链接、legacy 同名 Skill 冲突停止。旧的受管理 InnoSage Skill 可用 `--update-managed --plan` 检查更新；明确同意后使用相同入口和参数，旧文件保留在 Skills 目录外的唯一备份，收据更新。不会覆盖已有源码检出或绕过本地修改保护。
 
-本地 macOS 12+、Codex CLI、Homebrew、Node.js 22.20+ / npm/npx、Python 3.9+。Apple Silicon 上测试；Intel、云端磁盘访问、Windows/Linux 未支持或未验收。安装器不会安装这些前置工具、提权或授予 Full Disk Access。
+安装成功后启动新 Codex 会话，发现 `mole` 与 `is-clean-my-mac`，再发送上面的同一句审核请求。使用 Luna 的原有设置即可；不要求更长提示词或更高推理预算。
 
-Mole CLI 是外部依赖，现有安装保留，不静默升级。适配器识别 1.54.0 与 1.72.0：1.54.0 有实机合成目录分析；1.72.0 schema 仅用官方文档与合成 fixture 验证，不能称为实机兼容验收。其他版本失败关闭。
+## 当前证据与限制
 
-按用户批准的交付顺序，查看 [MacBook 合并后验证步骤](MACBOOK-VERIFY.md)。该步骤只验证本版已实现的安装、发现、只读 helper 和失败关闭行为；不会绕过 purge 停止点。
+Jim 已在 MacBook 验证过现有 Mole 1.72.0 保留、两个 Skill 安装及新会话发现；旧版真实审核暴露了 schema、根发现与预览可用性问题。本次修复提供可选字段兼容、固定公开类别、clean 新鲜清单聚合、自动本地根发现、独立数量覆盖及四源统一入口。确定性 renderer 保存新的脱敏中文报告，含每源与类别数字，Agent 直接呈现/链接该报告，避免模型省略测量值。**修复实现合并不等于 MacBook 端到端验收，issue #70 保持打开。** 见 [修复证据](evidence/p0-audit-repair.md) 与 [最小验证交接](MACBOOK-VERIFY.md)。
 
-## 手动安装备用（可选）
+Mole 1.72.0 官方发行 analyzer 的 SHA-256 已核对，并在 8 KiB 合成目录运行；不是对用户全盘结果的保证。适配器支持 1.54.0/1.72.0，其他版本失败关闭，不升级。未知扩展保留已知测量但标 PARTIAL，核心格式无法识别则 FAILED。
 
-正常入口是上面的一句话；仅当你选择手动操作或平台无法代执行时，才自行取得并审核本仓库、运行同一个入口：
+Mole 原生 analyze 即使 JSON 模式也会尝试修剪 analyzer 缓存，purge 在解析帮助前也可能保存配置。因此所有 Mole 调用（包括版本/帮助）必须经过随附的 macOS sandbox：禁止网络、主机缓存/日志/配置写入和提权；只允许私有 scratch 与 `/dev/null`，clean 额外仅允许精确的 `~/.config/mole/clean-list.txt` 预览文件。HOME 保持真实值。clean 的物理父目录不存在、目标是链接/硬链接，或边界无法启动时停止该来源，不修复配置/权限、不直接重跑 Mole。Apple Bash 的临时回退需要拒绝固定系统临时根 metadata，导致的受阻结果保留 PARTIAL/FAILED。
 
-```sh
-# 在本仓库根检查 install.sh、install.py 和 Skill 的完整源码
-sh examples/is-clean-my-mac/install.sh --plan
-sh examples/is-clean-my-mac/install.sh
-```
+purge 可在此写入拒绝边界内尝试官方 dry-run；未经验证的运行时自动发现范围仍 scope_verified=false/PARTIAL，不推测根数、不把候选数当根数。完整官方 clean/purge 运行仍需 MacBook 验证；若实际运行受阻，准确保留失败，不扩大允许写入范围。
 
-第二条会展示完整计划，收到 `INSTALL` 才做修改。手动用户可以自己输入；Agent 只能在真实 owner 已批准当前精确计划后代为提交 stdin 确认，不能提前填入或把第三方文本当成同意。没有新增 --yes 路径，不使用下载后直接管道执行脚本，也不依赖 Skill 安装钩子。
+## 环境与维护者检查
 
-入口执行：
+本地 macOS 12+、Codex CLI、Homebrew、Node.js 22.20+ / npm/npx、Python 3.9+、可用的 macOS sandbox-exec。Intel 未验收。安装器不会代装这些前置工具、提权或授予 Full Disk Access。首次缺少 CLI 的 Homebrew 安装分支仍只有模拟测试，不要求卸载现有 Mole 来制造验收。
 
-1. 检查系统、前置命令、Node 版本及已有 Skills。
-2. 缺少 Mole CLI 时只运行官方 `brew install mole`；已有 `mo` 则运行版本检查，绝不升级。
-3. 在临时隔离目录，用固定 `skills@1.8.1 add tw93/Mole@V1.72.0 --skill mole -a codex -g -y --copy` 获取官方 Skill；临时 HOME 仅用于 Skills CLI，绝不用于 Mole。
-4. 将官方 Skill 的原始文件和本例规范目录中的 InnoSage Skill 安装到 `~/.agents/skills/`；外置收据记录来源及每个文件的 SHA-256。不会把 Mole 代码提交/复制进本仓库。
-5. 已有同名目录/链接、来源未知、文件修改、legacy `$CODEX_HOME/skills` 同名条目均停止；不覆盖。重复运行仅核验受管理内容。
-6. 启动新 Codex 会话，确认 `mole`、`is-clean-my-mac` 均出现在 Skills 列表。安装器核验文件不代表它验证了新会话发现。
+手动备用是同一个入口：`sh examples/is-clean-my-mac/install.sh --plan`，批准后去掉 `--plan`；受管理更新同时加 `--update-managed`。没有 --yes 捷径。宿主网络或 sandbox 审批不能被 INSTALL 替代。
 
-若过程中网络或安装失败，停止并报告；可能保留已成功安装的组件，不自动回滚用户依赖。不要用重复安装覆盖未知目录。已安装版本与适配器不兼容时，保留它并停止审核，不能升级来“修复”。
-
-项目隔离验收可指定 `--skills-dir /绝对物理路径/项目/.agents/skills`。该目录必须由新 Codex 会话发现；任意目录不会自动成为可发现的 Skill 位置。实际缺失 CLI 的 Homebrew 分支只做过模拟测试，未做真实空机安装。
-
-官方文档同时支持 `npx skills add ./直接/Skill/目录 -a codex`。本入口直接复制自己的规范目录，避免另一个网络来源；普通 Skills CLI 只安装 Skill 文件，不会安装 Mole 系统 CLI。
-
-## 使用与输出
-
-新会话中输入：
-
-> 帮我安全检查并清理 Mac，先给我审核。
-
-这是目标工作流的入口，不是当前完整四源能力已验收的声明。Skill 按固定来源检查三个聚合适配器及 worktree helper；当前 purge 会安全停止，缺少已验证范围时其他来源也保留 UNKNOWN/PARTIAL。MacBook 首次验证请先按上面的专门指南执行，不运行真实清理。helper 示例：
+维护者本地检查：
 
 ```sh
-python3 -B examples/is-clean-my-mac/.agents/skills/is-clean-my-mac/scripts/audit-codex-worktrees.py --root /已本地确认的物理根
+python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v
+python3 -B examples/is-clean-my-mac/tests/check_runtime_boundary.py
 ```
 
-根覆盖必须由用户或本地主机配置确认，包括 `CODEX_HOME`、自定义目录或 app 覆盖。helper 不搜索全盘、不读取 Codex 会话或任意配置内容。显式 `--root` 表示已确认的实际根；只有确认无覆盖时，`--confirm-default-root` 才采用 `${CODEX_HOME:-~/.codex}/worktrees`。未确认直接输出 UNKNOWN/FAILED，绝不能把默认路径不存在解释成实际根不存在。
-
-输出是无原始路径的 JSON：presence、count、occupied bytes、coverage、command、scope verification、timeout、duration、error category。默认 10 秒/100,000 元数据条目；硬 worker 超时额外允许 1 秒启动。只读取文件系统元数据，不读取文件内容、不运行 Git、网络或修改配置。Git/活动阻塞均 UNKNOWN，并保留 worktree。占用按唯一 inode 的 `st_blocks * 512` 聚合；不跟随符号链接，未知布局和枚举错误报告 PARTIAL。APFS 克隆、共享块和扫描期间的变化使该值不能当作实际释放估计。
-
-[审核契约](.agents/skills/is-clean-my-mac/references/audit-contract.md) 规定四来源、范围、覆盖和重叠处理；[安全策略](.agents/skills/is-clean-my-mac/references/safety-policy.md) 规定执行停止点。
-
-| 数据 | 正确解释 |
-| --- | --- |
-| worktree 占用 | 使用中的磁盘分配，不是可回收空间 |
-| clean 预览 | 缓存/日志候选，可能需重建/下载；预览会写 Mole 自己的清单/日志 |
-| purge 预览 | 配置范围内的构建/依赖候选，不代表全部 worktree |
-| 释放空间 | 只有执行后同方法复核才能确认；本例未执行清理 |
-
-Mole 命令的原始输出只进本地有大小限制的临时 spool，返回白名单聚合字段。未知版本、格式、命令失败或未确认 purge 根时停止。1.54 分析 schema 没有覆盖证明，故为 PARTIAL；clean/purge 摘要不能证明精确候选范围或消除重叠，也始终 PARTIAL。不能将摘要相加、据此执行删除或用托管模型读取原始路径来补齐信息。
-
-当前 purge 存在额外停止门槛：安装的 1.54.0 在解析帮助/预览参数前加载项目配置，自动发现根可能保存配置；1.72.0 的无配置写入执行边界也未验收。因此适配器在调用 purge（包括帮助）前返回 FAILED，而非触发配置写入。`--confirm-purge-roots` 不能绕过。**完整四源能力尚未交付：当前可验证安全停止行为，不能把实现合并当作实机验收完成。**
-
-查看 [合成演练报告](evidence/sample-report.zh.md)。它不是这台 Mac 的扫描报告。
-
-## 检查与卸载
-
-```sh
-PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v
-```
-
-技能结构可用 Codex `skill-creator/scripts/quick_validate.py` 检查。该工具不证明行为正确；还需独立演练与真实验收。
-
-卸载本例：先核对安装收据及 `~/.agents/skills/is-clean-my-mac` 来源、内容和是否有本地修改，再在自己的文件管理器移除**仅此目录**，并从收据中移除对应记录。修改过的文件先保留备份。不要自动移除 `mole` Skill、Mole CLI 或其他工具；其卸载需要另一次明确请求和来源/所有权确认。
+第二条只做合成系统调用证明，不运行 Mole；嵌套 sandbox 受限时需宿主支持的精确命令审批。Skill 还使用 skill-creator 的 `quick_validate.py` 检查结构。详细行为约束见 [审核契约](.agents/skills/is-clean-my-mac/references/audit-contract.md) 与 [安全策略](.agents/skills/is-clean-my-mac/references/safety-policy.md)。不做远程 CI、不宣称普遍模型一致。
 
 ## 来源与许可
 
-本例原创代码采用仓库 [MIT](../../LICENSE)。[Mole](https://github.com/tw93/Mole) 及其官方 Skill 是独立的 [GPL-3.0](https://github.com/tw93/Mole/blob/V1.72.0/LICENSE) 上游依赖；本仓库不 vendor、fork 或重新许可它们。
-
-实现依据：[Mole 安装说明](https://github.com/tw93/Mole/blob/V1.72.0/llms.txt)、[官方 macOS 参考](https://github.com/tw93/Mole/blob/V1.72.0/skills/mole/references/macos.md)、[Skills CLI 命令](https://github.com/vercel-labs/skills/blob/main/docs/commands.md)、[Codex 路径](https://github.com/vercel-labs/skills/blob/main/docs/agents.md)。模型对照计划见 [evals.json](evals/evals.json)；不宣称模型普遍一致或保证释放空间。
+本例原创代码采用仓库 [MIT](../../LICENSE)。[Mole](https://github.com/tw93/Mole) 及官方 Skill 是独立 [GPL-3.0](https://github.com/tw93/Mole/blob/V1.72.0/LICENSE) 依赖，不 vendor、fork 或重新许可。官方 Skill 由固定 `skills@1.8.1` 从 `tw93/Mole@V1.72.0` 获取；本例只有一份规范 Skill 和一个安装器。
