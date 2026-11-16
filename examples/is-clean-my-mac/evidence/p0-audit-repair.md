@@ -1,3 +1,5 @@
+> Subsequent real MacBook regression and current file-type/numbered-row repair: [file-type-and-row-repair.md](file-type-and-row-repair.md). Previous artifact delivery evidence below does not establish current real acceptance or selected-row cleanup.
+
 # P0 audit repair — 2026-11-16
 
 Status: implementation tests pass; latest independent review and merge state are recorded in [PR #73](https://github.com/innosage-llc/innosage-labs/pull/73); repaired MacBook end-to-end acceptance pending. Issue #70 remains open. No real cleanup, package upgrade/removal, permission change, Mole configuration modification or remote CI run.

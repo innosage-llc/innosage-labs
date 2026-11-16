@@ -38,10 +38,13 @@ def open_root(root):
 
 
 def discover_root(environ=None, home=None):
-    """Read only the supported local app root metadata, never sessions/config.
+    """Discover the scoped local convention independently of workspace parsing.
 
-    Coverage is the local CODEX_HOME convention, not all remote hosts or custom
-    roots. No paths or dynamic metadata keys leave this function in the report.
+    CODEX_HOME is explicit local authority. Without it, recognized app root
+    metadata corroborates the default convention; an existing physical worktree
+    directory plus a regular app metadata file also corroborates that local root
+    when optional workspace metadata cannot be parsed. Neither proves coverage
+    of custom locations or other hosts. Never guess values in unknown formats.
     """
     environ = os.environ if environ is None else environ
     home = Path.home() if home is None else home
@@ -53,41 +56,80 @@ def discover_root(environ=None, home=None):
                     discovery_scope='local_CODEX_HOME_worktrees_only',
                     other_host_or_custom_root_coverage='UNKNOWN',
                     workspace_count=None, workspace_count_source='UNKNOWN',
-                    workspace_count_completeness='UNKNOWN')
-    fd = None
+                    workspace_count_completeness='UNKNOWN',
+                    workspace_metadata_status='unavailable',
+                    discovery_metadata_completeness='PARTIAL')
+    descriptor = None
+    metadata_regular = False
+    physical_worktrees = False
     try:
-        fd = open_root(codex_home)
-        file_fd = os.open('.codex-global-state.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                          dir_fd=fd)
-        with os.fdopen(file_fd, 'rb') as stream:
-            info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > 4 * 1024 * 1024:
-                raise ValueError('unsupported_app_root_metadata')
-            raw = stream.read(4 * 1024 * 1024 + 1)
-            if len(raw) > 4 * 1024 * 1024:
-                raise ValueError('app_root_metadata_budget_exceeded')
-            data = json.loads(raw)
-        if not isinstance(data, dict):
-            raise ValueError('unsupported_app_root_metadata')
-        roots = data.get('electron-saved-workspace-roots')
-        if not isinstance(roots, list) or len(roots) > 10000:
-            raise ValueError('unsupported_app_root_metadata')
-        if any(not isinstance(r, str) or not Path(r).is_absolute() or '..' in Path(r).parts
-               for r in roots):
-            raise ValueError('unsupported_app_root_metadata')
-        metadata.update(workspace_count=len(set(roots)),
-                        workspace_count_source='local_app_saved_workspace_roots',
-                        workspace_count_completeness='METADATA_SNAPSHOT')
-    except FileNotFoundError:
-        if not configured:
-            raise ValueError('root_configuration_not_verified') from None
-        # Explicit CODEX_HOME is authoritative for this local convention even
-        # when the app is absent (CLI-only host); saved workspace count unknown.
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        raise ValueError('app_root_metadata_unavailable_or_invalid') from None
+        descriptor = open_root(codex_home)
+        # Existence and type corroboration do not depend on readability/schema.
+        try:
+            info = os.stat('.codex-global-state.json', dir_fd=descriptor, follow_symlinks=False)
+            metadata_regular = stat.S_ISREG(info.st_mode)
+        except OSError:
+            metadata['workspace_metadata_status'] = 'missing_or_inaccessible'
+        if metadata_regular:
+            try:
+                file_fd = os.open('.codex-global-state.json',
+                                  os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=descriptor)
+                with os.fdopen(file_fd, 'rb') as stream:
+                    current = os.fstat(stream.fileno())
+                    if ((current.st_dev, current.st_ino) != (info.st_dev, info.st_ino) or
+                            not stat.S_ISREG(current.st_mode)):
+                        metadata_regular = False
+                        raise ValueError('metadata_changed')
+                    if current.st_size > 4 * 1024 * 1024:
+                        raise ValueError('metadata_budget_exceeded')
+                    raw = stream.read(4 * 1024 * 1024 + 1)
+                    if len(raw) > 4 * 1024 * 1024:
+                        raise ValueError('metadata_budget_exceeded')
+                    data = json.loads(raw)
+                roots = data.get('electron-saved-workspace-roots') if isinstance(data, dict) else None
+                if (not isinstance(roots, list) or len(roots) > 10000 or
+                        any(not isinstance(r, str) or not Path(r).is_absolute() or
+                            '..' in Path(r).parts for r in roots)):
+                    metadata['workspace_metadata_status'] = 'unsupported_workspace_roots_format'
+                else:
+                    metadata.update(workspace_count=len(set(roots)),
+                                    workspace_count_source='local_app_saved_workspace_roots',
+                                    workspace_count_completeness='METADATA_SNAPSHOT',
+                                    workspace_metadata_status='recognized',
+                                    discovery_metadata_completeness='COMPLETE')
+            except (OSError, ValueError, UnicodeError):
+                # No exception strings/raw metadata leave the helper.
+                metadata['workspace_metadata_status'] = 'unreadable_invalid_or_over_budget'
+        else:
+            metadata['workspace_metadata_status'] = 'missing_nonregular_or_link'
+        if not configured and metadata['workspace_count_completeness'] == 'UNKNOWN':
+            # A replaced/removed metadata marker cannot corroborate the fallback.
+            if metadata_regular:
+                try:
+                    latest = os.stat('.codex-global-state.json', dir_fd=descriptor, follow_symlinks=False)
+                    metadata_regular = (stat.S_ISREG(latest.st_mode) and
+                                        (latest.st_dev, latest.st_ino) == (info.st_dev, info.st_ino))
+                except OSError:
+                    metadata_regular = False
+            child = None
+            try:
+                child = os.open('worktrees', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                dir_fd=descriptor)
+                physical_worktrees = stat.S_ISDIR(os.fstat(child).st_mode)
+            except OSError:
+                pass
+            finally:
+                if child is not None:
+                    os.close(child)
+    except OSError:
+        metadata['workspace_metadata_status'] = 'codex_home_inaccessible_or_link'
     finally:
-        if fd is not None:
-            os.close(fd)
+        if descriptor is not None:
+            os.close(descriptor)
+    if not configured and metadata['workspace_count_completeness'] == 'UNKNOWN':
+        if not (metadata_regular and physical_worktrees):
+            raise ValueError('root_configuration_not_verified')
+        metadata['root_source'] = 'local_app_metadata_and_physical_worktrees_default'
     return codex_home / 'worktrees', metadata
 
 

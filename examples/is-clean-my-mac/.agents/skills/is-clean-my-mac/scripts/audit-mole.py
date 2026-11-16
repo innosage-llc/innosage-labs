@@ -18,6 +18,44 @@ LIMIT = 4 * 1024 * 1024
 ANSI = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 
 
+class CaptureDiagnostics(int):
+    """Keep the legacy stderr boolean contract while retaining redacted markers."""
+    def __new__(cls, stderr_present, categories=()):
+        value = super().__new__(cls, bool(stderr_present))
+        value.categories = tuple(categories)
+        return value
+
+
+class CaptureFailure(ValueError):
+    def __init__(self, reason, returncode=None, diagnostics=False):
+        super().__init__(reason)
+        self.returncode = returncode
+        self.diagnostics = diagnostics
+
+
+def diagnostic_markers(stdout, stderr, returncode):
+    """Observed patterns only, not root-cause claims; never retain matched text."""
+    text = (stdout + b'\n' + stderr).lower()
+    patterns = (
+        ('sandbox_initialization_denied', b'sandbox_apply: operation not permitted'),
+        ('shell_temporary_file_denied', b'cannot create temp file for here document'),
+        ('permission_denied', b'permission denied'),
+        ('operation_not_permitted', b'operation not permitted'),
+        ('read_only_filesystem', b'read-only file system'),
+        ('dependency_not_found', b'command not found'),
+        ('storage_exhausted', b'no space left on device'),
+        ('project_discovery_incomplete', b'project discovery was incomplete'),
+        ('artifacts_skipped', b'some artifacts were skipped'),
+        ('upstream_preview_incomplete', b'dry run incomplete - no changes made'),
+    )
+    markers = [label for label, needle in patterns if needle in text]
+    if returncode < 0:
+        markers.append('terminated_by_signal')
+    if returncode and not markers:
+        markers.append('unclassified_nonzero_exit')
+    return CaptureDiagnostics(bool(stderr), markers)
+
+
 def category(path, name='', overview=False):
     """Classify locally; never emit user-controlled names or paths."""
     path = path if isinstance(path, str) else ''
@@ -105,7 +143,9 @@ def result(source, reason, completeness='FAILED', version=None):
                 measurement='Mole-reported bytes or rounded SI decimal-unit preview estimate',
                 error_category=reason,
                 candidate_estimate_bytes=None, actual_freed_bytes=None,
-                exact_scope_available=False, overlapping_sources='UNKNOWN')
+                exact_scope_available=False, overlapping_sources='UNKNOWN',
+                command_stage=None, command_exit_code=None, stderr_present=False,
+                diagnostic_categories=[], diagnostic_semantics='observed_patterns_not_root_cause')
 
 
 def capture(command, timeout, env=None, cwd=None):
@@ -120,15 +160,26 @@ def capture(command, timeout, env=None, cwd=None):
         except subprocess.TimeoutExpired:
             os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
-            raise ValueError('command_timeout')
+            output.seek(0)
+            errors.seek(0)
+            observed = diagnostic_markers(output.read(LIMIT), errors.read(LIMIT), proc.returncode)
+            raise CaptureFailure('command_timeout', proc.returncode,
+                                 CaptureDiagnostics(bool(observed), (*observed.categories, 'command_timeout')))
         if output.tell() > LIMIT or errors.tell() > LIMIT:
             raise ValueError('output_budget_exceeded')
         output.seek(0)
         errors.seek(0)
         error_text = errors.read()
+        output_text = output.read()
         if proc.returncode and b'sandbox_apply: Operation not permitted' in error_text:
-            raise ValueError('runtime_sandbox_initialization_denied')
-        return proc.returncode, output.read().decode('utf-8', errors='strict'), bool(error_text)
+            raise CaptureFailure('runtime_sandbox_initialization_denied', proc.returncode,
+                                 diagnostic_markers(output_text, error_text, proc.returncode))
+        diagnostics = diagnostic_markers(output_text, error_text, proc.returncode)
+        try:
+            decoded = output_text.decode('utf-8', errors='strict')
+        except UnicodeDecodeError:
+            raise CaptureFailure('output_encoding_invalid', proc.returncode, diagnostics) from None
+        return proc.returncode, decoded, diagnostics
 
 
 PROFILE = '''(version 1)(allow default)(deny network*)
@@ -234,6 +285,18 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     text = ANSI.sub('', text)
     if source == 'purge':
         out['categories'] = purge_categories(text)
+        # V1.72.0 project.sh emits these exact terminal messages and sets
+        # no_candidates; purge.sh then returns zero without a final summary.
+        # This reports only the empty upstream observation, never exact scope.
+        empty_messages = {'✓ No old project artifacts to clean',
+                          'No eligible project artifacts to purge', 'No artifacts found to purge'}
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if version == '1.72.0' and not stderr and lines and lines[-1] in empty_messages:
+            out.update(completeness='PARTIAL', reason='upstream_no_candidates_scope_unverified',
+                       error_category='upstream_no_candidates_scope_unverified',
+                       observed_candidate_estimate_bytes=0, observed_candidate_entries=0,
+                       presence='PRESENT')
+            return out
     # Summary shape is fixed to installed 1.54.0. Keep all unmeasured/skipped
     # output conservative; a summary is not a verified per-candidate scope.
     if source == 'clean':
@@ -266,10 +329,12 @@ def main():
     started = time.monotonic()
     out = result(args.source, 'preflight_not_run')
     version_id = None
+    stage, rc, diagnostics = 'preflight', None, False
     try:
         if not 0 < args.timeout <= 300:
             raise ValueError('invalid_timeout')
-        rc, version, _ = guarded_capture(['mo', '--version'], 10)
+        stage = 'version'
+        rc, version, diagnostics = guarded_capture(['mo', '--version'], 10)
         if rc:
             raise ValueError('guarded_version_command_failed')
         match = re.search(r'Mole version (\d+\.\d+\.\d+)\b', version)
@@ -277,7 +342,8 @@ def main():
             raise ValueError('unsupported_mole_version_no_upgrade_attempted')
         version_id = match[1]
         # Even help is guarded: upstream may source configuration before dispatch.
-        rc, help_text, _ = guarded_capture(['mo', args.source, '--help'], 10)
+        stage, rc, diagnostics = 'help', None, False
+        rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], 10)
         flag = '--json' if args.source == 'analyze' else '--dry-run'
         if rc or flag not in help_text:
             raise ValueError('installed_help_incompatible')
@@ -289,11 +355,16 @@ def main():
                 raise ValueError('invalid_analyze_scope')
             command.append(str(args.analyze_root))
         preview_started = time.time_ns()
-        rc, raw, stderr = guarded_capture(command, args.timeout, args.source)
-        out = parse(args.source, raw, rc, stderr, version=match[1])
+        stage, rc, diagnostics = 'audit', None, False
+        rc, raw, diagnostics = guarded_capture(command, args.timeout, args.source)
+        out = parse(args.source, raw, rc, diagnostics, version=match[1])
         out['runtime_boundary'] = 'macOS_sandbox_deny_network_and_host_writes'
         out['allowed_host_writes'] = ['official_clean_preview_only'] if args.source == 'clean' else []
         if args.source == 'clean':
+            # Do not overwrite an upstream failure with a secondary ledger error.
+            if rc:
+                raise ValueError('command_failed')
+            stage = 'preview_readback'
             preview = Path.home() / '.config/mole/clean-list.txt'
             physical_file(preview, require_file=True)
             fd = os.open(preview, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -306,6 +377,8 @@ def main():
                     raise ValueError('preview_not_fresh_or_bounded')
                 out['categories'] = preview_categories(text.decode('utf-8'))
     except (OSError, ValueError, UnicodeError) as error:
+        if isinstance(error, CaptureFailure):
+            rc, diagnostics = error.returncode, error.diagnostics
         # Only literal codes from our own checks; never stringify raw errors.
         codes = {'invalid_timeout', 'unsupported_mole_version_no_upgrade_attempted',
                  'installed_help_incompatible', 'purge_roots_not_verified',
@@ -313,9 +386,20 @@ def main():
                  'purge_configuration_write_boundary_unverified', 'write_boundary_unavailable',
                  'preview_parent_not_physical', 'preview_target_not_regular',
                  'preview_not_published', 'preview_not_fresh_or_bounded',
-                 'runtime_sandbox_initialization_denied', 'guarded_version_command_failed'}
+                 'runtime_sandbox_initialization_denied', 'guarded_version_command_failed',
+                 'command_failed', 'output_encoding_invalid'}
         reason = error.args[0] if error.args and error.args[0] in codes else 'preflight_command_or_data_boundary_failed'
         out = result(args.source, reason, version=version_id)
+        # OS errors are classified locally; their strings and filenames stay local.
+        if isinstance(error, OSError):
+            import errno
+            marker = {errno.ENOENT: 'executable_or_file_missing', errno.EACCES: 'permission_denied',
+                      errno.EPERM: 'operation_not_permitted', errno.ENOSPC: 'storage_exhausted',
+                      errno.EROFS: 'read_only_filesystem'}.get(error.errno, 'os_operation_failed')
+            diagnostics = CaptureDiagnostics(bool(diagnostics), (*getattr(diagnostics, 'categories', ()), marker))
+    out.update(command_stage=stage, command_exit_code=rc,
+               stderr_present=bool(diagnostics),
+               diagnostic_categories=list(getattr(diagnostics, 'categories', ())))
     out.update(duration_seconds=round(time.monotonic() - started, 6), timeout_seconds=args.timeout,
                scope_verified=(args.source == 'analyze' and args.analyze_root is not None and out['completeness'] != 'FAILED'),
                error_category=None if out['completeness'] == 'COMPLETE' else out['reason'])

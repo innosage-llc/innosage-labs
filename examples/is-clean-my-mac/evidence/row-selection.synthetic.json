@@ -1,0 +1,21 @@
+{
+  "actual_freed_bytes": null,
+  "attribution": "filesystem observations include unrelated concurrent activity; no cleanup executed",
+  "mode": "no_production_cleanup_adapter",
+  "next_step": "official_preview_manifest_and_selected_ID_apply_API_required_no_broad_fallback",
+  "rows": [
+    {
+      "actual_freed_bytes": null,
+      "blocker": "aggregate_scope_not_executable",
+      "row_id": 1,
+      "status": "BLOCKED"
+    },
+    {
+      "actual_freed_bytes": null,
+      "blocker": "aggregate_scope_not_executable",
+      "row_id": 2,
+      "status": "BLOCKED"
+    }
+  ],
+  "status": "BLOCKED"
+}
