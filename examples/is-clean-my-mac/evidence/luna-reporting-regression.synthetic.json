@@ -1,0 +1,79 @@
+{
+  "evaluated_code_commit": "f510abc",
+  "scope": "targeted synthetic reporting regression; three cases per session",
+  "models_requested": [
+    "gpt-6-luna"
+  ],
+  "reasoning_setting": "medium",
+  "run_status": [
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning": "medium",
+      "mode": "baseline",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning": "medium",
+      "mode": "wrapper",
+      "exit_code": 0,
+      "final_exists": true
+    }
+  ],
+  "results": [
+    {
+      "mode": "baseline",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": 12288,
+          "model_reported_actual_freed_bytes": 0,
+          "model_reported_no_mutations": true
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": 8392704,
+          "model_reported_actual_freed_bytes": 0,
+          "model_reported_no_mutations": true
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": 0,
+          "occupied_bytes": 0,
+          "model_reported_actual_freed_bytes": 0,
+          "model_reported_no_mutations": true
+        }
+      ]
+    },
+    {
+      "mode": "wrapper",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": 12288,
+          "model_reported_actual_freed_bytes": null,
+          "model_reported_no_mutations": true
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": 8392704,
+          "model_reported_actual_freed_bytes": null,
+          "model_reported_no_mutations": true
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": 0,
+          "occupied_bytes": 0,
+          "model_reported_actual_freed_bytes": null,
+          "model_reported_no_mutations": true
+        }
+      ]
+    }
+  ],
+  "wrapper_unknown_freed_reporting_passed_this_run": true
+}

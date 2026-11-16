@@ -57,6 +57,7 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn('private-name', json.dumps(out))
         self.assertTrue(all(x == 'UNKNOWN' for x in out['blockers'].values()))
         self.assertIsNone(out['reclaimable_bytes'])
+        self.assertIsNone(out['actual_freed_bytes'])
 
     def test_direct_root_repository(self):
         self.fixture('repo')

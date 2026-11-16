@@ -16,6 +16,7 @@ Applied Codex **skill-creator** from its actual installed `SKILL.md`: concise Ch
 | --- | --- | --- |
 | Python unit suite | PASS, 22 tests at final code review | `PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s examples/is-clean-my-mac/tests -v` |
 | Skill structure | PASS | Actual `skill-creator/scripts/quick_validate.py` against this Skill |
+| Skills CLI direct nested-path install | PASS | Actual `skills@1.8.1 add <canonical nested Skill directory> -a codex -g -y --copy` into isolated temporary HOME; see `direct-path-install.json` |
 | Shell entrypoint / installer preflight | PASS | Inspectable `sh install.sh --plan`; no writes/scans from plan |
 | Independent allocated-size check | PASS | Synthetic multi-worktree inode aggregation equals platform `du -sk` measurement |
 | No content/mtime/ctime/mode change | PASS for explicit synthetic snapshot assertions | Snapshot checks on normal, duplicate/symlink and raced/unknown fixtures; this is not a full host audit |
@@ -49,3 +50,7 @@ The independent reviewer re-reviewed pinned `f6ae8f22a1b4d63ff1af46f4fa63e57c88e
 4. **No merge or closeout yet.** A draft PR may be reviewed, but the missing material gates cannot be replaced with unit tests or stronger model reasoning. Issue #70 must remain open until those gates pass. No deployment or social publication is authorized by this artifact.
 
 No real user data was deleted, moved, renamed or cleaned; Trash untouched; no worktree removal/pruning, system permission change, Full Disk Access grant or Mole configuration mutation. Temporary installation/evaluation fixtures were created only for this task. No guarantee is made about unobserved host activity.
+
+## Targeted reporting regression
+
+After the repeated Luna wrapper reported unmeasured actual freed as 0, commit `f510abc` added explicit audit-only null output to the helper and a narrow Skill instruction to preserve it. An actual Luna Medium baseline/wrapper pair re-ran all three synthetic cases; both sessions exited 0. The wrapper unknown-freed reporting assertion PASSED in this run. See `luna-reporting-regression.synthetic.json`; this does not erase the earlier failed assertion or establish universal model parity. No real Mole command or cleanup was part of the comparison.
