@@ -290,6 +290,7 @@ def process_request(args,executor=None,home=None,probe=None):
 
 def bounded_worker(arguments,acknowledgement=None,timeout=15):
     command=[sys.executable,'-B',os.path.abspath(__file__),'--worker',*arguments]
+    plan_id=arguments[arguments.index('--plan-id')+1]
     with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
         def bounded():resource.setrlimit(resource.RLIMIT_FSIZE,(1048576,1048576))
         process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=output,stderr=errors,start_new_session=True,preexec_fn=bounded)
@@ -304,10 +305,12 @@ def bounded_worker(arguments,acknowledgement=None,timeout=15):
                 or not isinstance(result.get('rows'),list)):raise ValueError('worker format')
             return result
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid,signal.SIGKILL);process.wait()
-            return dict(status='INTERRUPTED',blocker='worker_timeout_recovery_inspection_required',rows=[],actual_freed_bytes=None)
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            process.wait()
+            return dict(status='INTERRUPTED',blocker='worker_timeout_recovery_inspection_required',rows=[],actual_freed_bytes=None,recovery_plan_id=plan_id)
         except (ValueError,UnicodeError):
-            return dict(status='INTERRUPTED',blocker='worker_result_unknown_recovery_inspection_required',rows=[],actual_freed_bytes=None)
+            return dict(status='INTERRUPTED',blocker='worker_result_unknown_recovery_inspection_required',rows=[],actual_freed_bytes=None,recovery_plan_id=plan_id)
 
 
 def main():
@@ -338,4 +341,8 @@ def main():
 if __name__=='__main__':
     try:main()
     except (OSError,ValueError,KeyError,TypeError,OverflowError,RecursionError,AttributeError):
-        print(json.dumps(dict(status='BLOCKED',blocker='plan_read_or_format_failed',rows=[],actual_freed_bytes=None)))
+        uncertain='--apply' in sys.argv
+        plan_id=sys.argv[sys.argv.index('--plan-id')+1] if '--plan-id' in sys.argv and sys.argv.index('--plan-id')+1<len(sys.argv) else None
+        print(json.dumps(dict(status='INTERRUPTED' if uncertain else 'BLOCKED',
+            blocker='apply_outcome_unknown_recovery_inspection_required' if uncertain else 'plan_read_or_format_failed',
+            recovery_plan_id=plan_id,rows=[],actual_freed_bytes=None)))

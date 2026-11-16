@@ -86,3 +86,28 @@ class NativeCliTests(unittest.TestCase):
         self.assertEqual(out['rows'][1]['blocker'],'open_file_or_visibility_unknown')
         self.assertTrue(out['rows'][1]['restored'])
         self.assertEqual((home/'.Trash/PRIVATE-keep').read_bytes(),b'untouched')
+
+    def test_real_recovery_status_and_restore_workers_after_fixture_process_crash(self):
+        from test_precise_recovery import CHILD
+        home,path,plan,env,paths=self.fixture()
+        private=json.loads((path.parent/'private-candidates.json').read_text())
+        token=plan['rows'][0]['scope_tokens'][0]
+        item=next(item for item in private['objects'] if item['candidate_id']==token)
+        (home/'selection.json').write_text(json.dumps(item))
+        crashed=subprocess.run([sys.executable,'-B','-c',CHILD,str(SCRIPTS/'precise-cache.py'),str(home),'after_capture_receipt',plan['plan_id']],env=env,capture_output=True,timeout=20)
+        self.assertEqual(crashed.returncode,73)
+        self.assertFalse(paths[1].exists())
+        command=[sys.executable,'-B',str(SCRIPTS/'precise-cache.py'),'--plan-id',plan['plan_id']]
+        status=subprocess.run(command+['--recovery-status'],env=env,capture_output=True,text=True,timeout=20)
+        self.assertEqual(status.returncode,0);self.assertFalse(status.stderr)
+        out=json.loads(status.stdout)
+        self.assertEqual(out['rows'][0]['status'],'HELD_RESTORE_AVAILABLE')
+        self.assertNotIn('PRIVATE',status.stdout)
+        ack='RESTORE '+plan['plan_id']+' '+token+'\n'
+        restored=subprocess.run(command+['--restore-held',token],input=ack,env=env,capture_output=True,text=True,timeout=35)
+        self.assertEqual(restored.returncode,0);self.assertFalse(restored.stderr)
+        self.assertEqual(json.loads(restored.stdout.splitlines()[-1])['status'],'RESTORED')
+        self.assertEqual(paths[1].stat().st_ino,item['target']['st_ino'])
+        self.assertEqual(paths[1].stat().st_size,item['target']['st_size'])
+        self.assertTrue(paths[2].exists())
+        self.assertEqual((home/'.Trash/PRIVATE-keep').read_bytes(),b'untouched')

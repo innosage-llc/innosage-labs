@@ -17,6 +17,7 @@ import platform
 import pwd
 import re
 import resource
+import signal
 import stat
 import subprocess
 import sys
@@ -612,6 +613,35 @@ def collect_to(path,seconds=5):
     return public
 
 
+
+def bounded_recovery(arguments, acknowledgement=None, timeout=15):
+    """Bound recovery OS calls; any missing result remains outcome-unknown."""
+    plan_id=arguments[arguments.index('--plan-id')+1]
+    command=[sys.executable,'-B',os.path.abspath(__file__),'--recovery-worker',*arguments]
+    try:
+        with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
+            def bounded():resource.setrlimit(resource.RLIMIT_FSIZE,(1048576,1048576))
+            process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=output,stderr=errors,
+                                     start_new_session=True,preexec_fn=bounded)
+            try:
+                process.communicate(input=(acknowledgement+'\n').encode() if acknowledgement else b'',timeout=timeout)
+            except subprocess.TimeoutExpired:
+                try:os.killpg(process.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                process.wait()
+                raise ValueError('recovery timeout')
+            if process.returncode or errors.tell() or output.tell()>=1048576:raise ValueError('recovery failed')
+            output.seek(0);result=json.loads(output.read())
+            if (not isinstance(result,dict) or not set(result)<={'status','blocker','rows','actual_freed_bytes'}
+                or result.get('status') not in ('INSPECTED','BLOCKED','RESTORED','PARTIAL')
+                or not isinstance(result.get('rows'),list) or result.get('actual_freed_bytes') is not None):
+                raise ValueError('recovery format')
+            return result
+    except (OSError,ValueError,UnicodeError):
+        return dict(status='INTERRUPTED',blocker='recovery_worker_outcome_unknown',
+                    recovery_plan_id=plan_id,rows=[],actual_freed_bytes=None)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--collect-to',type=Path)
@@ -619,6 +649,7 @@ def main():
     parser.add_argument('--recovery-status',action='store_true')
     parser.add_argument('--restore-held',nargs='+',metavar='CANDIDATE_ID')
     parser.add_argument('--plan-id')
+    parser.add_argument('--recovery-worker',action='store_true',help=argparse.SUPPRESS)
     args=parser.parse_args()
     try:
         if args.restore_held:
@@ -626,18 +657,23 @@ def main():
                 or any(not re.fullmatch('[0-9a-f]{32}',token) for token in args.restore_held)):
                 raise Stop('invalid_recovery_scope')
             expected='RESTORE '+args.plan_id+' '+','.join(sorted(args.restore_held))
-            print('RESTORE_CONFIRM_PENDING '+args.plan_id,flush=True)
+            if not args.recovery_worker:print('RESTORE_CONFIRM_PENDING '+args.plan_id,flush=True)
             if sys.stdin.readline(1024).rstrip('\n')!=expected:
                 out=dict(status='BLOCKED',blocker='explicit_restore_consent_missing',rows=[],actual_freed_bytes=None)
-            else:out=restore_held(args.plan_id,args.restore_held)
+            elif args.recovery_worker:out=restore_held(args.plan_id,args.restore_held)
+            else:out=bounded_recovery(['--plan-id',args.plan_id,'--restore-held',*args.restore_held],expected,30)
         elif args.recovery_status:
-            out=recovery_status(args.plan_id)
-        elif args.collect_to is not None and 0<args.timeout<=10:
+            if not isinstance(args.plan_id,str) or not re.fullmatch('[0-9a-f]{64}',args.plan_id):raise Stop('invalid_recovery_scope')
+            out=recovery_status(args.plan_id) if args.recovery_worker else bounded_recovery(['--plan-id',args.plan_id,'--recovery-status'])
+        elif args.collect_to is not None and 0<args.timeout<=10 and not args.recovery_worker:
             out=collect_to(args.collect_to,args.timeout)
         else:raise Stop('invalid_request')
     except (OSError,Stop,ValueError,TypeError,KeyError,AttributeError,OverflowError,RecursionError):
-        out=dict(source='precise-cache-candidates',completeness='FAILED',candidates=[],
-                 reasons=['precise_candidate_collection_failed'])
+        if args.recovery_status or args.restore_held or args.recovery_worker:
+            out=dict(status='INTERRUPTED' if args.recovery_worker and args.restore_held else 'BLOCKED',
+                blocker='recovery_outcome_unknown_inspect_before_retry',recovery_plan_id=args.plan_id,rows=[],actual_freed_bytes=None)
+        else:out=dict(source='precise-cache-candidates',completeness='FAILED',candidates=[],
+                      reasons=['precise_candidate_collection_failed'])
     print(json.dumps(out,sort_keys=True))
 
 

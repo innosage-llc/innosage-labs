@@ -29,7 +29,7 @@
 
 ## 结果与验收
 
-每行区分 SUCCEEDED、BLOCKED、RECOVERY_REQUIRED、REMOVED_RECEIPT_FAILED；最后一种表示对象已删除但记录异常，不能说未改动。之前成功行不能回滚；剩余行不自动重试。超时/坏worker响应表示结果未知，先查持久恢复，不重放。
+每行区分 SUCCEEDED、BLOCKED、RECOVERY_REQUIRED、REMOVED_RECEIPT_FAILED；最后一种表示对象已删除但记录异常，不能说未改动。之前成功行不能回滚；剩余行不自动重试。执行worker上限120秒；恢复检查15秒、恢复操作30秒，也在有界worker内。超时/坏worker响应/意外apply异常返回INTERRUPTED并保留recovery_plan_id，表示结果未知，先查持久恢复，不重放。
 
 `removed_scope_allocated_bytes` 是被移除对象原有 `st_blocks*512`，不是保证物理释放。关闭本进程描述符后再测 `statvfs f_bavail*f_frsize`，分别给出前/后可用空间及差值；并发、打开引用、APFS共享和延迟使归因未知，`actual_freed_bytes=null`。持久日志/目录本身也占空间。
 

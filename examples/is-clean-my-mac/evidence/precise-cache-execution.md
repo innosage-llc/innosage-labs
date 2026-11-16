@@ -8,7 +8,7 @@ One row binds one existing ordinary file in either the fixed default Homebrew bo
 
 Public plan/hash/expiry and private manifest/digest bind category, UUID, physical identity, allocation, age, permissions, ancestor chain and pip companion metadata. Owner consent is required for the same current plan/rows; an installer approval is insufficient. Read-only preflight precedes the separate CLI stdin acknowledgement and a fresh bounded apply worker. A token confirms actual approval; software cannot create that authority.
 
-Native exclusive capture, repeated FD/name/ancestor/ACL/companion checks, bounded system lsof observation and exact unlink preserve unselected objects. Failure restores exclusively or retains a private recovery hold. Durable manifests/events and row mapping live outside caches/temp in Application Support. Successful deletion has no automatic backup. A crash/timeout does not establish that nothing changed; inspect recovery before any further request. See the [execution contract](../.agents/skills/is-clean-my-mac/references/precise-execution.md).
+Native exclusive capture, repeated FD/name/ancestor/ACL/companion checks, bounded system lsof observation and exact unlink preserve unselected objects. Apply/inspection/restore use bounded workers; timeout, malformed results or unexpected apply exceptions report INTERRUPTED with the same recovery plan ID, never assume no mutation. Failure restores exclusively or retains a private recovery hold. Durable manifests/events and row mapping live outside caches/temp in Application Support. Successful deletion has no automatic backup. A crash/timeout does not establish that nothing changed; inspect recovery before any further request. See the [execution contract](../.agents/skills/is-clean-my-mac/references/precise-execution.md).
 
 Protection is deliberately conservative: any fixed Mole whitelist file or unverifiable protection state makes precise objects manual, without reading/changing that configuration. Git ancestors, including a Home directory that is itself a repository, block execution. The development host has this condition; no real host cache collection/cleanup was used to manufacture acceptance.
 
@@ -18,7 +18,7 @@ Host: Apple Silicon macOS, Python 3.9; engineering/review GPT-6.1 Sol Medium. Ex
 
 Local suite uses disposable, test-owned fixture homes under physical system TMPDIR. It covers public/private binding, exact selected rows, mixed blocked rows, expiry/replay, identity/permission/ACL/ancestor drift, metadata drift at final unlink intent, overlapping/duplicate scopes, protected configuration appearing after capture, unselected objects/Trash, BUSY/UNKNOWN visibility, failures after removal, torn journals and subprocess crashes at five transitions. No cache contents are read by production code.
 
-Native opt-in tests run real renameatx_np/ACL/unlink/lsof/statvfs, including complete CLI preflight/acknowledgement/apply workers and a real second process holding a selected-but-busy approved object open. Only the account-home resolver is substituted to a fixture in child processes; production confirmation, selection and mutation controls remain intact. Synthetic API tests inject CLEAR where appropriate and do not claim real lsof coverage.
+Native opt-in tests run real renameatx_np/ACL/unlink/lsof/statvfs, including complete CLI preflight/acknowledgement/apply workers, process-crash to recovery-status/restore worker roundtrip, and a real second process holding a selected-but-busy approved object open. Only the account-home resolver is substituted to a fixture in child processes; production confirmation, selection and mutation controls remain intact. Synthetic API tests inject CLEAR where appropriate and do not claim real lsof coverage.
 
 Commands:
 
@@ -31,7 +31,7 @@ git diff --check
 
 The synthetic Mole runtime proof passed with host-approved execution of this exact test after the outer shell denied nested sandbox initialization. Both scratch-only and precise-clean-preview modes denied fixture overwrite/create/unlink/rename/symlink escape/child mutation, preserved synthetic analyzer cache and removed inherited overrides. Only the exact preview exception was allowed. No Mole scan/cleanup or real user file was targeted.
 
-Latest local result: **158/158 tests PASS**, including all three native opt-in tests (none skipped), actual skill-creator validator PASS, synthetic runtime-boundary proof PASS, whitespace PASS. Final exact-head review and rerun are recorded in the PR.
+Latest local result: **167/167 tests PASS**, including all four native opt-in tests (none skipped), actual skill-creator validator PASS, synthetic runtime-boundary proof PASS, whitespace PASS. Final exact-head review and rerun are recorded in the PR.
 
 Actual skill-creator instructions used: concise discriminating discovery, progressive detail in references, deterministic scripts for fragile operations, running changed scripts, meaningful invariant tests, `quick_validate.py`, and independent forward testing for risky workflows. The validator passed; it checks skill structure, not deletion safety. This updates an existing Skill, so it was not reinitialized. Independent code reviewers cross-cover components they did not author; final head/review results are recorded in the PR.
 

@@ -4,6 +4,7 @@ Successful requests are mocks. The sole real CLI subprocess exercises rejection
 before process_request and uses a nonexistent synthetic plan name.
 """
 import contextlib
+import ast
 import io
 import json
 from pathlib import Path
@@ -121,7 +122,7 @@ class PreciseCliHandshakeTests(unittest.TestCase):
 
 
 class PreciseWorkerBoundaryTests(unittest.TestCase):
-    def run_fake(self, payload, rc=0, stderr=b'', acknowledgement=None, timeout=False):
+    def run_fake(self, payload, rc=0, stderr=b'', acknowledgement=None, timeout=False, kill_error=None):
         made = {}
         class FakeProcess:
             pid = 987654321  # Never sent a real signal; killpg is always mocked.
@@ -142,7 +143,7 @@ class PreciseWorkerBoundaryTests(unittest.TestCase):
                 return self.returncode
         made['raise_timeout'] = timeout
         with patch.object(plans.subprocess, 'Popen', FakeProcess), \
-                patch.object(plans.os, 'killpg') as kill:
+                patch.object(plans.os, 'killpg', side_effect=kill_error) as kill:
             result = plans.bounded_worker(['--plan-id', PLAN], acknowledgement, timeout=0.25)
         return result, made, kill
 
@@ -168,6 +169,38 @@ class PreciseWorkerBoundaryTests(unittest.TestCase):
         self.assertEqual(result['rows'], [])
         kill.assert_called_once_with(made['process'].pid, signal.SIGKILL)
         self.assertEqual(made['process'].waited, 1)
+
+    def test_child_exit_at_timeout_preserves_uncertain_outcome_and_recovery_id(self):
+        result, made, kill = self.run_fake(b'', timeout=True, kill_error=ProcessLookupError())
+        self.assertEqual(result['status'], 'INTERRUPTED')
+        self.assertEqual(result['blocker'], 'worker_timeout_recovery_inspection_required')
+        self.assertEqual(result['recovery_plan_id'], PLAN)
+        self.assertEqual(made['process'].waited, 1)
+        self.assertIsNone(result['actual_freed_bytes'])
+
+    def test_unknown_worker_response_keeps_same_plan_for_recovery(self):
+        result, _, _ = self.run_fake(b'not-json', acknowledgement=ACK)
+        self.assertEqual(result['status'], 'INTERRUPTED')
+        self.assertEqual(result['recovery_plan_id'], PLAN)
+        self.assertIsNone(result['actual_freed_bytes'])
+
+    def test_top_level_apply_exception_is_unknown_not_no_change(self):
+        # Execute the exact existing entry guard with main mocked, rather than
+        # duplicating its exception handler in the test. No request/files run.
+        tree=ast.parse((SCRIPTS/'approval-plan.py').read_text())
+        guard=tree.body[-1]
+        self.assertIsInstance(guard,ast.If)
+        code=compile(ast.Module(body=[guard],type_ignores=[]),str(SCRIPTS/'approval-plan.py'),'exec')
+        for argv in (arguments(worker=True),arguments(worker=False)):
+            output=io.StringIO()
+            with patch.object(sys,'argv',argv),patch.object(plans,'main',side_effect=OSError('SYNTHETIC_PRIVATE')), \
+                    patch.dict(plans.__dict__,{'__name__':'__main__'}),contextlib.redirect_stdout(output):
+                exec(code,plans.__dict__)
+            result=json.loads(output.getvalue())
+            self.assertEqual(result['status'],'INTERRUPTED')
+            self.assertEqual(result['recovery_plan_id'],PLAN)
+            self.assertIsNone(result['actual_freed_bytes'])
+            self.assertNotIn('SYNTHETIC_PRIVATE',output.getvalue())
 
     def test_nonzero_stderr_bad_format_unknown_keys_and_false_release_are_interrupted(self):
         good = json.dumps(RESULT).encode()
