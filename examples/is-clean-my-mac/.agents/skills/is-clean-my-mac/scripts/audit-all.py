@@ -202,7 +202,9 @@ def main():
         ('report', report), ('details', details), ('ledger', ledger_path), ('plan', plan_path))}
     if private_review is not None:
         artifacts['private_objects'] = verify_artifact(private_review)
-    summary += '\n详情已在本机写出并检查可读；当前客户端能否打开尚未验证，临时文件可能失效。\n'
+    summary += ('\n详情已在本机写出并检查可读' if all(item['local_readable'] for item in artifacts.values())
+                else '\n部分本机详情文件可读性检查失败，不能依赖其链接')
+    summary += '；当前客户端能否打开尚未验证，临时文件可能失效。\n'
     print(json.dumps(dict(report_path=str(report), details_path=str(details), aggregate_path=str(aggregates),
         artifact_verification=artifacts,
         plan_path=str(plan_path), ledger_path=str(ledger_path), plan_id=plan['plan_id'],
