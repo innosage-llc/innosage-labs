@@ -74,6 +74,25 @@ def build_plan(data, now=None, precise=None):
                 operation='discard_download_cache_file_v1',exact_scope=True,actionable=True,blocker=None,
                 scope_tokens=[item['candidate_id']],scope_digest=item['scope_digest'],observed_count=1,
                 age_days=item.get('age_days'),recovery_cost='permanent_removal_redownload_may_be_unavailable',actual_freed_bytes=None))
+            # Decision evidence does not grant execution authority. The private
+            # manifest binds the exact file; activity/retention are not inferred
+            # from its age or layout. Existing apply-time checks remain intact.
+            stamp=precise.get('observed_at_unix')
+            if type(stamp) not in (int,float) or not math.isfinite(stamp) or not 0<=stamp<=10**12:stamp=None
+            rows[-1]['decision_evidence']=dict(
+                candidate_id=item['candidate_id'], scope_digest=item['scope_digest'],
+                scope='one_regular_file_in_fixed_supported_cache_layout',
+                allocated_bytes=item['allocated_bytes'], logical_bytes=item['logical_bytes'],
+                measurement='st_blocks_times_512_and_st_size_not_reclaim_guarantee',
+                observed_at_unix=stamp, freshness='snapshot_revalidation_required',
+                scan_completeness=precise.get('completeness') if precise.get('completeness') in ('COMPLETE','PARTIAL') else 'UNKNOWN',
+                identity='private_manifest_bound', protection='collection_checks_passed_recheck_required',
+                activity='UNKNOWN_not_checked_at_collection', retention='OWNER_DECISION_REQUIRED',
+                unique_state='format_and_age_do_not_prove_disposable',
+                recovery='permanent_no_backup_redownload_or_offline_failure',
+                overlap='may_already_be_in_clean_summary_do_not_add',
+                next_action='inspect_local_object_then_fresh_selected_preflight_and_separate_approval',
+                execution_authorized=False)
     def add(source, category, occupied=None, estimate=None, blocker='aggregate_scope_not_executable', count=None):
         rows.append(dict(row_id=len(rows)+1, source=source, category=category,
             occupied_bytes=occupied, candidate_estimate_bytes=estimate,

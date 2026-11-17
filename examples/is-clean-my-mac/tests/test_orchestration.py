@@ -20,8 +20,12 @@ class OrchestrationTests(unittest.TestCase):
             output = io.StringIO()
             with patch.object(orchestrator, 'run_all', return_value=data), \
                     patch.object(orchestrator.tempfile, 'mkdtemp', return_value=directory), \
+                    patch.object(orchestrator.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, stdout=json.dumps(dict(source='precise-cache-candidates', completeness='PARTIAL', candidates=[], reasons=[])).encode())) as candidate_run, \
                     patch('sys.argv', ['audit-all.py']), contextlib.redirect_stdout(output):
                 orchestrator.main()
+            self.assertEqual(candidate_run.call_count, 1)
+            self.assertIn('--collect-to', candidate_run.call_args.args[0])
+            self.assertLessEqual(candidate_run.call_args.kwargs['timeout'], 6)
             delivered = json.loads(output.getvalue())
             report = Path(delivered['report_path'])
             details = Path(delivered['details_path'])
@@ -35,6 +39,11 @@ class OrchestrationTests(unittest.TestCase):
             self.assertIn('| 证据 ID |', details.read_text())
             self.assertTrue(Path(delivered['ledger_path']).is_file())
             self.assertTrue(Path(delivered['plan_path']).is_file())
+            for evidence in delivered['artifact_verification'].values():
+                self.assertTrue(evidence['local_readable'])
+                self.assertFalse(evidence['client_link_opened'])
+                self.assertEqual(len(evidence['sha256']), 64)
+                self.assertEqual(evidence['retention'], 'temporary_not_guaranteed')
 
     def test_one_failed_source_does_not_skip_any_other_source(self):
         called = []
@@ -60,3 +69,26 @@ class OrchestrationTests(unittest.TestCase):
         self.assertEqual(len(out['sources']), 5)
         self.assertTrue(all(x['completeness'] == 'FAILED' for x in out['sources']))
         self.assertNotIn('PRIVATE', json.dumps(out))
+
+    def test_artifact_verification_rejects_symlink_and_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'target'
+            target.write_text('synthetic')
+            link = Path(directory) / 'link'
+            link.symlink_to(target)
+            self.assertFalse(orchestrator.verify_artifact(link)['local_readable'])
+            self.assertFalse(orchestrator.verify_artifact(Path(directory) / 'missing')['local_readable'])
+
+    def test_default_candidate_budget_exhaustion_is_unknown_without_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with patch.object(orchestrator, 'run_all', return_value=dict(sources=[])), \
+                    patch.object(orchestrator.time, 'monotonic', side_effect=[0, 301, 301]), \
+                    patch.object(orchestrator.tempfile, 'mkdtemp', return_value=directory), \
+                    patch.object(orchestrator.subprocess, 'run') as launch, \
+                    patch('sys.argv', ['audit-all.py']), contextlib.redirect_stdout(output):
+                orchestrator.main()
+            launch.assert_not_called()
+            plan = json.loads(Path(json.loads(output.getvalue())['plan_path']).read_text())
+            self.assertFalse(any(row.get('actionable') for row in plan['rows']))
+            self.assertIn('precise_candidate_shared_budget_exhausted', json.dumps(plan))

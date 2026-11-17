@@ -194,9 +194,9 @@ def render_evidence_table(data, plan):
         if row['source']=='precise-cache' and row.get('actionable') is True:
             kind={'precise_homebrew_bottle':'Homebrew bottle下载缓存','precise_pip_http_body':'pip HTTP响应缓存'}.get(key,'UNKNOWN')
             token=row.get('scope_tokens',['UNKNOWN'])[0][:8]
-            label='可执行：'+kind+' · 对象 '+token
+            label='精确待决策：'+kind+' · 对象 '+token
             value='原分配 '+size(row.get('occupied_bytes'))
-            decision='永久删除；可能需重下/离线不可用；'+number(row.get('age_days'))+'天，执行时复核'
+            decision='永久删除无备份；可能需重下/离线不可用；'+number(row.get('age_days'))+'天不是删除理由；活动 UNKNOWN，保留需求待定，执行前复核与单独批准'
         elif row['source']=='file-type-metadata':
             label = '文件类型：' + FILE_TYPES.get(key,'其他/未知')
             value = '已测占用 ' + size(row.get('occupied_bytes'))
@@ -313,6 +313,15 @@ def evidence_ledger(data, plan):
             recovery_cost=risk(key), overlap='UNKNOWN_may_overlap', contradictions=contradictions,
             recommended_next_step=next_step(key), scope_id=scope, parent_scope=parent,
             observation_time_unix=stamp, executable_authorization=False))
+    for entry, row in zip(ledger, plan['rows']):
+        evidence=row.get('decision_evidence')
+        if row.get('source') == 'precise-cache' and isinstance(evidence, dict):
+            entry.update(finding={'precise_homebrew_bottle':'Homebrew bottle 下载包','precise_pip_http_body':'pip HTTP 响应体'}.get(row['category'],'受支持缓存文件'),
+                category=row['category'], measurement_type='exact_file_allocated_bytes',
+                scope_id=evidence['candidate_id'], observation_time_unix=evidence['observed_at_unix'],
+                scan_completeness=evidence['scan_completeness'], cleanup_coverage='one_manifest_bound_file_not_authorized',
+                recovery_cost=evidence['recovery'], recommended_next_step=evidence['next_action'],
+                decision_evidence=evidence)
     return ledger
 
 
@@ -321,12 +330,12 @@ def decision_guardrails(data):
     clean, purge = sources.get('mole-clean', {}), sources.get('mole-purge', {})
     return [
         'clean 的 ' + size(clean.get('candidate_estimate_bytes')) + ' 是上游摘要总计，不是本报告分类求和；PARTIAL/舍入/重叠未知，不保证实际释放。',
-        'clean 会永久删除并重扫，可能清空未保护 Trash；没有按聚合编号选择的能力。默认没有精确对象或删除授权，不能执行 broad clean、purge --yes 或整棵 worktree 删除。',
+        'clean 会永久删除并重扫，可能清空未保护 Trash；没有按聚合编号选择的能力。聚合行没有精确对象范围，精确缓存行也没有删除授权，不能执行 broad clean、purge --yes 或整棵 worktree 删除。',
         'purge 保存的状态：' + STATUS.get(purge.get('completeness'),'UNKNOWN') + '；' + failure_detail(purge) + '。观察标记不是根因；不得改写成没有诊断或零候选。']
 
 
 def render_summary(data, plan):
-    if any(row.get('actionable') or row.get('source') == 'file-type-metadata' for row in plan['rows']):
+    if any(row.get('source') == 'file-type-metadata' for row in plan['rows']):
         return render_evidence_table(data, plan)
     sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
     ledger = evidence_ledger(data, plan)
@@ -365,7 +374,7 @@ def render_summary(data, plan):
         lines.append(f"| {row['evidence_id']} | {row['finding']} | {size(row['measured_size'])} | {row['scan_completeness']}；仅聚合预览 |")
     clean = sources.get('mole-clean', {})
     lines += ['', 'Mole clean 预览总计：候选约 ' + size(clean.get('candidate_estimate_bytes')) + '（' + STATUS.get(clean.get('completeness'),'UNKNOWN') + '）。分类不额外加到总计；舍入、未测量和重叠使它不是保证或下界。',
-        '已确认可精确执行的潜力 UNKNOWN：默认没有对象清单或删除授权。clean 永久删除并可能清空未保护 Trash；会重扫，不能按聚合行选择。purge --yes 也不能缩小到这些行。', '',
+        '已确认可精确执行的潜力 UNKNOWN：聚合行没有精确对象清单；如有严格缓存对象，其活动/保留仍待复核且没有删除授权。clean 永久删除并可能清空未保护 Trash；会重扫，不能按聚合行选择。purge --yes 也不能缩小到这些行。', '',
         '## 编号建议（证据、恢复成本与后悔风险优先）', '', '| 证据 ID | 建议 | 成本/保留理由 |', '| --- | --- | --- |']
     # Preview-backed review first, then preservation decisions for valuable data.
     # Other remains in its own coverage section and never displaces sessions/cache.
@@ -397,6 +406,18 @@ def render_summary(data, plan):
     reasons = [x for x in wt.get('reasons', []) if isinstance(x,str) and x in known_inventory_reasons]
     if reasons:
         lines.append('清单覆盖标记：' + '、'.join(reasons) + '；未完成部分不推断为零。')
+    exact_rows = [row for row in plan['rows'] if row.get('source') == 'precise-cache' and isinstance(row.get('decision_evidence'), dict)]
+    if exact_rows:
+        lines += ['', '## 精确缓存对象：可做保留决定，不等于已获执行批准', '',
+            '仅固定 Homebrew bottle / pip HTTP 响应体布局；每行一个普通文件。身份绑定私有 manifest，精确路径只在本机 private-objects.zh.md。年龄/格式不能证明可丢弃；活动与保留需求仍待核对。', '',
+            '| 方案行 / 对象 ID | 分配 / 逻辑字节 | 年龄 / 观察时点 / 覆盖 | 身份与保护 / 下一步 |', '| --- | --- | --- | --- |']
+        for row in exact_rows:
+            ev=row['decision_evidence']
+            lines.append('| ' + str(row['row_id']) + ' / ' + ev['candidate_id'] + ' | '
+                + size(ev['allocated_bytes']) + ' / ' + size(ev['logical_bytes']) + ' | '
+                + number(row.get('age_days')) + ' 天 / ' + (str(ev['observed_at_unix']) if ev['observed_at_unix'] is not None else 'UNKNOWN') + ' / ' + ev['scan_completeness']
+                + ' | 私有清单绑定；收集保护检查通过，执行前须重验。活动 UNKNOWN；先在本机核对保留/离线需求，再对所选对象做新鲜预检并单独批准 |')
+        lines += ['', '这些分配字节不是保证释放量，可能已包含在 clean 总计中，不另相加。永久删除成功后无自动备份；重下来源/流量/离线可用性未验证。所选行操作仅支持严格单文件 adapter，不能改成宽范围 clean/purge/Trash。']
     elapsed = data.get('total_duration_seconds')
     lines += ['', '本次总墙钟耗时 ' + (str(elapsed) + ' 秒' if type(elapsed) in (int,float) and elapsed >= 0 else 'UNKNOWN；各来源耗时之和不是已验证墙钟时间') + '。',
         '方案 ' + plan['plan_id'][:12] + '；编号沿用证据 ID，跳号正常。完整 ledger/方案留本地，测量、解释和授权分开。所有默认聚合行均没有已验证的精确清理操作；批准编号不能扩大到 mo clean、purge --yes、Trash 或整棵 worktree。',
@@ -416,7 +437,7 @@ def compact_size(value):
 
 def render_concise_summary(data, plan, details_link='audit-details.zh.md'):
     """Decision view, not the evidence ledger or an executable selection list."""
-    if any(row.get('actionable') or row.get('source') == 'file-type-metadata' for row in plan['rows']):
+    if any(row.get('source') == 'file-type-metadata' for row in plan['rows']):
         return render_evidence_table(data, plan)  # Explicit legacy optional modes.
     from urllib.parse import quote
     from pathlib import PurePosixPath
@@ -453,10 +474,29 @@ def render_concise_summary(data, plan, details_link='audit-details.zh.md'):
         lines.append('另有未解释范围 Other ' + compact_size(other['measured_size']) + '（' + other['scan_completeness'] + '，不同范围可能嵌套，非额外可清理空间）。')
     lines += ['', 'clean 上游预览总计约 ' + compact_size(clean.get('candidate_estimate_bytes')) + '（' + STATUS.get(clean.get('completeness'), 'UNKNOWN') + '，不是分类求和）；仅舍入候选，不保证释放。',
         'purge 独立预览：' + STATUS.get(purge.get('completeness'), 'UNKNOWN') + '，候选约 ' + compact_size(purge.get('candidate_estimate_bytes')) + '；' + failure_detail(purge) + '。不能用 clean 结果替代，也不能与 clean 相加。', '', '## 建议选项（不是删除批准）', '']
+    measured_preview = sorted([row for row in ledger if row['source'] == 'mole-clean'
+        and type(row['measured_size']) is int and row['measured_size'] > 0],
+        key=lambda row: row['measured_size'], reverse=True)[:2]
+    if measured_preview:
+        lines.insert(-3, 'clean 主要类别：' + '、'.join(display(row) for row in measured_preview)
+            + '；仅部分分类估算，不与总计或精确对象相加。')
     options = []
+    exact = [row for row in plan['rows'] if row.get('source') == 'precise-cache'
+             and row.get('exact_scope') is True and isinstance(row.get('decision_evidence'), dict)]
+    if exact:
+        chosen_exact = sorted(exact, key=lambda row: -row['decision_evidence']['allocated_bytes'])[:2]
+        labels = {'precise_homebrew_bottle': 'Homebrew bottle 下载包', 'precise_pip_http_body': 'pip HTTP 响应体'}
+        objects = []
+        for row in chosen_exact:
+            evidence = row['decision_evidence']
+            objects.append(labels.get(row['category'], '受支持缓存文件') + ' 对象 ' + evidence['candidate_id'][:8]
+                + '（精确方案行 ' + str(row['row_id']) + '，分配 ' + compact_size(evidence['allocated_bytes'])
+                + ' / 逻辑 ' + compact_size(evidence['logical_bytes']) + '，' + number(row.get('age_days')) + ' 天）')
+        options.append('先决定这些精确缓存对象是否还需保留：' + '；'.join(objects)
+            + '。本机详情可核对文件；身份/保护已检查但执行前须复核，活动 UNKNOWN，年龄不是删除理由。永久删除无备份，可能重下或离线失败；先核对保留需求，再做所选对象的新鲜预检和单独批准。')
     previews = [r for r in ledger if r['source'] == 'mole-clean' and type(r['measured_size']) is int and r['measured_size'] > 0]
     previews.sort(key=lambda r: r['measured_size'], reverse=True)
-    if previews:
+    if previews and not exact:
         rows = previews[:2]
         options.append('先复核 clean 缓存候选：' + '、'.join(display(r) for r in rows) + '。核对官方精确条目及活动应用/离线需求；可能重下、重建或重新登录，不按聚合类别直接删。' + ids(rows))
     sdk = chosen.get('android_sdk')
@@ -486,6 +526,9 @@ def render_concise_summary(data, plan, details_link='audit-details.zh.md'):
     # Sparse evidence yields fewer concrete options rather than fabricated findings.
     lines += [str(i) + '. ' + value for i, value in enumerate(options[:5], 1)]
     limits = []
+    collection = plan.get('precise_collection')
+    if isinstance(collection, dict) and not exact:
+        limits.append('有限精确缓存收集 ' + STATUS.get(collection.get('completeness'), 'UNKNOWN') + '，未取得可用精确对象，不代表没有可清理对象；预算/保护/不支持范围见方案')
     if any(r['observation_time_unix'] is None for r in ledger):
         limits.append('观察时点 UNKNOWN，保存记录不代表当前状态')
     else:
@@ -503,6 +546,6 @@ def render_concise_summary(data, plan, details_link='audit-details.zh.md'):
     if any(d.get('drilldown_budget_exhausted') for d in analyze.get('drilldowns', [])):
         limits.append('下钻达到预算，覆盖仍 PARTIAL')
     lines += ['', '关键限制：' + '；'.join(limits) + '。',
-        '已确认可精确执行的清理量 UNKNOWN。clean 实际清理会永久删除、重扫并可能清空未保护 Trash；预览不等于零副作用。编号仅用于讨论，不授权 broad clean、purge --yes 或删除文件。', '',
+        ('精确对象仅为待决策的单文件快照，不是已批准或已确认可释放量；可能已包含在 clean 总计中，不另相加。' if exact else '已确认可精确执行的清理量 UNKNOWN。') + 'clean 实际清理会永久删除、重扫并可能清空未保护 Trash；预览不等于零副作用。编号仅用于讨论，不授权 broad clean、purge --yes 或删除文件。', '',
         '[查看完整证据、精确字节、来源与覆盖](' + detail_href + ') · [证据 ledger](' + ledger_href + ')', '']
     return '\n'.join(lines)

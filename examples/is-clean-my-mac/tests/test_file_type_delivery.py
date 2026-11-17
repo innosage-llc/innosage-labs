@@ -39,7 +39,7 @@ class DeliveryTests(unittest.TestCase):
                     data.update(completeness='FAILED',reason='command_failed',command_stage='audit',command_exit_code=7,diagnostic_categories=['permission_denied'])
                 return subprocess.CompletedProcess(command,0,stdout=json.dumps(data).encode())
             stdout=io.StringIO()
-            with patch.object(runner,'run_worker',side_effect=collect),patch.object(runner.tempfile,'mkdtemp',return_value=str(output)),patch('sys.argv',['audit-all.py','--include-file-types']),contextlib.redirect_stdout(stdout):
+            with patch.object(runner,'run_worker',side_effect=collect),patch.object(runner.subprocess,'run',side_effect=lambda command,**kwargs: subprocess.CompletedProcess(command,0,stdout=b'{"source":"precise-cache-candidates","completeness":"PARTIAL","candidates":[],"reasons":[]}')),patch.object(runner.tempfile,'mkdtemp',return_value=str(output)),patch('sys.argv',['audit-all.py','--include-file-types']),contextlib.redirect_stdout(stdout):
                 runner.main()
             result=json.loads(stdout.getvalue())
             text=result['summary_markdown']

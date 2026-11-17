@@ -15,7 +15,7 @@ plans=load('mole_first_plans',SCRIPTS/'approval-plan.py')
 report=load('mole_first_report',SCRIPTS/'render-report.py')
 
 class MoleFirstTests(unittest.TestCase):
-    def test_default_runs_four_sources_without_census_or_precise_collection(self):
+    def test_default_runs_core_sources_without_general_census(self):
         calls=[]
         def run(command,**kwargs):
             script=Path(command[2]).name;calls.append(script)
@@ -23,7 +23,7 @@ class MoleFirstTests(unittest.TestCase):
             source='codex-worktree-inventory' if script=='audit-codex-worktrees.py' else 'mole-'+command[command.index('--source')+1]
             return subprocess.CompletedProcess(command,0,stdout=json.dumps(dict(source=source,completeness='PARTIAL',categories=[])).encode())
         with tempfile.TemporaryDirectory() as directory:
-            with patch.object(runner,'run_worker',side_effect=run),patch.object(runner.tempfile,'mkdtemp',return_value=directory),patch('sys.argv',['audit-all.py']),contextlib.redirect_stdout(io.StringIO()):runner.main()
+            with patch.object(runner,'run_worker',side_effect=run),patch.object(runner.subprocess,'run',return_value=subprocess.CompletedProcess([],0,stdout=b'{"source":"precise-cache-candidates","completeness":"PARTIAL","candidates":[],"reasons":[]}')),patch.object(runner.tempfile,'mkdtemp',return_value=directory),patch('sys.argv',['audit-all.py']),contextlib.redirect_stdout(io.StringIO()):runner.main()
             self.assertFalse((Path(directory)/'private-candidates.json').exists())
         self.assertEqual(len(calls),5)
 
