@@ -451,8 +451,20 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     # Official purge uses exit 1 for a completed but incomplete preview. Keep
     # its observed candidate prefix only when the explicit terminal summary is
     # present; interruption/timeout and arbitrary nonzero output stay failed.
-    purge_incomplete = (source == 'purge' and version == '1.72.0' and rc == 1
-        and 'Dry run incomplete - no changes made' in ANSI.sub('', text))
+    # Match the complete ordered terminal block emitted by 1.72.0
+    # print_summary_block, not marker-like filenames/diagnostics. Debug tails
+    # and any trailing failure are intentionally unsupported (fail closed).
+    incomplete_block = None
+    if source == 'purge' and version == '1.72.0' and rc == 1:
+        incomplete_block = re.search(
+            r'(?m)^(?P<divider>={1,70})\n'
+            r'Dry run incomplete - no changes made\n'
+            r'(?:Would free approximately: \d+(?:\.\d+)?\s*(?:B|KB|MB|GB|TB)'
+            r'(?: \+ \d+ unmeasured)? \| Items: [1-9]\d* \| Free: [^\r\n]+\n'
+            r'|No artifacts were removed\.\nFree space: [^\r\n]+\n)'
+            r'Some artifacts were skipped or could not be processed\.\n'
+            r'(?P=divider)[ \t\r\n]*\Z', ANSI.sub('', text))
+    purge_incomplete = incomplete_block is not None
     if rc and not purge_incomplete:
         return result(source, 'command_failed', version=version)
     if source == 'status':
@@ -460,6 +472,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     if source == 'analyze':
         return analyze(text, stderr, version)
     text = ANSI.sub('', text)
+    summary_text = incomplete_block.group(0) if incomplete_block else text
     if source == 'purge':
         out['categories'] = purge_categories(text)
         # V1.72.0 project.sh emits these exact terminal messages and sets
@@ -479,7 +492,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
                 out.update(reason='upstream_no_candidates_with_diagnostics',
                            error_category='upstream_no_candidates_with_diagnostics')
             return out
-        if purge_incomplete and not re.search(r'Would free approximately:', text):
+        if purge_incomplete and not re.search(r'^Would free approximately:', summary_text, re.M):
             out.update(completeness='PARTIAL', reason='upstream_purge_preview_incomplete',
                        error_category='upstream_purge_preview_incomplete', presence='PRESENT',
                        has_unmeasured_or_incomplete_marker=True)
@@ -489,7 +502,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     if source == 'clean':
         match = re.search(r'Potential space: (At least )?(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)\b', text)
     else:
-        match = re.search(r'Would free approximately: (\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)\b', text)
+        match = re.search(r'Would free approximately: (\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)\b', summary_text)
     if not match or not re.search(r'Dry run (?:complete|incomplete) - no changes made', text):
         return out
     out['has_unmeasured_or_incomplete_marker'] = bool(re.search(r'incomplete|unmeasured|At least|under-reported|timed out', text, re.I))
