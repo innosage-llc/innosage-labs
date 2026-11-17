@@ -18,6 +18,8 @@ description: 在本地 macOS 用官方 Mole 审核磁盘、解释主要占用和
 
 ## 测量、解释与授权分开
 
+最终答复直接使用 helper 已筛选的 `summary_markdown` 表格与覆盖段，不重新编号、删列或摘要这些测量字段；可在其后用官方 Skill 补充简短解释。必须保留 `decision_guardrails` 来源/执行边界、观察时点 UNKNOWN、workspace 数量/覆盖及 worktree 精确数/已观察数的区别。这防止压缩时丢失证据身份，把上游总计改写成分类之和、把未知根因改写成没有诊断，或省略永久删除/Trash 风险；不是新的执行授权。
+
 overview/父子/insight/不同来源可能重叠；标签去重不证明范围互斥。即使类别之和等于 overview，也不是全盘已用或唯一字节下界。PARTIAL 可能是覆盖、舍入或未知重叠，不能一律称下界。Mole 与独立清单的不同口径不能相减；展示 workspace 未知、精确/已观察 worktree 数、字节覆盖以及 Git/活动状态 UNKNOWN。旧报告无墙钟/时点就保持未知，不把来源耗时相加冒充墙钟。
 
 默认聚合行不是删除授权；批准编号不能替换成 `mo clean`、`purge --yes`、清空 Trash 或整棵 worktree 删除。官方交互选择只交接用户终端，不解析 TUI。用户另行要求精确缓存对象时才读 [可选流程](references/optional-execution-workflow.md) 和 [执行契约](references/precise-execution.md)，保留现有能力而不扩范围。实际执行仍需新鲜精确方案和真实逐行批准；报告逐行结果、可用空间变化与归因限制。

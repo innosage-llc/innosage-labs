@@ -136,7 +136,7 @@ def render(data):
     if 'file_type_inventory' in sources.get('mole-analyze', {}):
         lines += file_type_report(sources['mole-analyze']['file_type_inventory'])
     lines += ['## 四源覆盖与候选', '',
-      '| 来源 | 覆盖 | 范围验证 | 占用/已测下界 | 候选舍入估算 | 说明 |',
+      '| 来源 | 覆盖 | 范围验证 | 已报告占用（不同口径） | 候选舍入估算 | 说明 |',
       '| --- | --- | --- | --- | --- | --- |']
     for name, label in SOURCES.items():
         s = sources.get(name, {})
@@ -164,7 +164,7 @@ def render(data):
             count = group.get('measured_entries') if name == 'mole-analyze' else group.get('candidate_entries')
             if name == 'mole-analyze' and count == 0 and group.get('unknown_entries',0) > 0:
                 value = count = None
-            uncertainty = (('' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/已测子集）')
+            uncertainty = (('' if group.get('completeness') == 'COMPLETE' else '（PARTIAL/覆盖或重叠未知）')
                            if name == 'mole-analyze' else '（PARTIAL/舍入估算，可能重叠）')
             lines.append(f"| {SOURCES[name]} | {LABELS[key]} | {size(value)}{uncertainty} | {number(count)} | {risk(key)} |")
             rows += 1
@@ -253,14 +253,21 @@ def next_step(category):
     }.get(category, '仅复核；' + risk(category))
 
 
+PUBLIC_SCOPE_IDS = {'public:' + name for name in (
+    'home','user_library','applications','system_library','codex_home','codex_worktree_root',
+    'codex_sessions_root','codex_archived_sessions_root','colima_home','android_library',
+    'android_sdk_root','android_home','android_avd_root','library_caches','developer_library',
+    'xcode_library','xcode_derived_data_root')}
+
+
 def evidence_ledger(data, plan):
     """Measurements, interpretation and authorization remain separate fields."""
     sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
     contexts = []
     analyze = sources.get('mole-analyze', {})
     for source, scope, parent in [(analyze, 'overview', None)] + [
-            (d, 'public:' + d.get('scope_label', 'unknown') if d.get('scope_label') in LABELS else 'unknown',
-             d.get('parent_scope') if d.get('parent_scope') in ['overview'] + ['public:' + k for k in LABELS] else 'UNKNOWN')
+            (d, d.get('scope_id') if d.get('scope_id') in PUBLIC_SCOPE_IDS else 'UNKNOWN_legacy_scope',
+             d.get('parent_scope') if d.get('parent_scope') in PUBLIC_SCOPE_IDS | {'overview'} else 'UNKNOWN')
             for d in analyze.get('drilldowns', [])]:
         for group in source.get('categories', []):
             contexts.append((group, source, scope, parent))
@@ -306,13 +313,23 @@ def evidence_ledger(data, plan):
     return ledger
 
 
+def decision_guardrails(data):
+    sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
+    clean, purge = sources.get('mole-clean', {}), sources.get('mole-purge', {})
+    return [
+        'clean 的 ' + size(clean.get('candidate_estimate_bytes')) + ' 是上游摘要总计，不是本报告分类求和；PARTIAL/舍入/重叠未知，不保证实际释放。',
+        'clean 会永久删除并重扫，可能清空未保护 Trash；没有按聚合编号选择的能力。默认没有精确对象或删除授权，不能执行 broad clean、purge --yes 或整棵 worktree 删除。',
+        'purge 保存的状态：' + STATUS.get(purge.get('completeness'),'UNKNOWN') + '；' + failure_detail(purge) + '。观察标记不是根因；不得改写成没有诊断或零候选。']
+
+
 def render_summary(data, plan):
     if any(row.get('actionable') or row.get('source') == 'file-type-metadata' for row in plan['rows']):
         return render_evidence_table(data, plan)
     sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
     ledger = evidence_ledger(data, plan)
     capacity = sources.get('mole-status', {})
-    lines = ['## 容量基线', '',
+    time_note = '部分/全部证据观察时点 UNKNOWN；这是保存记录，不能代表当前磁盘状态或沿用为执行批准。' if any(r['observation_time_unix'] is None for r in ledger) else '观察时点保留在 ledger；各来源不是原子快照，执行前仍需新鲜精确复核。'
+    lines = [time_note, '', '## 必须保留的来源与执行边界', '', *decision_guardrails(data), '', '## 容量基线', '',
         '系统卷容量 ' + size(capacity.get('total_bytes')) + '；已用 ' + size(capacity.get('used_bytes')) + '；可用差额 ' + size(capacity.get('free_bytes')) + '。',
         '基线仅来自受保护的官方 status 同一卷 total − used；不是 Finder 含可清除空间的可用值。缺失保持 UNKNOWN。', '',
         '## 主要占用（不是清理优先级）', '',
@@ -360,7 +377,7 @@ def render_summary(data, plan):
     wt = sources.get('codex-worktree-inventory', {})
     observed_count = wt.get('observed_worktree_count')
     lines += ['', '## 覆盖与矛盾', '',
-        f"Codex workspace {number(wt.get('workspace_count'))}；worktree 精确数 {number(wt.get('worktree_count'))}，已观察数量 {number(observed_count)}；数量覆盖 {STATUS.get(wt.get('worktree_count_completeness'),'UNKNOWN')}。",
+        f"Codex workspace {number(wt.get('workspace_count'))}，workspace 覆盖 {STATUS.get(wt.get('workspace_count_completeness'),'UNKNOWN')}；worktree 精确数 {number(wt.get('worktree_count'))}，已观察数量 {number(observed_count)}；数量覆盖 {STATUS.get(wt.get('worktree_count_completeness'),'UNKNOWN')}。",
         '独立清单已测分配字节 ' + size(wt.get('observed_allocated_bytes') if wt.get('completeness') != 'FAILED' else None) + '；这是枚举子集，不能与 Mole 的目录字节相减来算缺口或可回收。Git/活动/未提交/未推送仍 UNKNOWN，清单不等于完成 Git 安全检查。',
         'overview 与 Home 下钻可能具有不同覆盖和时点；即使类别和等于 overview，也不证明不重叠。去重标签不证明范围互斥，不能相加，也不能跨父子/来源相减。PARTIAL 不统一解释为下界。', '',
         '| 来源 | 覆盖/失败 |', '| --- | --- |']

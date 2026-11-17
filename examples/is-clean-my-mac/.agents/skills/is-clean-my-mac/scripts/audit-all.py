@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -11,10 +12,32 @@ import tempfile
 import time
 
 
+def run_worker(command, timeout, **kwargs):
+    """Own/cancel one worker group, including inheriting descendants."""
+    env = dict(os.environ, IS_CLEAN_OWNED_WORKER='1')
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, start_new_session=True, env=env)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.communicate()
+        raise
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def collect_file_types(timeout=30):
     try:
-        run = subprocess.run([sys.executable, '-B', str(Path(__file__).with_name('audit-file-types.py')),
-             '--timeout', str(timeout)], capture_output=True, timeout=timeout + 3, stdin=subprocess.DEVNULL)
+        run = run_worker([sys.executable, '-B', str(Path(__file__).with_name('audit-file-types.py')),
+             '--timeout', str(max(.05, timeout - .5))], capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL)
         data = json.loads(run.stdout)
         if not isinstance(data, dict) or data.get('source') != 'file-type-metadata':
             raise ValueError('invalid aggregate')
@@ -52,7 +75,7 @@ def run_all(timeout=300, worktree_timeout=30, file_type_timeout=30, include_file
                      if name == 'codex-worktree-inventory' else
                      [str(scripts / 'audit-mole.py'), '--source', name[5:], '--timeout', str(helper_budget)])
         try:
-            run = subprocess.run([sys.executable, '-B', *arguments], capture_output=True,
+            run = run_worker([sys.executable, '-B', *arguments], capture_output=True,
                                  timeout=allocation, stdin=subprocess.DEVNULL)
             data = json.loads(run.stdout)
             if (not isinstance(data, dict) or data.get('source') != name or
@@ -138,7 +161,7 @@ def main():
     if private_review is not None:summary+='\n[查看仅本机精确对象（不要上传或交给模型读取）]('+str(private_review)+')\n'
     print(json.dumps(dict(report_path=str(report), aggregate_path=str(aggregates),
         plan_path=str(plan_path), ledger_path=str(ledger_path), plan_id=plan['plan_id'],
-        summary_markdown=summary), sort_keys=True))
+        summary_markdown=summary, decision_guardrails=renderer.decision_guardrails(data)), sort_keys=True))
 
 
 if __name__ == '__main__':

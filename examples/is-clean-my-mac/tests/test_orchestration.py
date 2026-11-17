@@ -16,7 +16,7 @@ class OrchestrationTests(unittest.TestCase):
             if name == 'mole-clean':
                 raise subprocess.TimeoutExpired(command, 1)
             return subprocess.CompletedProcess(command, 0, stdout=json.dumps(dict(source=name, completeness='PARTIAL', actual_freed_bytes=None)).encode())
-        with patch.object(orchestrator.subprocess, 'run', side_effect=run):
+        with patch.object(orchestrator, 'run_worker', side_effect=run):
             out = orchestrator.run_all(300, 30)
         self.assertEqual(called, ['mole-status', 'mole-analyze', 'codex-worktree-inventory', 'mole-clean', 'mole-purge'])
         self.assertEqual(len(out['sources']), 5)
@@ -27,7 +27,7 @@ class OrchestrationTests(unittest.TestCase):
 
     def test_wrong_source_output_and_raw_stderr_never_forwarded(self):
         run = subprocess.CompletedProcess([], 1, stdout=b'PRIVATE arbitrary output', stderr=b'PRIVATE logs')
-        with patch.object(orchestrator.subprocess, 'run', return_value=run):
+        with patch.object(orchestrator, 'run_worker', return_value=run):
             out = orchestrator.run_all(300, 30)
         self.assertEqual(len(out['sources']), 5)
         self.assertTrue(all(x['completeness'] == 'FAILED' for x in out['sources']))

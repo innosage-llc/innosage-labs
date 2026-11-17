@@ -4,7 +4,7 @@
 
 > 全面审核我的 Mac 磁盘，给我清理计划，先不要清理。
 
-官方 Mole Skill 负责解释磁盘和清理规则；薄 harness 补齐四源覆盖、隐私聚合和 Codex worktree 清单。Agent 在对话直接展示编号表：主要目录用途/占用、缓存和构建候选、数量/覆盖、风险和准确失败原因。默认 analyze 总计最多八次（一次顶层加七次下钻），在原有总时间预算内沿固定公开工具布局渐进测量 Codex worktrees/会话、Colima、Android 等；会话/worktree 只用父级测量，不枚举其子目录，不做 Home 扩展名普查，也不准备删除对象。占用不是可回收；审核不清理。
+官方 Mole Skill 负责解释磁盘和清理规则；薄 harness 补齐四源覆盖、隐私聚合和 Codex worktree 清单。对话分开呈现容量基线、主要占用、预览估算、编号建议与覆盖矛盾；建议按证据和恢复/后悔成本，不按最大六项筛选。完整脱敏 ledger 保留范围、时点、口径、恢复成本与重叠。默认 analyze 总计最多八次（一次顶层加七次下钻）；固定公开物理工具根，会话/worktree 只用父级测量，不枚举其子目录，不做 Home 扩展名普查，也不准备删除对象。占用不是可回收；审核不清理。
 
 ## 安装或更新
 
@@ -33,9 +33,11 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 ## 证据与限制
 
+本轮把占用、预览与建议分开，并用实际保存的脱敏输入做私下报告对照；[证据组织修复记录](evidence/evidence-ledger-repair.md) 区分通过、失败与未运行项。保存输入/报告不公开，新 status 仅做源码与 fixture 验证，本轮未重新扫描主机。
+
 最新 MacBook 实际审核尚未达到用户目标；本次按已批准 Mole-first 方向修复，真实验收仍待 Jim。历史测试不证明当前可用或模型效果一致。见 [本次具体证据修复](evidence/specific-evidence.md)、[前次证据](evidence/mole-first-harness.md)、[精确执行证据](evidence/precise-cache-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
 
-四源仍为 Mole analyze、clean/purge预览及worktree清单。原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole支持1.54.0/1.72.0，未知版本不升级。目录用途来自固定元数据规则，不是内容分类；未知项不猜测。不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
+四个 core 来源仍为 Mole analyze、clean/purge 预览及 worktree 清单；另加受保护官方 status 的系统卷容量/已用/差额投影，只核验1.72结构，失败保持 UNKNOWN，不输出进程/用户信息。默认共享300秒总预算，为 core 预览保留时间；来源耗时之和不是墙钟。原始数据在本地有界 spool，既有写入/网络边界不变。未知版本不升级。PARTIAL 不统一等于唯一字节下界；独立清单不是已完成 Git 安全检查；不同范围/度量不相减。目录用途不是内容分类；未知项不猜测，worktree 整体永不删除。
 
 purge 在官方1.72受保护运行中仍可失败；本次真实复现了临时文件/写入拒绝及存储错误文本，不能据此声称磁盘真的已满或已确定 Jim 的原因。不得移除边界、写配置或假报零候选。其他源继续呈现，下钻失败保留顶层证据。
 

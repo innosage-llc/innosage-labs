@@ -46,6 +46,7 @@ class LedgerTests(unittest.TestCase):
         self.assertNotIn('其他/未分类',recommendations);self.assertIn('90,000 B',text)
         self.assertIn('100,000 B',text);self.assertIn('240,000 B',text)
         self.assertIn('已观察数量 3',text);self.assertIn('worktree 精确数 UNKNOWN',text)
+        self.assertIn('workspace UNKNOWN，workspace 覆盖 UNKNOWN',text)
         self.assertIn('Git 安全检查',text);self.assertIn('各来源耗时之和不是',text)
         self.assertNotIn('PRIVATE',text);self.assertNotIn('PARTIAL 为已测下界',text)
         self.assertEqual(plans.select(plan,[3],plan['plan_id'])['status'],'BLOCKED')
@@ -57,10 +58,57 @@ class LedgerTests(unittest.TestCase):
             calls.append((name,kwargs['timeout']))
             clock[0]+=kwargs['timeout']
             return subprocess.CompletedProcess(cmd,0,stdout=json.dumps(dict(source=name,completeness='PARTIAL')).encode())
-        with patch.object(runner.time,'monotonic',side_effect=lambda:clock[0]),patch.object(runner.subprocess,'run',side_effect=run):result=runner.run_all(300,30)
+        with patch.object(runner.time,'monotonic',side_effect=lambda:clock[0]),patch.object(runner,'run_worker',side_effect=run):result=runner.run_all(300,30)
         self.assertEqual([n for n,_ in calls],['mole-status','mole-analyze','codex-worktree-inventory','mole-clean','mole-purge'])
         self.assertEqual(sum(b for _,b in calls),300);self.assertEqual(result['total_duration_seconds'],300)
         self.assertGreaterEqual(dict(calls)['mole-clean'],130);self.assertGreaterEqual(dict(calls)['mole-purge'],30)
-        with patch.object(runner.subprocess,'run') as run:result=runner.run_all(.1,.1)
+        with patch.object(runner,'run_worker') as run:result=runner.run_all(.1,.1)
         run.assert_not_called();self.assertEqual(len(result['sources']),5)
         self.assertTrue(all(s['reason']=='shared_budget_exhausted' for s in result['sources']))
+
+    def test_large_known_scope_precedes_tiny_tool_branch(self):
+        from pathlib import Path
+        import tempfile,time
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory).resolve();(home/'.android/avd').mkdir(parents=True);(home/'Library/Android').mkdir(parents=True)
+            entries=[dict(path=str(home/'.android'),size=12,is_dir=True),dict(path=str(home/'Library'),size=900000,is_dir=True)]
+            raw=json.dumps(dict(overview=True,entries=entries));calls=[]
+            def capture(cmd,*args):
+                calls.append(cmd[-1]);return 0,json.dumps(dict(overview=False,total_size=0,scan_status='complete',entries=[])),adapter.CaptureDiagnostics(False)
+            with patch.object(Path,'home',return_value=home),patch.object(adapter,'guarded_capture',side_effect=capture):
+                adapter.largest_entry_drilldowns(raw,'1.72.0',time.monotonic()+20)
+            self.assertEqual(calls[0],str(home/'Library'))
+
+    def test_public_scope_ids_are_unique_and_legacy_ambiguity_is_unknown(self):
+        from pathlib import Path
+        identities=adapter.public_scope_ids(Path('/synthetic'))
+        self.assertEqual(len(identities),len(set(identities.values())))
+        self.assertNotEqual(identities[Path('/synthetic/.android')],identities[Path('/synthetic/Library/Android')])
+        self.assertNotEqual(identities[Path('/synthetic/Library/Developer')],identities[Path('/synthetic/Library/Developer/Xcode')])
+        group=dict(category='android_data',observed_bytes=10,measured_entries=1)
+        data={'sources':[dict(source='mole-analyze',drilldowns=[dict(scope_label='android_data',scope_id='public:android_data',parent_scope='public:android_data',categories=[group])])]}
+        ledger=report.evidence_ledger(data,plans.build_plan(data))
+        self.assertEqual(ledger[0]['scope_id'],'UNKNOWN_legacy_scope');self.assertEqual(ledger[0]['parent_scope'],'UNKNOWN')
+
+    def test_outer_cancellation_terminates_owned_adapter_children(self):
+        import sys,tempfile,time
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);started=root/'started';escaped=root/'escaped'
+            child="from pathlib import Path; import time; Path(%r).write_text('started'); time.sleep(2); Path(%r).write_text('escaped')"%(str(started),str(escaped))
+            script="import importlib.util,sys,time; s=importlib.util.spec_from_file_location('a',%r); a=importlib.util.module_from_spec(s); s.loader.exec_module(a); time.sleep(.05); a.capture([sys.executable,'-c',%r],20)"%(str(SCRIPTS/'audit-mole.py'),child)
+            with self.assertRaises(subprocess.TimeoutExpired):runner.run_worker([sys.executable,'-B','-c',script],timeout=.6)
+            self.assertTrue(started.exists(),'synthetic child must actually have started')
+            time.sleep(2.2)
+            self.assertFalse(escaped.exists(),'owned child survived outer cancellation')
+
+    def test_missing_observation_time_is_explicit_in_summary(self):
+        data=self.fixture();text=report.render_summary(data,plans.build_plan(data))
+        self.assertIn('证据观察时点 UNKNOWN',text);self.assertIn('不能代表当前磁盘状态',text)
+
+    def test_decision_guardrails_preserve_provenance_and_observed_failure(self):
+        data=self.fixture();facts=report.decision_guardrails(data)
+        self.assertIn('7,000 B',facts[0]);self.assertIn('不是本报告分类求和',facts[0])
+        self.assertIn('永久删除',facts[1]);self.assertIn('Trash',facts[1])
+        self.assertIn('操作不允许',facts[2]);self.assertIn('退出码：1',facts[2])
+        self.assertTrue(all(f in report.render_summary(data,plans.build_plan(data)) for f in facts))

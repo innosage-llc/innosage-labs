@@ -69,6 +69,19 @@ def public_tool_roots(home):
         ('Library/Developer/Xcode/DerivedData', 'xcode_derived_data'))}
 
 
+def public_scope_ids(home):
+    """Fixed identities distinguish roots that share a display category."""
+    names = {'.codex':'codex_home', '.codex/worktrees':'codex_worktree_root',
+        '.codex/sessions':'codex_sessions_root', '.codex/archived_sessions':'codex_archived_sessions_root',
+        '.colima':'colima_home', 'Library/Android':'android_library',
+        'Library/Android/sdk':'android_sdk_root', '.android':'android_home', '.android/avd':'android_avd_root',
+        'Library/Caches':'library_caches', 'Library/Developer':'developer_library',
+        'Library/Developer/Xcode':'xcode_library', 'Library/Developer/Xcode/DerivedData':'xcode_derived_data_root'}
+    result = {home / relative: identity for relative, identity in names.items()}
+    result.update({home:'home',home/'Library':'user_library',Path('/Applications'):'applications',Path('/Library'):'system_library'})
+    return result
+
+
 def category(path, name='', overview=False):
     """Classify locally; never emit user-controlled names or paths."""
     path = path if isinstance(path, str) else ''
@@ -186,6 +199,7 @@ def largest_entry_drilldowns(raw, version, deadline):
             return details
         home = Path.home().resolve(strict=True)
         roots = public_tool_roots(home)
+        scope_ids = public_scope_ids(home)
         roots.update({home: 'home', home / 'Library': 'user_library',
                       Path('/Applications'): 'applications', Path('/Library'): 'system_library'})
         pending, seen = {}, set()
@@ -246,8 +260,8 @@ def largest_entry_drilldowns(raw, version, deadline):
                     if isinstance(error, CaptureFailure):
                         detail.update(command_exit_code=error.returncode,
                                       diagnostic_categories=list(getattr(error.diagnostics, 'categories', ())))
-            detail.update(scope_label=roots[path], scope_id='public:' + roots[path],
-                          parent_scope='public:' + roots[path.parent] if path.parent in roots else 'overview',
+            detail.update(scope_label=roots[path], scope_id='public:' + scope_ids[path],
+                          parent_scope='public:' + scope_ids[path.parent] if path.parent in scope_ids else 'overview',
                           observed_at_unix=time.time(), overlaps_parent=True)
             details.append(detail)
             if remaining <= 0:
@@ -277,12 +291,16 @@ def capture(command, timeout, env=None, cwd=None):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         def limit_spool():
             resource.setrlimit(resource.RLIMIT_FSIZE, (LIMIT, LIMIT))
-        proc = subprocess.Popen(command, stdout=output, stderr=errors, start_new_session=True,
+        owned_worker = os.environ.get('IS_CLEAN_OWNED_WORKER') == '1' and os.getpgrp() == os.getpid()
+        proc = subprocess.Popen(command, stdout=output, stderr=errors, start_new_session=not owned_worker,
                                 preexec_fn=limit_spool, env=env, cwd=cwd, stdin=subprocess.DEVNULL)
         try:
             proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
+            if owned_worker:
+                proc.kill()
+            else:
+                os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
             output.seek(0)
             errors.seek(0)
