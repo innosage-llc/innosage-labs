@@ -39,11 +39,13 @@
 
 ## 默认 Mole-first 审核与可选模式
 
-默认只采集四源，Mole 官方 Skill 负责解释和建议。analyze overview 后最多对两个最大、非 insight、物理目录运行官方 `analyze --json <path>`；仅允许本机 Home/Library、Applications、系统 Library，保留同一总预算，每次最多30秒。不跟链接、不扩展为任意返回路径。固定目录组件映射只解释用途，不验证内容；unknown/other 不猜测。下钻与父项重叠，绝不相加；下钻失败不丢弃 overview。
+默认保留四个 core 来源，另加受保护 `mo status --json` 容量投影；Mole 官方 Skill 负责解释。status 仅支持已核验的1.72结构，投影唯一内置根卷 total/used及同记录差额，丢弃进程、用户、设备、网络和其他元数据。差额不是 Finder 含purgeable可用空间，未知结构/版本保持 UNKNOWN。
+
+默认共享总墙钟预算300秒，可用 --timeout 降低；core时间预留按预算比例分配：status10、analyze100、清单30、clean130、purge30。提前完成释放时间给后续来源，每个来源仍有上限；下钻不能侵占预览保留时间。analyze最多八次测量（顶层+七次下钻），每次下钻最多30秒；优先最大已观测未解释允许范围，不能让微小工具分支抢占大型已知目录。允许根与物理/同设备边界见代码固定清单；不跟链接、不扩到任意返回路径。会话/worktree只用父级测量。Colima显式测量仍独立，不能填补或改变父总量。
 
 `--include-file-types` 是可选旧元数据普查；`--precise-candidates` 是可选已有精确缓存能力。默认不调用两者，不写私有删除清单。只有另行请求相关模式时使用，不靠它们代替官方 Mole。
 
-直接呈现编号 summary_markdown。默认聚合行没有精确目标，均 review-only。用户批准编号不能扩大到 `mo clean` / `purge --yes`；后者不支持把本表作为精确选择清单，clean 还可能清空 Trash。不得改配置、调用私有函数或解析 TUI。
+按容量、占用、预览、编号建议、覆盖/矛盾呈现 summary_markdown；完整 evidence-ledger.json 保留所有证据。默认聚合行没有精确目标，均 review-only。用户批准编号不能扩大到 `mo clean` / `purge --yes`；后者不支持把本表作为精确选择清单，clean 还可能清空 Trash。不得改配置、调用私有函数或解析 TUI。
 
 ## 新授权的独立精确缓存能力
 

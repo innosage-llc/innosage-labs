@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -11,10 +12,32 @@ import tempfile
 import time
 
 
+def run_worker(command, timeout, **kwargs):
+    """Own/cancel one worker group, including inheriting descendants."""
+    env = dict(os.environ, IS_CLEAN_OWNED_WORKER='1')
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, start_new_session=True, env=env)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.communicate()
+        raise
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def collect_file_types(timeout=30):
     try:
-        run = subprocess.run([sys.executable, '-B', str(Path(__file__).with_name('audit-file-types.py')),
-             '--timeout', str(timeout)], capture_output=True, timeout=timeout + 3, stdin=subprocess.DEVNULL)
+        run = run_worker([sys.executable, '-B', str(Path(__file__).with_name('audit-file-types.py')),
+             '--timeout', str(max(.05, timeout - .5))], capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL)
         data = json.loads(run.stdout)
         if not isinstance(data, dict) or data.get('source') != 'file-type-metadata':
             raise ValueError('invalid aggregate')
@@ -25,36 +48,52 @@ def collect_file_types(timeout=30):
                     observed_allocated_bytes=None, actual_freed_bytes=None)
 
 
-def run_all(timeout=180, worktree_timeout=30, file_type_timeout=30, include_file_types=False):
+def run_all(timeout=300, worktree_timeout=30, file_type_timeout=30, include_file_types=False):
     scripts = Path(__file__).resolve().parent
     sources = []
-    commands = [('codex-worktree-inventory', [str(scripts / 'audit-codex-worktrees.py'),
-                 '--timeout', str(worktree_timeout), '--max-entries', '500000'], worktree_timeout + 3)]
-    commands += [('mole-' + source, [str(scripts / 'audit-mole.py'), '--source', source,
-                  '--timeout', str(timeout)], timeout + 25) for source in ('analyze', 'clean', 'purge')]
-    for name, arguments, budget in commands:
+    started_all = time.monotonic()
+    deadline = started_all + timeout
+    # Reservations scale with the explicit total budget. Early completion releases
+    # time forward; optional analyze depth cannot consume the preview reservations.
+    jobs = [('mole-status', 10), ('mole-analyze', 100),
+            ('codex-worktree-inventory', 30), ('mole-clean', 130), ('mole-purge', 30)]
+    for index, (name, weight) in enumerate(jobs):
         started = time.monotonic()
+        remaining = deadline - started
+        reserve = sum(w for _, w in jobs[index + 1:]) * timeout / 300
+        allocation = min(180, max(0, remaining - reserve))
+        if name == 'mole-status':
+            allocation = min(allocation, 10)
+        if name == 'codex-worktree-inventory':
+            allocation = min(allocation, worktree_timeout)
+        if allocation <= 1:
+            sources.append(dict(source=name, completeness='FAILED', presence='UNKNOWN',
+                reason='shared_budget_exhausted', actual_freed_bytes=None))
+            continue
+        helper_budget = allocation - 0.5
+        arguments = ([str(scripts / 'audit-codex-worktrees.py'), '--timeout', str(helper_budget), '--max-entries', '500000']
+                     if name == 'codex-worktree-inventory' else
+                     [str(scripts / 'audit-mole.py'), '--source', name[5:], '--timeout', str(helper_budget)])
         try:
-            run = subprocess.run([sys.executable, '-B', *arguments], capture_output=True,
-                                 timeout=budget, stdin=subprocess.DEVNULL)
+            run = run_worker([sys.executable, '-B', *arguments], capture_output=True,
+                                 timeout=allocation, stdin=subprocess.DEVNULL)
             data = json.loads(run.stdout)
             if (not isinstance(data, dict) or data.get('source') != name or
                     data.get('completeness') not in ('COMPLETE', 'PARTIAL', 'FAILED')):
                 raise ValueError('invalid aggregate')
-            # Helpers own their fixed output schemas; never forward their stderr.
+            data.setdefault('observed_at_unix', time.time())
             sources.append(data)
         except (OSError, ValueError, subprocess.TimeoutExpired):
             sources.append(dict(source=name, completeness='FAILED', presence='UNKNOWN',
                 reason='source_process_failed_or_timed_out', actual_freed_bytes=None,
                 duration_seconds=round(time.monotonic() - started, 6)))
-    # Supplemental metadata measurement inside the analyze evidence, not a
-    # replacement or invented fifth Mole source. It can succeed if Mole fails.
-    if include_file_types:
-        file_types = collect_file_types(file_type_timeout)
+    if include_file_types and deadline - time.monotonic() > 1:
+        file_types = collect_file_types(min(file_type_timeout, deadline - time.monotonic() - 1))
         for data in sources:
             if data['source'] == 'mole-analyze':
                 data['file_type_inventory'] = file_types
     return dict(schema_version=1, mode='audit_only', sources=sources,
+                total_budget_seconds=timeout, total_duration_seconds=round(time.monotonic() - started_all, 6),
                 actual_freed_bytes=None, combined_reclaimable_bytes=None,
                 source_sizes_must_not_be_added=True,
                 whole_worktrees_are_candidates=False)
@@ -62,7 +101,7 @@ def run_all(timeout=180, worktree_timeout=30, file_type_timeout=30, include_file
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--timeout', type=float, default=180)
+    parser.add_argument('--timeout', type=float, default=300, help='Total audit wall-time budget, including reserved core sources')
     parser.add_argument('--worktree-timeout', type=float, default=30)
     parser.add_argument('--file-type-timeout', type=float, default=30)
     parser.add_argument('--include-file-types', action='store_true', help='Optional Home extension census, not the Mole-first audit')
@@ -115,11 +154,14 @@ def main():
     plan_path = directory / 'review-plan.json'
     with plan_path.open('x') as output:
         json.dump(plan, output, sort_keys=True)
+    ledger_path = directory / 'evidence-ledger.json'
+    with ledger_path.open('x') as output:
+        json.dump(renderer.evidence_ledger(data,plan), output, sort_keys=True)
     summary=renderer.render_summary(data,plan)
     if private_review is not None:summary+='\n[查看仅本机精确对象（不要上传或交给模型读取）]('+str(private_review)+')\n'
     print(json.dumps(dict(report_path=str(report), aggregate_path=str(aggregates),
-        plan_path=str(plan_path), plan_id=plan['plan_id'],
-        summary_markdown=summary), sort_keys=True))
+        plan_path=str(plan_path), ledger_path=str(ledger_path), plan_id=plan['plan_id'],
+        summary_markdown=summary, decision_guardrails=renderer.decision_guardrails(data)), sort_keys=True))
 
 
 if __name__ == '__main__':

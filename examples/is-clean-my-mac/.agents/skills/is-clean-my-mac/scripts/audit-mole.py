@@ -69,6 +69,19 @@ def public_tool_roots(home):
         ('Library/Developer/Xcode/DerivedData', 'xcode_derived_data'))}
 
 
+def public_scope_ids(home):
+    """Fixed identities distinguish roots that share a display category."""
+    names = {'.codex':'codex_home', '.codex/worktrees':'codex_worktree_root',
+        '.codex/sessions':'codex_sessions_root', '.codex/archived_sessions':'codex_archived_sessions_root',
+        '.colima':'colima_home', 'Library/Android':'android_library',
+        'Library/Android/sdk':'android_sdk_root', '.android':'android_home', '.android/avd':'android_avd_root',
+        'Library/Caches':'library_caches', 'Library/Developer':'developer_library',
+        'Library/Developer/Xcode':'xcode_library', 'Library/Developer/Xcode/DerivedData':'xcode_derived_data_root'}
+    result = {home / relative: identity for relative, identity in names.items()}
+    result.update({home:'home',home/'Library':'user_library',Path('/Applications'):'applications',Path('/Library'):'system_library'})
+    return result
+
+
 def category(path, name='', overview=False):
     """Classify locally; never emit user-controlled names or paths."""
     path = path if isinstance(path, str) else ''
@@ -186,6 +199,7 @@ def largest_entry_drilldowns(raw, version, deadline):
             return details
         home = Path.home().resolve(strict=True)
         roots = public_tool_roots(home)
+        scope_ids = public_scope_ids(home)
         roots.update({home: 'home', home / 'Library': 'user_library',
                       Path('/Applications'): 'applications', Path('/Library'): 'system_library'})
         pending, seen = {}, set()
@@ -222,8 +236,9 @@ def largest_entry_drilldowns(raw, version, deadline):
         except OSError:
             pass
         while pending and len(details) < 7:
-            # Prefer discovered specific tools over remaining generic parents.
-            path = max(pending, key=lambda p: (p not in (home, home / 'Library', Path('/Applications'), Path('/Library')), pending[p], str(p)))
+            # Largest measured unexplained scope first; tiny tool branches must
+            # not outrank a large known parent. Unmeasured Colima probe is last.
+            path = max(pending, key=lambda p: (pending[p], str(p)))
             del pending[path]
             seen.add(path)
             remaining = deadline - time.monotonic()
@@ -245,7 +260,9 @@ def largest_entry_drilldowns(raw, version, deadline):
                     if isinstance(error, CaptureFailure):
                         detail.update(command_exit_code=error.returncode,
                                       diagnostic_categories=list(getattr(error.diagnostics, 'categories', ())))
-            detail.update(scope_label=roots[path], overlaps_parent=True)
+            detail.update(scope_label=roots[path], scope_id='public:' + scope_ids[path],
+                          parent_scope='public:' + scope_ids[path.parent] if path.parent in scope_ids else 'overview',
+                          observed_at_unix=time.time(), overlaps_parent=True)
             details.append(detail)
             if remaining <= 0:
                 break
@@ -259,7 +276,7 @@ def largest_entry_drilldowns(raw, version, deadline):
 def result(source, reason, completeness='FAILED', version=None):
     return dict(schema_version=1, source='mole-' + source, version=version,
                 completeness=completeness, reason=reason, occupied_bytes=None,
-                command='mo ' + source + (' --json' if source == 'analyze' else ' --dry-run'),
+                command='mo ' + source + (' --json' if source in ('status', 'analyze') else ' --dry-run'),
                 scope_verified=False, presence='UNKNOWN', duration_seconds=None, timeout_seconds=None,
                 measurement='Mole-reported bytes or rounded SI decimal-unit preview estimate',
                 error_category=reason,
@@ -274,12 +291,16 @@ def capture(command, timeout, env=None, cwd=None):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         def limit_spool():
             resource.setrlimit(resource.RLIMIT_FSIZE, (LIMIT, LIMIT))
-        proc = subprocess.Popen(command, stdout=output, stderr=errors, start_new_session=True,
+        owned_worker = os.environ.get('IS_CLEAN_OWNED_WORKER') == '1' and os.getpgrp() == os.getpid()
+        proc = subprocess.Popen(command, stdout=output, stderr=errors, start_new_session=not owned_worker,
                                 preexec_fn=limit_spool, env=env, cwd=cwd, stdin=subprocess.DEVNULL)
         try:
             proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(proc.pid, signal.SIGKILL)
+            if owned_worker:
+                proc.kill()
+            else:
+                os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
             output.seek(0)
             errors.seek(0)
@@ -397,10 +418,39 @@ def purge_categories(text):
     return list(groups.values())
 
 
+def capacity_status(text, stderr, version):
+    """Project only one internal root-volume record; discard all other metadata."""
+    out = result('status', 'capacity_schema_unverified', version=version)
+    if version != '1.72.0':
+        return out
+    try:
+        data = json.loads(text)
+        disks = data.get('disks') if isinstance(data, dict) else None
+        if not isinstance(disks, list):
+            return out
+        roots = [d for d in disks if isinstance(d, dict) and d.get('mount') == '/' and d.get('external') is False]
+        if len(roots) != 1:
+            return out
+        disk = roots[0]
+        if any(type(disk.get(k)) is not int for k in ('total', 'used')) or not 0 <= disk['used'] <= disk['total'] <= 2**63 or disk['total'] == 0:
+            return out
+        out.update(total_bytes=disk['total'], used_bytes=disk['used'],
+                   free_bytes=disk['total'] - disk['used'],
+                   measurement='same_root_volume_total_minus_used_not_Finder_purgeable',
+                   completeness='PARTIAL' if stderr else 'COMPLETE', presence='PRESENT',
+                   reason='capacity_snapshot', error_category=None,
+                   scope_id='system_root_volume', parent_scope=None)
+        return out
+    except (ValueError, TypeError):
+        return out
+
+
 def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     out = result(source, 'unrecognized_output', version=version)
     if rc:
         return result(source, 'command_failed', version=version)
+    if source == 'status':
+        return capacity_status(text, stderr, version)
     if source == 'analyze':
         return analyze(text, stderr, version)
     text = ANSI.sub('', text)
@@ -444,7 +494,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', required=True, choices=('analyze', 'clean', 'purge'))
+    parser.add_argument('--source', required=True, choices=('status', 'analyze', 'clean', 'purge'))
     parser.add_argument('--analyze-root', type=Path, help='Optional verified synthetic/root scope')
     parser.add_argument('--timeout', type=float, default=180)
     args = parser.parse_args()
@@ -457,9 +507,9 @@ def main():
             raise ValueError('invalid_timeout')
         def budget(limit):
             remaining = started + args.timeout - time.monotonic()
-            if args.source == 'analyze' and remaining <= 0:
+            if args.source in ('status', 'analyze', 'clean', 'purge') and remaining <= 0:
                 raise ValueError('command_timeout')
-            return min(limit, remaining) if args.source == 'analyze' else limit
+            return min(limit, remaining) if args.source in ('status', 'analyze', 'clean', 'purge') else limit
         stage = 'version'
         rc, version, diagnostics = guarded_capture(['mo', '--version'], budget(10))
         if rc:
@@ -471,7 +521,7 @@ def main():
         # Even help is guarded: upstream may source configuration before dispatch.
         stage, rc, diagnostics = 'help', None, False
         rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], budget(10))
-        flag = '--json' if args.source == 'analyze' else '--dry-run'
+        flag = '--json' if args.source in ('status', 'analyze') else '--dry-run'
         if rc or flag not in help_text:
             raise ValueError('installed_help_incompatible')
         command = ['mo', args.source, flag]
@@ -487,6 +537,9 @@ def main():
         out = parse(args.source, raw, rc, diagnostics, version=match[1])
         if args.source == 'analyze' and args.analyze_root is None and out['completeness'] != 'FAILED':
             out['drilldowns'] = largest_entry_drilldowns(raw, version_id, started + args.timeout)
+        out['observed_at_unix'] = time.time()
+        if args.source == 'analyze':
+            out.update(scope_id='overview' if args.analyze_root is None else 'explicit_root', parent_scope=None)
         out['runtime_boundary'] = 'macOS_sandbox_deny_network_and_host_writes'
         out['allowed_host_writes'] = ['official_clean_preview_only'] if args.source == 'clean' else []
         if args.source == 'clean':
