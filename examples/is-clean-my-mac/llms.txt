@@ -97,7 +97,9 @@ permission changes.
    manifest-matching remaining subsets may be reconciled after recovery consent; never manually remove a pending state or old backup.
    If the host cannot control stdin or safely run the command, explain that exact
    limitation; do not invent a --yes flag, self-approve, or weaken sandbox policy.
-5. Let the installer fetch the official Mole Skill using its pinned official
+5. For a fresh installation only, let the installer fetch missing Skills using
+   the following routes. Wrapper updates skip these dependency installations.
+   Fetch the official Mole Skill using its pinned official
    Skills CLI route and install the InnoSage Skill from this canonical directory.
    Missing Mole CLI uses only `brew install mole`; existing Mole is version-checked
    and preserved, never silently upgraded. Unknown/modified/symlink/legacy Skill
