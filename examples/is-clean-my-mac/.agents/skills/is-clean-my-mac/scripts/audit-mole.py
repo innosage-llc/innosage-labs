@@ -346,6 +346,7 @@ def physical_file(path, require_file=False):
         raise ValueError('preview_not_published')
 
 
+
 def guarded_capture(command, timeout, source=None):
     if not Path('/usr/bin/sandbox-exec').is_file():
         raise ValueError('write_boundary_unavailable')
@@ -447,7 +448,12 @@ def capacity_status(text, stderr, version):
 
 def parse(source, text, rc=0, stderr=False, version='1.54.0'):
     out = result(source, 'unrecognized_output', version=version)
-    if rc:
+    # Official purge uses exit 1 for a completed but incomplete preview. Keep
+    # its observed candidate prefix only when the explicit terminal summary is
+    # present; interruption/timeout and arbitrary nonzero output stay failed.
+    purge_incomplete = (source == 'purge' and version == '1.72.0' and rc == 1
+        and 'Dry run incomplete - no changes made' in ANSI.sub('', text))
+    if rc and not purge_incomplete:
         return result(source, 'command_failed', version=version)
     if source == 'status':
         return capacity_status(text, stderr, version)
@@ -462,11 +468,21 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
         empty_messages = {'✓ No old project artifacts to clean',
                           'No eligible project artifacts to purge', 'No artifacts found to purge'}
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        if version == '1.72.0' and not stderr and lines and lines[-1] in empty_messages:
+        if version == '1.72.0' and not rc and lines and lines[-1] in empty_messages:
             out.update(completeness='PARTIAL', reason='upstream_no_candidates_scope_unverified',
                        error_category='upstream_no_candidates_scope_unverified',
                        observed_candidate_estimate_bytes=0, observed_candidate_entries=0,
                        presence='PRESENT')
+            if stderr:
+                # Logs remain denied: an empty observation with warnings is
+                # not a complete scope or an assertion of no potential space.
+                out.update(reason='upstream_no_candidates_with_diagnostics',
+                           error_category='upstream_no_candidates_with_diagnostics')
+            return out
+        if purge_incomplete and not re.search(r'Would free approximately:', text):
+            out.update(completeness='PARTIAL', reason='upstream_purge_preview_incomplete',
+                       error_category='upstream_purge_preview_incomplete', presence='PRESENT',
+                       has_unmeasured_or_incomplete_marker=True)
             return out
     # Summary shape is fixed to installed 1.54.0. Keep all unmeasured/skipped
     # output conservative; a summary is not a verified per-candidate scope.
@@ -505,6 +521,11 @@ def main():
     try:
         if not 0 < args.timeout <= 300:
             raise ValueError('invalid_timeout')
+        # Official timeout backends can create independent process groups.
+        # Until cancellation ownership is proven, do not launch even purge's
+        # version/help preflight. This is a pause, not an empty observation.
+        if args.source == 'purge':
+            raise ValueError('purge_lifecycle_unverified')
         def budget(limit):
             remaining = started + args.timeout - time.monotonic()
             if args.source in ('status', 'analyze', 'clean', 'purge') and remaining <= 0:
@@ -562,7 +583,7 @@ def main():
         if isinstance(error, CaptureFailure):
             rc, diagnostics = error.returncode, error.diagnostics
         # Only literal codes from our own checks; never stringify raw errors.
-        codes = {'invalid_timeout', 'unsupported_mole_version_no_upgrade_attempted',
+        codes = {'purge_lifecycle_unverified', 'invalid_timeout', 'unsupported_mole_version_no_upgrade_attempted',
                  'installed_help_incompatible', 'purge_roots_not_verified',
                  'invalid_analyze_scope', 'command_timeout', 'output_budget_exceeded',
                  'purge_configuration_write_boundary_unverified', 'write_boundary_unavailable',
@@ -585,6 +606,8 @@ def main():
     out.update(duration_seconds=round(time.monotonic() - started, 6), timeout_seconds=args.timeout,
                scope_verified=(args.source == 'analyze' and args.analyze_root is not None and out['completeness'] != 'FAILED'),
                error_category=None if out['completeness'] == 'COMPLETE' else out['reason'])
+    if out.get('reason') == 'purge_lifecycle_unverified':
+        out.update(execution_blocked=True, subprocess_started=False)
     print(json.dumps(out, sort_keys=True))
     return 0 if out['completeness'] != 'FAILED' else 2
 

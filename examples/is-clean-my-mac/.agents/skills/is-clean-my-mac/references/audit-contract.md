@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | analyze | `mo analyze --json`，先验证本版本帮助 | 一般磁盘占用；不是候选或释放估算 |
 | clean | `mo clean --dry-run` | 缓存/日志候选；仅允许精确本地 clean-list 预览文件写入 |
-| purge | `mo purge --dry-run`，在写入拒绝边界内验证帮助；未验证运行时根保持 PARTIAL | 项目构建/依赖候选；缺根、拒绝访问、超时均不完整 |
+| purge | 当前在版本/帮助/预览进程启动前暂停：`purge_lifecycle_unverified` | 预览不可用，候选 UNKNOWN；不是零或成功，clean 不能替代 |
 | worktrees | 随附 Python helper | 已验证根的独立数量与已分配磁盘字节，不是可回收空间 |
 
 仅 helper 的聚合 stdout 可直接进入模型。Mole 来源必须由本地、版本固定、具备对应 fixtures 的适配器处理；未知格式失败关闭。本例适配器支持 1.54.0/1.72.0 聚合类别；预览摘要保守为 PARTIAL，不授权精确清理。
@@ -33,7 +33,7 @@
 | home、user_library、applications、system_library、other | 磁盘类别/未分类聚合 | 不推导可回收字节，不做自动清理建议 |
 | worktrees | 独立数量、已分配占用或 observed 下界；workspace_count 是保存根元数据快照 | 全部 Git/活动状态 UNKNOWN；不删除整个 worktree；重建、未推送内容和任务状态未知 |
 
-新版固定入口 `audit-all.py` 自动尝试四源；不需要模型补充根路径。worktree_count_completeness 与字节枚举覆盖分别报告，部分字节结果不抹掉已完成的浅层数量枚举。自动发现只覆盖本机 CODEX_HOME 约定，其他主机或未知自定义根仍 UNKNOWN。
+固定入口 `audit-all.py` 保留四源状态；当前 purge 预检返回暂停而不启动外部命令，其他来源独立处理；不需要模型补充根路径。worktree_count_completeness 与字节枚举覆盖分别报告，部分字节结果不抹掉已完成的浅层数量枚举。自动发现只覆盖本机 CODEX_HOME 约定，其他主机或未知自定义根仍 UNKNOWN。
 
 运行边界禁止网络和除私有 scratch、`/dev/null`、clean 精确预览文件之外的写入；禁止 sudo 和系统管理工具。HOME 保持真实值；继承的 MO_ANALYZE_PATH、BASH_ENV 和 Mole 测试/跳过变量不传给子进程。Apple Bash 临时文件回退需要拒绝固定系统临时根 metadata，所以 /tmp 下的软件/审核根可能失败；失败时不扩大权限。clean 的物理父目录缺失或目标为链接/硬链接时失败关闭，不创建配置目录。运行时结果只有聚合候选，不足以授权精确删除。
 
@@ -45,8 +45,12 @@
 
 `--include-file-types` 是可选旧元数据普查；`--precise-candidates` 是可选已有精确缓存能力。默认不调用两者，不写私有删除清单。只有另行请求相关模式时使用，不靠它们代替官方 Mole。
 
-按容量、占用、预览、编号建议、覆盖/矛盾呈现 summary_markdown；完整 evidence-ledger.json 保留所有证据。默认聚合行没有精确目标，均 review-only。用户批准编号不能扩大到 `mo clean` / `purge --yes`；后者不支持把本表作为精确选择清单，clean 还可能清空 Trash。不得改配置、调用私有函数或解析 TUI。
+主答 summary_markdown / audit.zh.md 简洁呈现容量、主要占用、3–5 个具体选项及关键限制，不强制粘贴完整证据表。audit-details.zh.md 与 evidence-ledger.json 保留精确字节、来源、稳定 ID、覆盖/矛盾；主答须链接真实生成的详情。讨论编号不是执行选择行。clean/purge 预览分开呈现，部分 clean 结果不能替代 purge；失败、超时、中断不变成零。默认聚合行没有精确目标，均 review-only。用户批准编号不能扩大到 `mo clean` / `purge --yes`；后者不支持把本表作为精确选择清单，clean 还可能清空 Trash。不得改配置、调用私有函数或解析 TUI。
 
 ## 新授权的独立精确缓存能力
 
 当前开发/测试批准没有授权清理真实用户文件。只有私有清单绑定的Homebrew bottle/pip HTTP-v2单文件行可能actionable；其他聚合行仍review-only。公开方案包含私有清单hash和随机对象ID；路径只在人类本机详情中。逐行批准、描述符复核、原生排他捕获、有限打开观察、持久恢复状态与计量详见 [精确执行契约](precise-execution.md)。本能力不调用Mole删除引擎。若已有Mole clean whitelist或无法确认其状态，v1全部精确对象转人工，不读取/修改其保护内容来绕过。
+
+## 当前 purge 暂停及生命周期限制
+
+官方 1.72 timeout 后端能建立独立子进程组。隔离的官方 Perl 后端 fixture 证明：只取消外层进程组不能保证终止全部子组；TERM 宽限也不能覆盖直接子进程退出但孙进程忽略 TERM 的情况。实验性 mktemp 路由已撤回，4 MiB 单文件限制和既有写入/网络拒绝不变；没有新进程扫描器或宽范围 kill。purge 在任何子进程前明确 FAILED/blocked，不宣称预览成功。其他来源沿用既有运行边界，但不能据旧的同组子进程测试宣称全部后代生命周期已证明。真实 MacBook 验收仍未完成。

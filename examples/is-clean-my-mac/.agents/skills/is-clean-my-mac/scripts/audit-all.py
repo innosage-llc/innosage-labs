@@ -127,7 +127,11 @@ def main():
     approvals = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(approvals)
     plan = approvals.build_plan(data,precise=precise)
-    text = renderer.render_summary(data,plan)+'\n---\n'+renderer.render(data)
+    # Keep the decision-facing report short; the full evidence is a separate
+    # sibling artifact, not appended to the default answer again.
+    detail_text = renderer.render_summary(data,plan)+'\n---\n'+renderer.render(data)
+    details = directory / 'audit-details.zh.md'
+    text = renderer.render_concise_summary(data,plan,details_link=details.name)
     private_review=None
     if any(row.get('source')=='precise-cache' for row in plan['rows']):
         # Human-local inspection only. Do not put these contents in stdout.
@@ -148,6 +152,8 @@ def main():
     report = directory / 'audit.zh.md'
     with report.open('x') as output:
         output.write(text)
+    with details.open('x') as output:
+        output.write(detail_text)
     aggregates = directory / 'aggregate.json'
     with aggregates.open('x') as output:
         json.dump(data, output, sort_keys=True)
@@ -157,9 +163,9 @@ def main():
     ledger_path = directory / 'evidence-ledger.json'
     with ledger_path.open('x') as output:
         json.dump(renderer.evidence_ledger(data,plan), output, sort_keys=True)
-    summary=renderer.render_summary(data,plan)
+    summary=renderer.render_concise_summary(data,plan,details_link=str(details))
     if private_review is not None:summary+='\n[查看仅本机精确对象（不要上传或交给模型读取）]('+str(private_review)+')\n'
-    print(json.dumps(dict(report_path=str(report), aggregate_path=str(aggregates),
+    print(json.dumps(dict(report_path=str(report), details_path=str(details), aggregate_path=str(aggregates),
         plan_path=str(plan_path), ledger_path=str(ledger_path), plan_id=plan['plan_id'],
         summary_markdown=summary, decision_guardrails=renderer.decision_guardrails(data)), sort_keys=True))
 

@@ -13,7 +13,7 @@ spec.loader.exec_module(adapter)
 
 
 class PurgeDiagnosticsTests(unittest.TestCase):
-    def run_main(self, results, source='purge'):
+    def run_main(self, results, source='analyze'):
         with patch.object(adapter, 'guarded_capture', side_effect=results), \
                 patch('sys.argv', ['audit-mole.py', '--source', source]), \
                 patch('builtins.print') as output:
@@ -46,7 +46,7 @@ class PurgeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(error.diagnostics)
         self.assertEqual(error.diagnostics.categories, ('permission_denied',))
         status, out = self.run_main([(0, 'Mole version 1.72.0', False),
-                                    (0, '--dry-run', False), error])
+                                    (0, '--dry-run --json', False), error])
         self.assertEqual(status, 2)
         self.assertEqual(out['reason'], 'output_encoding_invalid')
         self.assertEqual(out['command_stage'], 'audit')
@@ -76,11 +76,11 @@ class PurgeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(out['reason'], 'installed_help_incompatible')
         self.assertNotIn('PRIVATE', json.dumps(out))
 
-    def test_purge_failure_reports_only_fixed_diagnostics(self):
+    def test_source_failure_reports_only_fixed_diagnostics(self):
         markers = adapter.diagnostic_markers(b'PRIVATE_PATH',
             b'PRIVATE_PATH: Operation not permitted\nSome artifacts were skipped', 1)
         status, out = self.run_main([(0, 'Mole version 1.72.0', False),
-                                    (0, '--dry-run', False), (1, 'PRIVATE_PATH', markers)])
+                                    (0, '--dry-run --json', False), (1, 'PRIVATE_PATH', markers)])
         self.assertEqual(status, 2)
         self.assertEqual(out['command_stage'], 'audit')
         self.assertEqual(out['command_exit_code'], 1)
@@ -93,7 +93,7 @@ class PurgeDiagnosticsTests(unittest.TestCase):
     def test_clean_command_failure_not_replaced_by_preview_readback(self):
         with patch.object(adapter, 'physical_file', side_effect=AssertionError('must not read ledger')):
             status, out = self.run_main([(0, 'Mole version 1.72.0', False),
-                                        (0, '--dry-run', False), (9, '', True)], 'clean')
+                                        (0, '--dry-run --json', False), (9, '', True)], 'clean')
         self.assertEqual(status, 2)
         self.assertEqual(out['reason'], 'command_failed')
         self.assertEqual(out['command_stage'], 'audit')
@@ -110,7 +110,7 @@ class PurgeDiagnosticsTests(unittest.TestCase):
 
     def test_timeout_stage_is_preserved(self):
         status, out = self.run_main([(0, 'Mole version 1.72.0', False),
-            (0, '--dry-run', False), adapter.CaptureFailure('command_timeout', -9,
+            (0, '--dry-run --json', False), adapter.CaptureFailure('command_timeout', -9,
                 adapter.CaptureDiagnostics(False, ('command_timeout',)))])
         self.assertEqual(status, 2)
         self.assertEqual(out['command_stage'], 'audit')
@@ -135,7 +135,6 @@ class PurgeDiagnosticsTests(unittest.TestCase):
         cases = [('No items selected', 0, False, '1.72.0'),
                  ('No artifacts found in the completed project scans', 0, False, '1.72.0'),
                  ('No eligible project artifacts to purge', 1, False, '1.72.0'),
-                 ('No artifacts found to purge', 0, True, '1.72.0'),
                  ('PRIVATE/No artifacts found to purge', 0, False, '1.72.0'),
                  ('No artifacts found to purge\nNo items selected', 0, False, '1.72.0'),
                  ('No artifacts found to purge', 0, False, '1.54.0')]

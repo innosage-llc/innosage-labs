@@ -38,6 +38,9 @@ REASONS = {
  'drilldown_failed_or_timed_out': '官方目录下钻失败或超时，保留顶层测量',
  'source_process_failed_or_timed_out': '来源进程失败或超时'}
 REASONS.update(capacity_snapshot='官方系统卷容量快照（差额口径）', capacity_schema_unverified='容量结构/根卷身份未验证', shared_budget_exhausted='共享总预算不足，来源未执行', output_encoding_invalid='输出编码无法识别，保留已知退出/诊断',
+               purge_lifecycle_unverified='purge 预览已暂停：子进程取消边界未验证，未启动命令',
+               upstream_purge_preview_incomplete='官方 purge 预览明确不完整，保留已观察候选而非完整结果',
+               upstream_no_candidates_with_diagnostics='本次范围未观察到候选但有诊断，不代表无清理潜力',
                upstream_no_candidates_scope_unverified='官方本次范围未找到候选；完整范围未验证',
                installed_help_incompatible='本版本帮助与固定参数不兼容',
                preflight_command_or_data_boundary_failed='预检/数据边界失败；具体根因未验证')
@@ -398,4 +401,108 @@ def render_summary(data, plan):
     lines += ['', '本次总墙钟耗时 ' + (str(elapsed) + ' 秒' if type(elapsed) in (int,float) and elapsed >= 0 else 'UNKNOWN；各来源耗时之和不是已验证墙钟时间') + '。',
         '方案 ' + plan['plan_id'][:12] + '；编号沿用证据 ID，跳号正常。完整 ledger/方案留本地，测量、解释和授权分开。所有默认聚合行均没有已验证的精确清理操作；批准编号不能扩大到 mo clean、purge --yes、Trash 或整棵 worktree。',
         '本次未清理；实际释放 UNKNOWN。会话/容器卷/模拟器可能含唯一数据；SDK/构建/缓存可能需重下或重建，恢复时间与成本未测。', '']
+    return '\n'.join(lines)
+
+
+def compact_size(value):
+    """Human-scale decimal units; exact bytes stay in the linked ledger."""
+    if type(value) is not int or value < 0:
+        return 'UNKNOWN'
+    for unit, scale in (('GB', 10**9), ('MB', 10**6), ('KB', 10**3)):
+        if value >= scale:
+            return f'{value / scale:.3f} {unit}'
+    return f'{value} B'
+
+
+def render_concise_summary(data, plan, details_link='audit-details.zh.md'):
+    """Decision view, not the evidence ledger or an executable selection list."""
+    if any(row.get('actionable') or row.get('source') == 'file-type-metadata' for row in plan['rows']):
+        return render_evidence_table(data, plan)  # Explicit legacy optional modes.
+    from urllib.parse import quote
+    from pathlib import PurePosixPath
+    detail_href = quote(str(details_link), safe='/.:_-')
+    ledger_href = quote(str(PurePosixPath(str(details_link)).parent / 'evidence-ledger.json'), safe='/.:_-')
+    sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
+    ledger = evidence_ledger(data, plan)
+    capacity, analyze = sources.get('mole-status', {}), sources.get('mole-analyze', {})
+    clean, purge = sources.get('mole-clean', {}), sources.get('mole-purge', {})
+    wt = sources.get('codex-worktree-inventory', {})
+    occupied = [r for r in ledger if r['source'] in ('mole-analyze', 'mole-analyze-drilldown')]
+    chosen = {}
+    for row in occupied:
+        if row['measured_size'] is None:
+            continue
+        key = row['category']
+        old = chosen.get(key)
+        score = (row['scan_completeness'] == 'COMPLETE', row['measured_size'])
+        if old is None or score > (old['scan_completeness'] == 'COMPLETE', old['measured_size']):
+            chosen[key] = row
+    broad = {'other', 'home', 'user_library', 'applications', 'system_library', 'codex_data', 'android_data'}
+    selected = sorted((r for k, r in chosen.items() if k not in broad), key=lambda r: r['measured_size'], reverse=True)[:5]
+    # Sessions are not disposable cache and must not disappear behind large containers.
+    sessions = chosen.get('codex_sessions')
+    if sessions and sessions not in selected:
+        selected = selected[:4] + [sessions]
+    display = lambda r: r['finding'] + ' ' + compact_size(r['measured_size']) + ('（' + r['scan_completeness'] + '）' if r['scan_completeness'] != 'COMPLETE' else '')
+    ids = lambda rows: '〔证据 ' + '/'.join(str(r['evidence_id']) for r in rows) + '〕'
+    lines = ['# 磁盘审核：先看这些', '',
+        '本次未清理。容量 ' + compact_size(capacity.get('total_bytes')) + '，已用 ' + compact_size(capacity.get('used_bytes')) + '，可用差额 ' + compact_size(capacity.get('free_bytes')) + '（官方 status 口径，不含 Finder 可清除空间）。',
+        '主要占用：' + ('；'.join(display(r) for r in selected) if selected else '尚无可靠分类测量') + '。占用不等于可回收，父子/来源可能重叠，不能相加。']
+    other = chosen.get('other')
+    if other:
+        lines.append('另有未解释范围 Other ' + compact_size(other['measured_size']) + '（' + other['scan_completeness'] + '，不同范围可能嵌套，非额外可清理空间）。')
+    lines += ['', 'clean 上游预览总计约 ' + compact_size(clean.get('candidate_estimate_bytes')) + '（' + STATUS.get(clean.get('completeness'), 'UNKNOWN') + '，不是分类求和）；仅舍入候选，不保证释放。',
+        'purge 独立预览：' + STATUS.get(purge.get('completeness'), 'UNKNOWN') + '，候选约 ' + compact_size(purge.get('candidate_estimate_bytes')) + '；' + failure_detail(purge) + '。不能用 clean 结果替代，也不能与 clean 相加。', '', '## 建议选项（不是删除批准）', '']
+    options = []
+    previews = [r for r in ledger if r['source'] == 'mole-clean' and type(r['measured_size']) is int and r['measured_size'] > 0]
+    previews.sort(key=lambda r: r['measured_size'], reverse=True)
+    if previews:
+        rows = previews[:2]
+        options.append('先复核 clean 缓存候选：' + '、'.join(display(r) for r in rows) + '。核对官方精确条目及活动应用/离线需求；可能重下、重建或重新登录，不按聚合类别直接删。' + ids(rows))
+    sdk = chosen.get('android_sdk')
+    if sdk:
+        options.append('核对 Android SDK ' + compact_size(sdk['measured_size']) + '：用 SDK Manager 找不再依赖的版本；可能需重新下载，先确认项目和离线需求。这里只测占用，未确认可释放量。' + ids([sdk]))
+    valuable = [chosen[k] for k in ('colima_data', 'container_data', 'android_emulators', 'xcode_simulators') if k in chosen]
+    if valuable:
+        valuable.sort(key=lambda r: r['measured_size'], reverse=True)
+        rows = valuable[:2]
+        options.append('复核 ' + '、'.join(display(r) for r in rows) + '：用所属容器/设备管理工具确认不用的实例与备份；卷、数据库或模拟器可能含唯一状态，不直接删目录。' + ids(rows))
+    codex = [chosen[k] for k in ('codex_worktrees', 'codex_sessions') if k in chosen]
+    if codex:
+        options.append('先保留 ' + '、'.join(display(r) for r in codex) + '：在 Codex 核对历史/工作用途；会话可能唯一，Git/活动/未推送安全检查未完成，禁止整棵 worktree 删除。' + ids(codex))
+    if len(options) < 5:
+        candidate = purge.get('candidate_estimate_bytes')
+        if type(candidate) is int and candidate >= 0 and purge.get('completeness') != 'FAILED':
+            step = '复核 purge 构建/依赖候选约 ' + compact_size(candidate) + '：单独核对项目与可重建产物，先停相关任务并评估重新下载/编译成本；不是删源码、仓库或整个 worktree。'
+        else:
+            step = 'purge 暂不计清理收益：只在所需条件满足后安排一次受保护、限时预览；失败/超时/中断保留未知，不放宽权限、不无限重试。purge 查构建/依赖候选，不等于删除 worktree。'
+        options.append(step)
+    if len(options) < 3:
+        remaining = [r for r in selected if r['category'] not in {'codex_sessions', 'codex_worktrees', 'android_sdk', 'colima_data', 'container_data', 'android_emulators', 'xcode_simulators'}]
+        for row in remaining:
+            if len(options) >= 3:
+                break
+            options.append('复核 ' + display(row) + '：' + next_step(row['category']) + '。未确认可回收量。' + ids([row]))
+    # Sparse evidence yields fewer concrete options rather than fabricated findings.
+    lines += [str(i) + '. ' + value for i, value in enumerate(options[:5], 1)]
+    limits = []
+    if any(r['observation_time_unix'] is None for r in ledger):
+        limits.append('观察时点 UNKNOWN，保存记录不代表当前状态')
+    else:
+        limits.append('各来源并非原子快照，执行前须重新核验')
+    if 'codex-worktree-inventory' in sources:
+        observed = wt.get('observed_worktree_count')
+        count = 'worktree 精确数 ' + number(wt.get('worktree_count'))
+        if type(observed) is int:
+            count += '，已观察至少 ' + number(observed)
+        limits.append(count + '；workspace 数量/覆盖 ' + number(wt.get('workspace_count')) + '/' + STATUS.get(wt.get('workspace_count_completeness'), 'UNKNOWN') + '；清单分配字节与 Mole 目录字节不可相减')
+    home_top = [g.get('observed_bytes') for g in analyze.get('categories', []) if g.get('category') == 'home']
+    home_detail = [d.get('occupied_bytes') for d in analyze.get('drilldowns', []) if d.get('scope_label') == 'home']
+    if home_top and home_detail and home_top[0] != home_detail[0]:
+        limits.append('Home overview 与下钻覆盖矛盾未解释，不能算术调平')
+    if any(d.get('drilldown_budget_exhausted') for d in analyze.get('drilldowns', [])):
+        limits.append('下钻达到预算，覆盖仍 PARTIAL')
+    lines += ['', '关键限制：' + '；'.join(limits) + '。',
+        '已确认可精确执行的清理量 UNKNOWN。clean 实际清理会永久删除、重扫并可能清空未保护 Trash；预览不等于零副作用。编号仅用于讨论，不授权 broad clean、purge --yes 或删除文件。', '',
+        '[查看完整证据、精确字节、来源与覆盖](' + detail_href + ') · [证据 ledger](' + ledger_href + ')', '']
     return '\n'.join(lines)
