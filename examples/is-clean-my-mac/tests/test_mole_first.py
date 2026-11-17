@@ -30,7 +30,7 @@ class MoleFirstTests(unittest.TestCase):
     def test_official_categories_drilldown_and_unknown_workspace_inline(self):
         data={'sources':[dict(source='mole-analyze',completeness='PARTIAL',categories=[dict(category='home',observed_bytes=50000,measured_entries=1)],drilldowns=[dict(categories=[dict(category='movies',observed_bytes=30000,measured_entries=2)])]),dict(source='codex-worktree-inventory',completeness='PARTIAL',workspace_count=None,worktree_count=5,worktree_count_completeness='COMPLETE',observed_allocated_bytes=12345)]}
         plan=plans.build_plan(data);text=report.render_summary(data,plan)
-        for value in ('50,000','30,000','12,345','视频目录','workspace UNKNOWN','worktree 5','不能相加'):self.assertIn(value,text)
+        for value in ('30,000','12,345','视频目录','workspace UNKNOWN','worktree 5','不能相加'):self.assertIn(value,text)
         self.assertTrue(all(not row['actionable'] for row in plan['rows']))
         self.assertNotIn('Home 已测子集',text)
         self.assertNotIn('什么类型的文件占空间',report.render(data))

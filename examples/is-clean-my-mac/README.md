@@ -4,7 +4,7 @@
 
 > 全面审核我的 Mac 磁盘，给我清理计划，先不要清理。
 
-官方 Mole Skill 负责解释磁盘和清理规则；薄 harness 补齐四源覆盖、隐私聚合和 Codex worktree 清单。Agent 在对话直接展示编号表：主要目录用途/占用、缓存和构建候选、数量/覆盖、风险和准确失败原因。默认最多对两个官方最大顶层目录做 Mole 下钻，不做 Home 扩展名普查，也不准备删除对象。占用不是可回收；审核不清理。
+官方 Mole Skill 负责解释磁盘和清理规则；薄 harness 补齐四源覆盖、隐私聚合和 Codex worktree 清单。Agent 在对话直接展示编号表：主要目录用途/占用、缓存和构建候选、数量/覆盖、风险和准确失败原因。默认 analyze 总计最多八次（一次顶层加七次下钻），在原有总时间预算内沿固定公开工具布局渐进测量 Codex worktrees/会话、Colima、Android 等；会话/worktree 只用父级测量，不枚举其子目录，不做 Home 扩展名普查，也不准备删除对象。占用不是可回收；审核不清理。
 
 ## 安装或更新
 
@@ -33,7 +33,7 @@ Agent 获取新检出、检查源码和唯一安装器，展示具体计划并�
 
 ## 证据与限制
 
-最新 MacBook 实际审核尚未达到用户目标；本次按已批准 Mole-first 方向修复，真实验收仍待 Jim。历史测试不证明当前可用或模型效果一致。见 [本次证据](evidence/mole-first-harness.md)、[精确执行证据](evidence/precise-cache-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
+最新 MacBook 实际审核尚未达到用户目标；本次按已批准 Mole-first 方向修复，真实验收仍待 Jim。历史测试不证明当前可用或模型效果一致。见 [本次具体证据修复](evidence/specific-evidence.md)、[前次证据](evidence/mole-first-harness.md)、[精确执行证据](evidence/precise-cache-execution.md) 和 [MacBook验证](MACBOOK-VERIFY.md)。
 
 四源仍为 Mole analyze、clean/purge预览及worktree清单。原始Mole数据在本地有界spool，内层边界阻止主机cache/config/log写入，clean仅可更新精确预览。Mole支持1.54.0/1.72.0，未知版本不升级。目录用途来自固定元数据规则，不是内容分类；未知项不猜测。不把Home当全盘、占用当可回收、不同维度/来源相加。worktree整体永不删除。
 
