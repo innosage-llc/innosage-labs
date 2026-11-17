@@ -1,8 +1,10 @@
 # MacBook 最小验证
 
+明确更新请求已覆盖同范围普通操作时，Agent 检查并说明实际计划后直接提交 INSTALL，不再二次询问；保留 owner 要求先批计划、范围变化和平台强制确认。URL 本身不是同意。
+
 先让本地 Agent 安全更新（现有 Mole/官方 Skill 不升级，历史备份不处理）：
 
-> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
+> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，只更新受管理的 wrapper，保留 Mole 和其他 Skills，不要扫描或清理磁盘。
 
 更新后启动新 Luna 会话，保持原来的设置，只发：
 

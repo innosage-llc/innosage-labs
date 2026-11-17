@@ -43,6 +43,22 @@ class InstallerTests(unittest.TestCase):
              consent_input, contextlib.redirect_stdout(io.StringIO()):
             installer.main()
 
+    def test_wrapper_update_does_not_install_missing_components(self):
+        for plan in (False, True):
+            with self.assertRaisesRegex(ValueError, 'Wrapper-only update'):
+                self.invoke(update=True, plan=plan)
+        self.assertFalse(self.target.exists())
+        self.assertFalse(any(c[0] in ('npx', 'brew') for c in self.commands))
+
+    def test_wrapper_update_missing_cli_preserves_existing_skills(self):
+        self.invoke()
+        receipt = (self.target.parent / 'is-clean-my-mac-install.json').read_bytes()
+        self.commands.clear()
+        with self.assertRaisesRegex(ValueError, 'Wrapper-only update'):
+            self.invoke(update=True, missing_mole=True)
+        self.assertEqual(receipt, (self.target.parent / 'is-clean-my-mac-install.json').read_bytes())
+        self.assertFalse(any(c[0] in ('npx', 'brew') for c in self.commands))
+
     def test_plan_and_denied_consent_no_writes(self):
         self.invoke(plan=True)
         self.assertFalse(self.target.exists())

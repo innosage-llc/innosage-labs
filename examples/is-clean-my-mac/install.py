@@ -360,8 +360,8 @@ def main():
         _,_,action=transaction_state(target,record)
         print('Recovery plan: '+action+' pending managed wrapper transaction only; preserve historical backups and unknown/modified objects.')
         if args.plan:return
-        try:consent=input('Type INSTALL for this exact recovery plan (agent: only after owner approval): ')
-        except EOFError:raise ValueError('No recovery consent on stdin; obtain owner approval before INSTALL.') from None
+        try:consent=input('Type INSTALL for this exact recovery plan (agent: existing explicit request may cover this plan; respect required confirmations): ')
+        except EOFError:raise ValueError('No recovery acknowledgement on stdin; submit INSTALL only when trusted owner consent explicitly covers this recovery plan.') from None
         if consent!='INSTALL':raise ValueError('Consent not given; no changes made.')
         recover_update(target,record)
         print('Recovery verified; one active wrapper. Start a fresh session.');return
@@ -397,6 +397,8 @@ def main():
         else:
             missing.append(name)
     has_mole = shutil.which('mo') is not None
+    if args.update_managed and (missing or not has_mole):
+        raise ValueError('Wrapper-only update requires existing managed Skills and Mole CLI; missing components need a separately scoped installation decision.')
     print('Plan: preserve existing Mole CLI; verify its version only.' if has_mole else
           'Plan: install Mole CLI with brew install mole (Homebrew may fetch formula dependencies).')
     print('Skills to install: ' + (', '.join(missing) or 'none; verify existing managed files'))
@@ -414,9 +416,9 @@ def main():
         print('Managed files verified. Start a fresh Codex session and verify both Skills are listed.')
         return
     try:
-        consent = input('Type INSTALL for this exact plan (agent: only after owner approval): ')
+        consent = input('Type INSTALL for this exact plan (agent: existing explicit request may cover this plan; respect required confirmations): ')
     except EOFError:
-        raise ValueError('No consent received on stdin; disclose this plan and obtain owner approval before submitting INSTALL.') from None
+        raise ValueError('No acknowledgement on stdin; inspect/disclose the plan, then submit INSTALL only when covered by trusted owner consent; an existing matching explicit request suffices unless confirmation is required.') from None
     if consent != 'INSTALL':
         raise ValueError('Consent not given; no changes made.')
     # Fetch through the official Skills CLI into an isolated HOME. Do not touch
