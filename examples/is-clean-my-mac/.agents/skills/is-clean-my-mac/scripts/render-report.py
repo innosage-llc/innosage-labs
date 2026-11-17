@@ -37,7 +37,7 @@ REASONS = {
  'scan_unavailable': '扫描不可用', 'unrecognized_output': '核心输出形状未知',
  'drilldown_failed_or_timed_out': '官方目录下钻失败或超时，保留顶层测量',
  'source_process_failed_or_timed_out': '来源进程失败或超时'}
-REASONS.update(output_encoding_invalid='输出编码无法识别，保留已知退出/诊断',
+REASONS.update(capacity_snapshot='官方系统卷容量快照（差额口径）', capacity_schema_unverified='容量结构/根卷身份未验证', shared_budget_exhausted='共享总预算不足，来源未执行', output_encoding_invalid='输出编码无法识别，保留已知退出/诊断',
                upstream_no_candidates_scope_unverified='官方本次范围未找到候选；完整范围未验证',
                installed_help_incompatible='本版本帮助与固定参数不兼容',
                preflight_command_or_data_boundary_failed='预检/数据边界失败；具体根因未验证')
@@ -54,6 +54,10 @@ def size(value):
 
 
 def risk(category):
+    if category in ('codex_sessions','codex_worktrees','colima_data','android_emulators'):
+        return '可能包含唯一历史、未推送工作或设备/卷状态；先保留，恢复保证未知'
+    if category == 'android_sdk':
+        return '可能需重新下载 SDK；项目依赖、离线可用性与耗时未知'
     if category in ('ios_backups', 'old_downloads', 'xcode_archives', 'container_data', 'xcode_simulators'):
         return '可能是唯一备份/个人数据/容器或模拟器状态；仅复核，恢复保障未知'
     if category in ('xcode_derived_data', 'build_and_dependencies', 'node_modules', '.build', 'build', 'target', 'dist', '.next', '.nuxt', 'vendor', 'Pods', 'other_build_artifacts'):
@@ -180,7 +184,7 @@ def render_evidence_table(data, plan):
     sources = {s.get('source'):s for s in data.get('sources',[]) if isinstance(s,dict) and s.get('source') in SOURCES}
     types = sources.get('mole-analyze',{}).get('file_type_inventory',{})
     lines = ['## Mole 磁盘占用与候选决策表', '',
-      f"方案 {plan['plan_id'][:12]}，10 分钟有效。占用来自官方 Mole；目录用途是固定路径规则的解释，不是文件内容/可删除性证明。下钻与父项重叠，不能相加；PARTIAL 为已测下界。", '',
+      f"方案 {plan['plan_id'][:12]}，10 分钟有效。占用来自官方 Mole；目录用途是固定路径规则的解释，不是文件内容/可删除性证明。下钻与父项重叠，不能相加；PARTIAL 可能是覆盖不足、舍入或重叠未知，不能统一称下界。", '',
       '| 行 | 类型/候选 | 占用或候选估算 | 条目数 | 风险/恢复与操作 |', '| --- | --- | --- | --- | --- |']
     for row in plan['rows']:
         key = row['category']
@@ -237,7 +241,7 @@ def render_evidence_table(data, plan):
 def next_step(category):
     """Useful review routes are not execution capabilities or deletion consent."""
     return {
-      'codex_worktrees': '与独立 Git 清单交叉核对活动/未提交/未推送状态；整棵保留，不执行删除',
+      'codex_worktrees': '保留整棵 worktree；独立清单仅提供数量/分配字节，活动/未提交/未推送安全检查尚未完成',
       'codex_sessions': '会话历史可能唯一；在 Codex 中核对保留需求，未读会话内容，不自动删除',
       'codex_data': '优先看 worktrees 与会话子项；父子重叠，不能相加或视为可回收',
       'colima_data': '在 Colima/Docker 官方工具核对实例与卷用途/备份；可能含唯一数据，不直接删目录',
@@ -249,42 +253,132 @@ def next_step(category):
     }.get(category, '仅复核；' + risk(category))
 
 
+def evidence_ledger(data, plan):
+    """Measurements, interpretation and authorization remain separate fields."""
+    sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
+    contexts = []
+    analyze = sources.get('mole-analyze', {})
+    for source, scope, parent in [(analyze, 'overview', None)] + [
+            (d, 'public:' + d.get('scope_label', 'unknown') if d.get('scope_label') in LABELS else 'unknown',
+             d.get('parent_scope') if d.get('parent_scope') in ['overview'] + ['public:' + k for k in LABELS] else 'UNKNOWN')
+            for d in analyze.get('drilldowns', [])]:
+        for group in source.get('categories', []):
+            contexts.append((group, source, scope, parent))
+    analyze_context = iter(contexts)
+    ledger = []
+    for row in plan['rows']:
+        name, key = row.get('source'), row.get('category')
+        source = sources.get(name, {})
+        scope, parent, group = 'UNKNOWN', None, {}
+        if name in ('mole-analyze', 'mole-analyze-drilldown'):
+            group, source, scope, parent = next(analyze_context, ({}, {}, 'UNKNOWN', None))
+        elif name in ('mole-clean', 'mole-purge'):
+            scope = name + ':preview'
+        elif name == 'codex-worktree-inventory':
+            scope = 'codex:inventory'
+        stamp = source.get('observed_at_unix')
+        if type(stamp) not in (int, float) or not 0 <= stamp <= 10**12:
+            stamp = None
+        preview = name in ('mole-clean', 'mole-purge')
+        measurement = 'rounded_preview_estimate' if preview else 'independent_allocated_subset' if name == 'codex-worktree-inventory' else 'Mole_reported_occupied_bytes'
+        amount = row.get('candidate_estimate_bytes') if preview else row.get('occupied_bytes')
+        if name == 'codex-worktree-inventory' and amount is None:
+            amount = source.get('observed_allocated_bytes') if source.get('completeness') != 'FAILED' else None
+        if type(amount) is not int or amount < 0:
+            amount = None
+        contradictions = []
+        if name in ('mole-analyze', 'mole-analyze-drilldown'):
+            contradictions.append('overlapping_scopes_not_unique_total')
+        if key in ('codex_worktrees', 'worktrees'):
+            contradictions.append('Mole_and_inventory_scope_metrics_not_reconciled')
+        if scope == 'public:home' or key == 'home':
+            contradictions.append('overview_and_detail_coverage_not_reconciled')
+        ledger.append(dict(evidence_id=row['row_id'], finding=LABELS.get(key, 'Codex worktree' if key == 'worktrees' else '其他/未知'),
+            source=name if name in (*SOURCES, 'mole-analyze-drilldown', 'precise-cache', 'file-type-metadata') else 'UNKNOWN',
+            source_command={'mole-analyze':'mo analyze --json', 'mole-analyze-drilldown':'mo analyze --json <verified public scope>',
+                'mole-clean':'mo clean --dry-run','mole-purge':'mo purge --dry-run','codex-worktree-inventory':'bundled read-only inventory'}.get(name,'optional workflow'),
+            category=key if key in LABELS or key == 'worktrees' else 'other', measured_size=amount,
+            measurement_type=measurement, scan_completeness=STATUS.get(group.get('completeness', source.get('completeness')), 'UNKNOWN'),
+            cleanup_coverage='aggregate_preview_only' if preview else 'not_established',
+            recovery_cost=risk(key), overlap='UNKNOWN_may_overlap', contradictions=contradictions,
+            recommended_next_step=next_step(key), scope_id=scope, parent_scope=parent,
+            observation_time_unix=stamp, executable_authorization=False))
+    return ledger
+
+
 def render_summary(data, plan):
-    """Prioritized findings keep original evidence IDs; full plan remains local."""
-    if any(row.get('actionable') for row in plan['rows']):
-        return render_evidence_table(data, plan)  # Optional exact-object UX unchanged.
-    rows = plan['rows']
-    specific = {'codex_worktrees', 'codex_sessions', 'colima_data', 'android_sdk',
-                'android_emulators', 'xcode_derived_data', 'homebrew_cache'}
-    parents = {'home', 'user_library', 'applications', 'system_library'}
-    categories = {row['category'] for row in rows if row.get('occupied_bytes') is not None}
-    if categories & {'codex_worktrees', 'codex_sessions'}:
-        parents.add('codex_data')
-    if categories & {'android_sdk', 'android_emulators'}:
-        parents.add('android_data')
-    candidates = [r for r in rows if r['category'] not in parents and
-                  (r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None)]
-    if not candidates:
-        candidates = [r for r in rows if r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None]
-    candidates.sort(key=lambda r: (max(r.get('occupied_bytes') or 0, r.get('candidate_estimate_bytes') or 0),
-                    r['category'] in specific), reverse=True)
-    selected, seen = [], set()
-    for row in candidates:
-        # Same semantic category can occur in parent and child analyze output.
-        key = ('analyze' if row['source'].startswith('mole-analyze') else row['source'], row['category'])
-        if key in seen:
+    if any(row.get('actionable') or row.get('source') == 'file-type-metadata' for row in plan['rows']):
+        return render_evidence_table(data, plan)
+    sources = {s.get('source'): s for s in data.get('sources', []) if isinstance(s, dict)}
+    ledger = evidence_ledger(data, plan)
+    capacity = sources.get('mole-status', {})
+    lines = ['## 容量基线', '',
+        '系统卷容量 ' + size(capacity.get('total_bytes')) + '；已用 ' + size(capacity.get('used_bytes')) + '；可用差额 ' + size(capacity.get('free_bytes')) + '。',
+        '基线仅来自受保护的官方 status 同一卷 total − used；不是 Finder 含可清除空间的可用值。缺失保持 UNKNOWN。', '',
+        '## 主要占用（不是清理优先级）', '',
+        '| 证据 ID | 类型 | Mole 已观测字节 | 覆盖 |', '| --- | --- | --- | --- |']
+    occupied = [r for r in ledger if r['source'] in ('mole-analyze','mole-analyze-drilldown')]
+    specific = {'codex_worktrees','codex_sessions','colima_data','android_sdk','android_emulators','xcode_simulators','xcode_derived_data','container_data'}
+    chosen = {}
+    for row in occupied:
+        key = row['category']
+        if key in ('other','home','user_library','applications','system_library','codex_data','android_data'):
             continue
-        seen.add(key)
-        selected.append(row)
-        if len(selected) == 6:
-            break
-    text = render_evidence_table(data, dict(plan, rows=selected))
-    sources = {s.get('source'): s for s in data.get('sources', [])}
+        score = (row['scan_completeness'] == 'COMPLETE', row['measured_size'] or 0)
+        previous = chosen.get(key)
+        if previous is None or score > (previous['scan_completeness'] == 'COMPLETE', previous['measured_size'] or 0):
+            chosen[key] = row
+    occupiers = sorted(chosen.values(), key=lambda r: (r['category'] in specific, r['measured_size'] or 0), reverse=True)
+    for row in occupiers:
+        lines.append(f"| {row['evidence_id']} | {row['finding']} | {size(row['measured_size'])} | {row['scan_completeness']} |")
+    if not occupiers:
+        lines.append('| — | 尚无可解释的分类 | UNKNOWN | UNKNOWN |')
+    analyze = sources.get('mole-analyze', {})
+    lines += ['', 'Mole overview 报告值 ' + size(analyze.get('occupied_bytes')) + '（' + STATUS.get(analyze.get('completeness'),'UNKNOWN') + '）；不是全盘已用或无条件唯一字节下界。']
+    unknown = [r for r in occupied if r['category'] == 'other']
+    if unknown:
+        lines += ['', '未解释范围 Other（每条独立保留，可能嵌套；不合并、不据体积生成清理建议）：']
+        lines += [f"- 证据 {r['evidence_id']}：{size(r['measured_size'])}；{r['scan_completeness']}；范围 {r['scope_id']}。" for r in unknown]
+    lines += ['', '## 清理预览与已确认可执行潜力', '', '| 证据 ID | 预览类别 | 舍入候选估算 | 覆盖 |', '| --- | --- | --- | --- |']
+    previews = [r for r in ledger if r['source'] in ('mole-clean','mole-purge') and r['measured_size'] is not None]
+    for row in previews:
+        lines.append(f"| {row['evidence_id']} | {row['finding']} | {size(row['measured_size'])} | {row['scan_completeness']}；仅聚合预览 |")
     clean = sources.get('mole-clean', {})
-    total = size(clean.get('candidate_estimate_bytes'))
-    text = text.replace('## Mole 磁盘占用与候选决策表', '## 优先复核的磁盘发现')
-    text = text.replace('10 分钟有效。', '10 分钟有效。编号是原始证据 ID，跳号正常；完整分类与未入选证据保留在本地报告/方案。')
-    if any(d.get('drilldown_budget_exhausted') for d in sources.get('mole-analyze', {}).get('drilldowns', [])):
-        text += '\n下钻覆盖 PARTIAL：已达到调用/时间预算，仍有公开工具根未测；已完成类别保留各自测量状态。\n'
-    text += '\nMole clean 预览总计：候选约 ' + total + '（' + STATUS.get(clean.get('completeness'), 'UNKNOWN') + '）。分类是总计的解释，不额外相加；这不是实际释放或已授权操作。\n'
-    return text
+    lines += ['', 'Mole clean 预览总计：候选约 ' + size(clean.get('candidate_estimate_bytes')) + '（' + STATUS.get(clean.get('completeness'),'UNKNOWN') + '）。分类不额外加到总计；舍入、未测量和重叠使它不是保证或下界。',
+        '已确认可精确执行的潜力 UNKNOWN：默认没有对象清单或删除授权。clean 永久删除并可能清空未保护 Trash；会重扫，不能按聚合行选择。purge --yes 也不能缩小到这些行。', '',
+        '## 编号建议（证据、恢复成本与后悔风险优先）', '', '| 证据 ID | 建议 | 成本/保留理由 |', '| --- | --- | --- |']
+    # Preview-backed review first, then preservation decisions for valuable data.
+    # Other remains in its own coverage section and never displaces sessions/cache.
+    recommendations = previews + [r for r in occupiers if r['category'] in specific]
+    seen = set()
+    for row in recommendations:
+        key = (row['source'] if row in previews else 'occupancy',row['category'])
+        if key in seen: continue
+        seen.add(key)
+        step = '先核对官方预览中具体范围及活动/离线需求；不执行聚合删除' if row in previews else row['recommended_next_step']
+        lines.append(f"| {row['evidence_id']} | {row['finding']}：{step} | {row['recovery_cost']} |")
+    wt = sources.get('codex-worktree-inventory', {})
+    observed_count = wt.get('observed_worktree_count')
+    lines += ['', '## 覆盖与矛盾', '',
+        f"Codex workspace {number(wt.get('workspace_count'))}；worktree 精确数 {number(wt.get('worktree_count'))}，已观察数量 {number(observed_count)}；数量覆盖 {STATUS.get(wt.get('worktree_count_completeness'),'UNKNOWN')}。",
+        '独立清单已测分配字节 ' + size(wt.get('observed_allocated_bytes') if wt.get('completeness') != 'FAILED' else None) + '；这是枚举子集，不能与 Mole 的目录字节相减来算缺口或可回收。Git/活动/未提交/未推送仍 UNKNOWN，清单不等于完成 Git 安全检查。',
+        'overview 与 Home 下钻可能具有不同覆盖和时点；即使类别和等于 overview，也不证明不重叠。去重标签不证明范围互斥，不能相加，也不能跨父子/来源相减。PARTIAL 不统一解释为下界。', '',
+        '| 来源 | 覆盖/失败 |', '| --- | --- |']
+    for name, label in [('mole-status','Mole status 容量补充')] + list(SOURCES.items()):
+        source = sources.get(name,{})
+        lines.append(f"| {label} | {STATUS.get(source.get('completeness'),'UNKNOWN')}；{failure_detail(source)} |")
+    if any(d.get('drilldown_budget_exhausted') for d in analyze.get('drilldowns', [])):
+        lines.append('下钻覆盖 PARTIAL：达到调用/时间预算；已完成类别保留各自状态。')
+    home_overview = [g.get('observed_bytes') for g in analyze.get('categories', []) if g.get('category') == 'home']
+    home_details = [d.get('occupied_bytes') for d in analyze.get('drilldowns', []) if d.get('scope_label') == 'home']
+    if home_overview and home_details:
+        lines.append('Home overview 记录 ' + size(home_overview[0]) + '；Home 下钻记录 ' + size(home_details[0]) + '。覆盖/时点不一致尚未解释，不作算术调平。')
+    known_inventory_reasons = {'count_unrecognized_root_contents','count_unrecognized_worktree_layout','scan_budget_exhausted','symlink_not_followed','unrecognized_root_contents','unrecognized_worktree_layout','entry_inaccessible_or_changed','enumeration_failed'}
+    reasons = [x for x in wt.get('reasons', []) if isinstance(x,str) and x in known_inventory_reasons]
+    if reasons:
+        lines.append('清单覆盖标记：' + '、'.join(reasons) + '；未完成部分不推断为零。')
+    elapsed = data.get('total_duration_seconds')
+    lines += ['', '本次总墙钟耗时 ' + (str(elapsed) + ' 秒' if type(elapsed) in (int,float) and elapsed >= 0 else 'UNKNOWN；各来源耗时之和不是已验证墙钟时间') + '。',
+        '方案 ' + plan['plan_id'][:12] + '；编号沿用证据 ID，跳号正常。完整 ledger/方案留本地，测量、解释和授权分开。所有默认聚合行均没有已验证的精确清理操作；批准编号不能扩大到 mo clean、purge --yes、Trash 或整棵 worktree。',
+        '本次未清理；实际释放 UNKNOWN。会话/容器卷/模拟器可能含唯一数据；SDK/构建/缓存可能需重下或重建，恢复时间与成本未测。', '']
+    return '\n'.join(lines)

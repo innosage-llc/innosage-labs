@@ -5,26 +5,19 @@ description: 在本地 macOS 用官方 Mole 审核磁盘、解释主要占用和
 
 # is-clean-my-mac
 
-用户说“全面审核我的 Mac 磁盘，给我清理计划，先不要清理。”时直接开始；不要求更长提示词或换模型。
+用户说“全面审核我的 Mac 磁盘，给我清理计划，先不要清理。”时直接开始，不要求更长提示词或换模型。先读本机已安装的官方 **mole Skill**、macOS reference 和本例 [审核契约](references/audit-contract.md)。官方 Mole 决定命令语义、用途解释与恢复成本；harness 补齐覆盖、隐私和独立 worktree 清单。
 
-## Mole 为主，harness 补齐覆盖
+## 六步审核
 
-先读取本机已安装的官方 **mole Skill** 和其 macOS reference。由它指导如何解释磁盘占用、按后悔/恢复成本排序、区分 clean/purge/uninstall 与个人数据的处理路线；不要只运行 helper 后给出机械状态。Mole 是命令语义和清理规则的权威。本 Skill 只补齐四源覆盖、隐私边界、worktree 清单及对话表。缺依赖时使用 [唯一安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，获真实 owner 对具体计划的同意后安装/更新；安装本身不扫描或清理。
+1. 确认官方 Skill、平台和版本。依赖缺失时走 [唯一安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，具体计划经真实 owner 同意后安装/更新；安装不扫描。运行入口是**当前已读 SKILL.md 同目录**的 `scripts/audit-all.py`：`python3 -B <该 Skill 目录>/scripts/audit-all.py`。不从工作目录猜路径，不手造证据。入口先受保护验证版本/帮助，采集官方 status 的容量投影和 analyze overview；status 只输出同一系统卷容量/已用/差额，未知保持 UNKNOWN。
+2. 诊断失败而不绕过。analyze 启动可能改缓存，purge 启动可能写配置；**版本、帮助、status、下钻、预览全部保留现有拒绝主机写入/网络边界**。clean 仅允许更新精确本地 clean-list。不得因官方通用示例而裸跑命令、改配置、权限或升级包。失败不变零；purge 保留阶段/退出码/观察标记，不推断根因。
+3. 在共享总预算内先解释最大的未解释允许范围。analyze 最多八次测量（顶层加七次下钻），固定公开物理/同设备工具根，不跟链接。会话/worktree 用父级大小，不枚举其子目录；Colima 固定根是上游跳过父扫描后的显式测量。独立清单只给数量和分配字节/覆盖，**不是完成 Git 或活动安全审查**。未知个人目录、Other 留未知，不加新扫描器或读内容。
+4. 顺序收集 clean/purge 预览。仅本地适配器读取官方预览清单，模型接收类别/舍入估算，不接收原始路径，不默认生成删除清单。预览值不是实际释放或唯一范围下界。说明永久删除、重下/重建、模拟器/容器唯一状态和未保护 Trash 风险；聚合命令重扫，无法按本表行号缩小。
+5. 默认总墙钟预算 300 秒，入口给 core 来源保留时间；需要更短时可用 `--timeout`，耗尽明确报告，不自动无限重跑。`--include-file-types` 和 `--precise-candidates` 是另行请求的旧可选模式，不参与默认审核。
+6. 直接在对话给出：**容量基线 → 主要占用 → 预览估算与已确认可执行潜力 → 编号建议 → 覆盖/矛盾**。以 helper 的 `summary_markdown` 和本地 evidence-ledger 为依据，可按官方 Skill 简洁解释，不仅贴链接。保留证据 ID，跳号正常，不重编号。占用不等于清理优先级；按证据、后悔风险、恢复成本排序，保留会话与重要预览类别；Other 单列解释缺口，不挤掉建议。ledger 记录测量类型、范围/父范围、时点、来源、覆盖、重叠、矛盾、恢复成本与下一步，未知不补造。
 
-读取 [审核契约](references/audit-contract.md) 的边界。简短说明本次仅预览：Mole analyze 可能尝试改缓存，purge 启动可能尝试写配置；因此**包括版本/帮助/下钻的每次 Mole 调用都保留内层拒绝主机写入/网络边界**。clean 仅允许更新精确 clean-list 预览文件。不能为了遵循上游一般运行示例而绕过本机边界。
+## 测量、解释与授权分开
 
-从刚读取的本 `SKILL.md` 所在目录定位 `scripts/audit-all.py`（不是工作目录根下），运行 `python3 -B <该 Skill 目录>/scripts/audit-all.py`。若找不到入口，核对已读 Skill 的路径；仍缺失则报告安装缺件，不手造方案/编号。它尝试 analyze、clean dry-run、purge dry-run 及独立 Codex 清单；在相同总时间预算内analyze 总计最多八次（一次顶层加七次渐进下钻）：只沿已观测到的物理目录进入固定公开工具布局（Codex worktrees/会话、Colima、Android、Xcode/缓存）及顶层目录，仅用官方 analyze，不做 Home 扩展名全量枚举，也不收集精确删除对象。会话/worktree 根的大小从父级官方测量取得，不再枚举其子目录；Colima 因上游父扫描跳过，只探测固定物理根后显式测量。原始路径/文件名留本地，模型只接收固定类别聚合。无法解释的 other 保留未知，不自行递归扫描或读文件内容来填满表格。
+overview/父子/insight/不同来源可能重叠；标签去重不证明范围互斥。即使类别之和等于 overview，也不是全盘已用或唯一字节下界。PARTIAL 可能是覆盖、舍入或未知重叠，不能一律称下界。Mole 与独立清单的不同口径不能相减；展示 workspace 未知、精确/已观察 worktree 数、字节覆盖以及 Git/活动状态 UNKNOWN。旧报告无墙钟/时点就保持未知，不把来源耗时相加冒充墙钟。
 
-## 直接回答用户的决定
-
-以官方 Mole Skill 的判断框架，先用一两句话解释**主要是什么占空间、优先复核什么、什么保留**。直接在对话展示 `summary_markdown` 的编号表和四源/工作区覆盖；链接不能代替表格。只展示优先发现，完整证据留本地；编号必须与 `summary_markdown` / plan 完全一致，跳号正常，不重新编号。可据官方 Mole Skill 补充具体复核路线，不能把复核路线当作清理授权。可压缩重复说明，不能省掉实测大小、来源、风险、下界/未知或失败原因。区分 Mole 实测与固定目录用途解释；后者不是内容验证。不要宣称目录类别是全盘文件扩展名普查。
-
-占用与候选估算分开；父子下钻、insight 和来源可能重叠，不相加。worktree 数量与已测字节下界独立报告，workspace 元数据 UNKNOWN 不抹掉已测 worktree；整个 worktree 永不作为可回收。没有预览支持的类别不能说 Mole 可以清理。永久删除、重下/重编译、活动/离线及唯一副本风险按已观察类别解释；实际耗时/备份未验证就说未知。
-
-purge FAILED 必须给出阶段、退出码和脱敏诊断，不能推断零候选、自动归咎 sandbox 或直接重跑裸命令。当前范围无法解决时说明具体下一步/限制，继续报告其他源。不得改配置、权限或升级包来制造成功。
-
-## 后续动作
-
-默认编号是复核行，不是精确删除授权。用户批准这些行时，不能替换为宽范围 `mo clean` / `purge --yes`：clean 重扫且可清空 Trash，purge 无人值守处理全部适合项，不能用行号缩小它们。官方交互选择只交接用户终端，不解析 TUI。
-
-只有用户另行要求审阅受支持的精确下载缓存对象，才读 [可选精确流程](references/optional-execution-workflow.md) 和 [精确执行契约](references/precise-execution.md)，生成新方案；保留原有能力，不扩范围。审核、安装和工程测试同意都不授权清理。执行后必须逐行报告结果、前后可用空间和测量限制；未知物理归因不得冒充确定释放。
+默认聚合行不是删除授权；批准编号不能替换成 `mo clean`、`purge --yes`、清空 Trash 或整棵 worktree 删除。官方交互选择只交接用户终端，不解析 TUI。用户另行要求精确缓存对象时才读 [可选流程](references/optional-execution-workflow.md) 和 [执行契约](references/precise-execution.md)，保留现有能力而不扩范围。实际执行仍需新鲜精确方案和真实逐行批准；报告逐行结果、可用空间变化与归因限制。

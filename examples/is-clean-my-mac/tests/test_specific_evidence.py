@@ -87,7 +87,8 @@ class SpecificEvidenceTests(unittest.TestCase):
         data={'sources':[dict(source='mole-analyze',categories=[dict(category='other',observed_bytes=9000000,measured_entries=1,completeness='PARTIAL'),dict(category='codex_sessions',observed_bytes=4096,measured_entries=1,completeness='COMPLETE')])]}
         text=report.render_summary(data,plans.build_plan(data))
         self.assertIn('9,000,000 B',text)
-        self.assertLess(text.index('| 1 |'),text.index('| 2 |'))
+        self.assertIn('证据 1',text)
+        self.assertIn('未解释范围 Other',text)
 
     def test_colliding_private_tool_names_are_not_public_tool_evidence(self):
         with patch.object(Path,'home',return_value=Path('/synthetic')):
@@ -97,7 +98,7 @@ class SpecificEvidenceTests(unittest.TestCase):
     def test_budget_exhaustion_is_separate_from_complete_measurement(self):
         data={'sources':[dict(source='mole-analyze',completeness='COMPLETE',categories=[dict(category='codex_sessions',observed_bytes=4096,measured_entries=1,completeness='COMPLETE')],drilldowns=[dict(drilldown_budget_exhausted=True)])]}
         text=report.render_summary(data,plans.build_plan(data))
-        self.assertIn('下钻覆盖 PARTIAL',text);self.assertIn('（COMPLETE）',text)
+        self.assertIn('下钻覆盖 PARTIAL',text);self.assertIn('| COMPLETE |',text)
 
     def test_recognized_preview_does_not_retain_parse_failure_marker(self):
         value=adapter.parse('clean','Potential space: 12.00 MB\nDry run complete - no changes made',version='1.72.0')
