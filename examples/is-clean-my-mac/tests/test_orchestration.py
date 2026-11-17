@@ -92,3 +92,17 @@ class OrchestrationTests(unittest.TestCase):
             plan = json.loads(Path(json.loads(output.getvalue())['plan_path']).read_text())
             self.assertFalse(any(row.get('actionable') for row in plan['rows']))
             self.assertIn('precise_candidate_shared_budget_exhausted', json.dumps(plan))
+
+    def test_failed_artifact_verification_never_claims_readable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with patch.object(orchestrator, 'run_all', return_value=dict(sources=[])), \
+                    patch.object(orchestrator.time, 'monotonic', side_effect=[0, 301, 301]), \
+                    patch.object(orchestrator.tempfile, 'mkdtemp', return_value=directory), \
+                    patch.object(orchestrator, 'verify_artifact', return_value=dict(local_readable=False, client_link_opened=False)), \
+                    patch('sys.argv', ['audit-all.py']), contextlib.redirect_stdout(output):
+                orchestrator.main()
+            delivered = json.loads(output.getvalue())
+            self.assertNotIn('已在本机写出并检查可读', delivered['summary_markdown'])
+            self.assertIn('可读性检查失败', delivered['summary_markdown'])
+            self.assertTrue(all(not item['local_readable'] for item in delivered['artifact_verification'].values()))
