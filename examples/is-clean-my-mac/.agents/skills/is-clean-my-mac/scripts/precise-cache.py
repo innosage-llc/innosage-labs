@@ -246,7 +246,7 @@ def discover(home=None, seconds=5, max_entries=20000, now=None):
     if len(objects)>MAX_OBJECTS:reasons.add('candidate_display_limit')
     objects=objects[:MAX_OBJECTS]
     private=dict(schema_version=1,created_at=now,objects=objects)
-    public=dict(source='precise-cache-candidates',completeness='PARTIAL' if reasons else 'COMPLETE',
+    public=dict(source='precise-cache-candidates',observed_at_unix=now,completeness='PARTIAL' if reasons else 'COMPLETE',
         reasons=sorted(reasons),scope='fixed_default_download_cache_layouts_only',
         candidates=[{key:item[key] for key in ('candidate_id','category','scope_digest','allocated_bytes','logical_bytes','age_days')} for item in objects])
     return private,public

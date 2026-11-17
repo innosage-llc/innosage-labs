@@ -206,7 +206,9 @@ class PrecisePlanIntegrationTests(unittest.TestCase):
         public=stdout.getvalue()+Path(result['report_path']).read_text()+Path(result['plan_path']).read_text()+Path(result['aggregate_path']).read_text()
         self.assertNotIn('PRIVATE',public)
         self.assertNotIn(str(self.home),public)
-        self.assertIn('可执行',result['summary_markdown'])
+        self.assertIn('精确方案行',result['summary_markdown'])
+        self.assertIn('活动 UNKNOWN',result['summary_markdown'])
+        self.assertNotIn('| ---',result['summary_markdown'])
         details=self.artifacts/'private-objects.zh.md'
         self.assertEqual(details.stat().st_mode & 0o777,0o600)
         self.assertIn('PRIVATE',details.read_text())
