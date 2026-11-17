@@ -56,6 +56,19 @@ def diagnostic_markers(stdout, stderr, returncode):
     return CaptureDiagnostics(bool(stderr), markers)
 
 
+def public_tool_roots(home):
+    """Only public default layouts; no config, project or content discovery."""
+    return {home / relative: label for relative, label in (
+        ('.codex', 'codex_data'), ('.codex/worktrees', 'codex_worktrees'),
+        ('.codex/sessions', 'codex_sessions'), ('.codex/archived_sessions', 'codex_sessions'),
+        ('.colima', 'colima_data'), ('Library/Android', 'android_data'),
+        ('Library/Android/sdk', 'android_sdk'), ('.android', 'android_data'),
+        ('.android/avd', 'android_emulators'), ('Library/Caches', 'caches'),
+        ('Library/Developer', 'developer_data'),
+        ('Library/Developer/Xcode', 'developer_data'),
+        ('Library/Developer/Xcode/DerivedData', 'xcode_derived_data'))}
+
+
 def category(path, name='', overview=False):
     """Classify locally; never emit user-controlled names or paths."""
     path = path if isinstance(path, str) else ''
@@ -69,11 +82,17 @@ def category(path, name='', overview=False):
             'Gradle Cache': 'developer_caches', 'CocoaPods Cache': 'developer_caches'}
         if isinstance(name, str) and name in insights:
             return insights[name]
+    # Recognize only fixed public tool layouts under this Home, longest first.
+    roots = public_tool_roots(Path.home())
+    candidate = Path(path)
+    for root, label in sorted(roots.items(), key=lambda item: len(item[0].parts), reverse=True):
+        if candidate == root or root in candidate.parents:
+            return label
     # Fixed path components only; names are never returned or interpreted as instructions.
     parts = Path(path).parts
     fixed = {'Downloads': 'downloads', 'Documents': 'documents', 'Pictures': 'pictures',
              'Movies': 'movies', 'Music': 'music', 'Desktop': 'desktop',
-             'Application Support': 'application_support', '.codex': 'codex_data',
+             'Application Support': 'application_support',
              'Virtual Machines.localized': 'virtual_machines', 'Developer': 'developer_data'}
     for component in ('Caches', '.cache', 'Logs', 'node_modules', 'DerivedData'):
         if component in parts:
@@ -107,14 +126,17 @@ def analyze(text, stderr, version):
         extras = len(set(data) - known)
         groups = {}
         statuses = [data.get('scan_status')]
+        group_complete = {}
         for entry in data['entries']:
             if not isinstance(entry, dict) or type(entry.get('size')) is not int:
                 return out
-            extras += len(set(entry) - {'name', 'path', 'size', 'is_dir', 'last_access',
+            entry_extras = len(set(entry) - {'name', 'path', 'size', 'is_dir', 'last_access',
                                         'cleanable', 'scan_status', 'insight'})
+            extras += entry_extras
             status = entry.get('scan_status')
             statuses.append(status)
             label = category(entry.get('path'), entry.get('name'), data['overview'])
+            group_complete[label] = group_complete.get(label, True) and status == 'complete' and not entry_extras
             group = groups.setdefault(label, dict(category=label, observed_bytes=0,
                 measured_entries=0, unknown_entries=0, upstream_cleanable_entries=0,
                 occupied_bytes=None, candidate_estimate_bytes=None, completeness='PARTIAL'))
@@ -128,7 +150,7 @@ def analyze(text, stderr, version):
         complete = (version == '1.72.0' and all(x == 'complete' for x in statuses)
                     and not stderr and not extras and not any(g['unknown_entries'] for g in groups.values()))
         for group in groups.values():
-            if complete and not group['unknown_entries']:
+            if version == '1.72.0' and group_complete[group['category']] and not stderr and not group['unknown_entries']:
                 group.update(occupied_bytes=group['observed_bytes'], completeness='COMPLETE')
         files = data.get('total_files')
         if files is not None and (type(files) is not int or files < 0):
@@ -152,10 +174,10 @@ def analyze(text, stderr, version):
 
 
 def largest_entry_drilldowns(raw, version, deadline):
-    """At most two official directory scans selected locally from overview evidence.
+    """Progressive official scans, at most seven extra calls (eight total) and the original deadline.
 
-    No filenames/paths cross the aggregate boundary. Never follow links or scan
-    arbitrary upstream paths. Failures are independent of the overview result.
+    Only evidence-discovered physical public roots are eligible. Arbitrary child
+    names never become targets; no private path/name leaves this local function.
     """
     details = []
     try:
@@ -163,46 +185,72 @@ def largest_entry_drilldowns(raw, version, deadline):
         if not isinstance(data, dict) or data.get('overview') is not True:
             return details
         home = Path.home().resolve(strict=True)
-        allowed = {home, home / 'Library', Path('/Applications'), Path('/Library')}
-        entries = data.get('entries', [])
-        if not isinstance(entries, list):
-            return details
-        candidates = []
-        for entry in entries:
-            if (not isinstance(entry, dict) or entry.get('is_dir') is not True
-                    or entry.get('insight') is True or type(entry.get('size')) is not int
-                    or entry['size'] <= 0 or not isinstance(entry.get('path'), str)):
-                continue
-            path = Path(entry['path'])
-            try:
-                if path not in allowed or path != path.resolve(strict=True) or not path.is_dir():
+        roots = public_tool_roots(home)
+        roots.update({home: 'home', home / 'Library': 'user_library',
+                      Path('/Applications'): 'applications', Path('/Library'): 'system_library'})
+        pending, seen = {}, set()
+
+        def enqueue(document, parent=None):
+            entries = document.get('entries', []) if isinstance(document, dict) else []
+            if not isinstance(entries, list):
+                return
+            for entry in entries:
+                if (not isinstance(entry, dict) or entry.get('is_dir') is not True
+                        or entry.get('insight') is True or type(entry.get('size')) is not int
+                        or entry['size'] <= 0 or not isinstance(entry.get('path'), str)):
                     continue
-            except OSError:
-                continue
-            candidates.append((entry['size'], str(path)))
-        seen = set()
-        for _, path in sorted(candidates, reverse=True):
-            if path in seen:
-                continue
+                path = Path(entry['path'])
+                if path not in roots or roots.get(path) in ('codex_worktrees', 'codex_sessions') or path in seen or (parent is not None and path.parent != parent):
+                    continue
+                try:
+                    if path != path.resolve(strict=True) or not path.is_dir():
+                        continue
+                except OSError:
+                    continue
+                if path.stat().st_dev != home.stat().st_dev and home in path.parents:
+                    continue
+                pending[path] = entry['size']
+
+        enqueue(data)
+        # Mole 1.72 explicitly skips .colima in parent output. Probe only this
+        # exact public root's metadata (not children); an explicit official scan
+        # remains subject to the same physical-directory/device/time boundary.
+        colima = home / '.colima'
+        try:
+            if home in pending and colima.resolve(strict=True) == colima and colima.is_dir() and colima.stat().st_dev == home.stat().st_dev:
+                pending[colima] = 0
+        except OSError:
+            pass
+        while pending and len(details) < 7:
+            # Prefer discovered specific tools over remaining generic parents.
+            path = max(pending, key=lambda p: (p not in (home, home / 'Library', Path('/Applications'), Path('/Library')), pending[p], str(p)))
+            del pending[path]
             seen.add(path)
-            if len(details) >= 2:
-                break
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                details.append(result('analyze', 'command_timeout', version=version))
-                break
-            try:
-                rc, text, diagnostics = guarded_capture(['mo', 'analyze', '--json', path], min(30, remaining), 'analyze')
-                detail = parse('analyze', text, rc, diagnostics, version)
-                detail.update(command_exit_code=rc, diagnostic_categories=list(diagnostics.categories))
-            except (OSError, ValueError) as error:
-                detail = result('analyze', 'drilldown_failed_or_timed_out', version=version)
-                if isinstance(error, CaptureFailure):
-                    detail.update(command_exit_code=error.returncode,
-                                  diagnostic_categories=list(getattr(error.diagnostics, 'categories', ())))
-            detail['scope_label'] = 'home' if Path(path) == home else 'user_library' if Path(path) == home / 'Library' else 'applications' if path == '/Applications' else 'system_library'
-            detail['overlaps_parent'] = True
+                detail = result('analyze', 'command_timeout', version=version)
+            else:
+                try:
+                    if path.resolve(strict=True) != path or not path.is_dir():
+                        raise ValueError('physical_directory_changed')
+                    rc, text, diagnostics = guarded_capture(['mo', 'analyze', '--json', str(path)], min(30, remaining), 'analyze')
+                    if path.resolve(strict=True) != path or not path.is_dir():
+                        raise ValueError('physical_directory_changed')
+                    detail = parse('analyze', text, rc, diagnostics, version)
+                    detail.update(command_exit_code=rc, diagnostic_categories=list(diagnostics.categories))
+                    if rc == 0 and detail['completeness'] != 'FAILED':
+                        enqueue(json.loads(text), path)
+                except (OSError, ValueError) as error:
+                    detail = result('analyze', 'drilldown_failed_or_timed_out', version=version)
+                    if isinstance(error, CaptureFailure):
+                        detail.update(command_exit_code=error.returncode,
+                                      diagnostic_categories=list(getattr(error.diagnostics, 'categories', ())))
+            detail.update(scope_label=roots[path], overlaps_parent=True)
             details.append(detail)
+            if remaining <= 0:
+                break
+        if pending and details:
+            details[-1]['drilldown_budget_exhausted'] = True
     except (ValueError, OSError):
         pass
     return details
@@ -390,6 +438,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
                reason='preview_summary_only_scope_and_overlap_unverified')
     if stderr:
         out['reason'] = 'stderr_present_preview_may_be_incomplete'
+    out.update(error_category=out['reason'], presence='PRESENT')
     return out
 
 
@@ -406,8 +455,13 @@ def main():
     try:
         if not 0 < args.timeout <= 300:
             raise ValueError('invalid_timeout')
+        def budget(limit):
+            remaining = started + args.timeout - time.monotonic()
+            if args.source == 'analyze' and remaining <= 0:
+                raise ValueError('command_timeout')
+            return min(limit, remaining) if args.source == 'analyze' else limit
         stage = 'version'
-        rc, version, diagnostics = guarded_capture(['mo', '--version'], 10)
+        rc, version, diagnostics = guarded_capture(['mo', '--version'], budget(10))
         if rc:
             raise ValueError('guarded_version_command_failed')
         match = re.search(r'Mole version (\d+\.\d+\.\d+)\b', version)
@@ -416,7 +470,7 @@ def main():
         version_id = match[1]
         # Even help is guarded: upstream may source configuration before dispatch.
         stage, rc, diagnostics = 'help', None, False
-        rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], 10)
+        rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], budget(10))
         flag = '--json' if args.source == 'analyze' else '--dry-run'
         if rc or flag not in help_text:
             raise ValueError('installed_help_incompatible')
@@ -429,7 +483,7 @@ def main():
             command.append(str(args.analyze_root))
         preview_started = time.time_ns()
         stage, rc, diagnostics = 'audit', None, False
-        rc, raw, diagnostics = guarded_capture(command, args.timeout, args.source)
+        rc, raw, diagnostics = guarded_capture(command, budget(args.timeout), args.source)
         out = parse(args.source, raw, rc, diagnostics, version=match[1])
         if args.source == 'analyze' and args.analyze_root is None and out['completeness'] != 'FAILED':
             out['drilldowns'] = largest_entry_drilldowns(raw, version_id, started + args.timeout)

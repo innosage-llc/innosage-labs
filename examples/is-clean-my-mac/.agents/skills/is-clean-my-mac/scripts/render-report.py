@@ -17,6 +17,7 @@ LABELS = {
  'node_modules': 'Node 依赖', '.build': 'Swift 构建', 'build': '构建产物',
  'target': '构建 target', 'dist': '构建 dist', '.next': 'Next 构建', '.nuxt': 'Nuxt 构建',
  'vendor': 'vendor 依赖', 'Pods': 'CocoaPods 依赖', 'other_build_artifacts': '其他构建产物'}
+LABELS.update(codex_worktrees='Codex worktrees', codex_sessions='Codex 会话记录', colima_data='Colima 虚拟机/容器数据', android_data='Android 工具数据', android_sdk='Android SDK', android_emulators='Android 模拟器')
 SOURCES = {'mole-analyze': 'Mole analyze', 'mole-clean': 'Mole clean 预览',
            'mole-purge': 'Mole purge 预览', 'codex-worktree-inventory': 'Codex worktree 清单'}
 STATUS = {'COMPLETE': 'COMPLETE', 'PARTIAL': 'PARTIAL', 'FAILED': 'FAILED',
@@ -174,7 +175,7 @@ def render(data):
     return '\n'.join(lines)
 
 
-def render_summary(data, plan):
+def render_evidence_table(data, plan):
     """Numbered core answer delivered inline; no file click required for types."""
     sources = {s.get('source'):s for s in data.get('sources',[]) if isinstance(s,dict) and s.get('source') in SOURCES}
     types = sources.get('mole-analyze',{}).get('file_type_inventory',{})
@@ -196,7 +197,7 @@ def render_summary(data, plan):
         elif row['source'] in ('mole-analyze', 'mole-analyze-drilldown'):
             label=('Mole 下钻：' if row['source']=='mole-analyze-drilldown' else 'Mole 占用：')+LABELS.get(key,'其他/未分类')
             value='已测占用/下界 '+size(row.get('occupied_bytes'))+'（'+STATUS.get(row.get('completeness'),'UNKNOWN')+'）'
-            decision='仅复核；'+risk(key)
+            decision=next_step(key)
         elif row['source']=='codex-worktree-inventory':
             label='Codex worktree';value='占用 '+size(row.get('occupied_bytes'));decision='保留；Git/活动未知，禁止整棵删除'
         else:
@@ -231,3 +232,59 @@ def render_summary(data, plan):
     lines += ['', explanation,
       '本次未清理；实际释放 UNKNOWN（null），估算/占用/磁盘可用空间不混用；来源与目录用途可能重叠，不相加。先复核最大占用用途/备份，缓存与构建候选再确认活动任务、下载/编译成本。', '']
     return '\n'.join(lines)
+
+
+def next_step(category):
+    """Useful review routes are not execution capabilities or deletion consent."""
+    return {
+      'codex_worktrees': '与独立 Git 清单交叉核对活动/未提交/未推送状态；整棵保留，不执行删除',
+      'codex_sessions': '会话历史可能唯一；在 Codex 中核对保留需求，未读会话内容，不自动删除',
+      'codex_data': '优先看 worktrees 与会话子项；父子重叠，不能相加或视为可回收',
+      'colima_data': '在 Colima/Docker 官方工具核对实例与卷用途/备份；可能含唯一数据，不直接删目录',
+      'android_sdk': '在 Android Studio SDK Manager 核对不用的版本；需要重下，先确认项目依赖',
+      'android_emulators': '在 Android Studio Device Manager 核对虚拟设备；设备数据可能丢失，先确认备份',
+      'android_data': '核对 SDK/模拟器子项与项目需求；不直接删工具目录',
+      'xcode_derived_data': '确认 Xcode 构建已停并评估重编译成本；按官方工具核对具体对象',
+      'caches': '与 clean 预览分类交叉核对；先确认活动应用和离线需求，可能重下/重建',
+    }.get(category, '仅复核；' + risk(category))
+
+
+def render_summary(data, plan):
+    """Prioritized findings keep original evidence IDs; full plan remains local."""
+    if any(row.get('actionable') for row in plan['rows']):
+        return render_evidence_table(data, plan)  # Optional exact-object UX unchanged.
+    rows = plan['rows']
+    specific = {'codex_worktrees', 'codex_sessions', 'colima_data', 'android_sdk',
+                'android_emulators', 'xcode_derived_data', 'homebrew_cache'}
+    parents = {'home', 'user_library', 'applications', 'system_library'}
+    categories = {row['category'] for row in rows if row.get('occupied_bytes') is not None}
+    if categories & {'codex_worktrees', 'codex_sessions'}:
+        parents.add('codex_data')
+    if categories & {'android_sdk', 'android_emulators'}:
+        parents.add('android_data')
+    candidates = [r for r in rows if r['category'] not in parents and
+                  (r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None)]
+    if not candidates:
+        candidates = [r for r in rows if r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None]
+    candidates.sort(key=lambda r: (max(r.get('occupied_bytes') or 0, r.get('candidate_estimate_bytes') or 0),
+                    r['category'] in specific), reverse=True)
+    selected, seen = [], set()
+    for row in candidates:
+        # Same semantic category can occur in parent and child analyze output.
+        key = ('analyze' if row['source'].startswith('mole-analyze') else row['source'], row['category'])
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(row)
+        if len(selected) == 6:
+            break
+    text = render_evidence_table(data, dict(plan, rows=selected))
+    sources = {s.get('source'): s for s in data.get('sources', [])}
+    clean = sources.get('mole-clean', {})
+    total = size(clean.get('candidate_estimate_bytes'))
+    text = text.replace('## Mole 磁盘占用与候选决策表', '## 优先复核的磁盘发现')
+    text = text.replace('10 分钟有效。', '10 分钟有效。编号是原始证据 ID，跳号正常；完整分类与未入选证据保留在本地报告/方案。')
+    if any(d.get('drilldown_budget_exhausted') for d in sources.get('mole-analyze', {}).get('drilldowns', [])):
+        text += '\n下钻覆盖 PARTIAL：已达到调用/时间预算，仍有公开工具根未测；已完成类别保留各自测量状态。\n'
+    text += '\nMole clean 预览总计：候选约 ' + total + '（' + STATUS.get(clean.get('completeness'), 'UNKNOWN') + '）。分类是总计的解释，不额外相加；这不是实际释放或已授权操作。\n'
+    return text
