@@ -256,7 +256,7 @@ def render_summary(data, plan):
     rows = plan['rows']
     specific = {'codex_worktrees', 'codex_sessions', 'colima_data', 'android_sdk',
                 'android_emulators', 'xcode_derived_data', 'homebrew_cache'}
-    parents = {'home', 'user_library', 'applications', 'system_library', 'other'}
+    parents = {'home', 'user_library', 'applications', 'system_library'}
     categories = {row['category'] for row in rows if row.get('occupied_bytes') is not None}
     if categories & {'codex_worktrees', 'codex_sessions'}:
         parents.add('codex_data')
@@ -266,8 +266,8 @@ def render_summary(data, plan):
                   (r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None)]
     if not candidates:
         candidates = [r for r in rows if r.get('occupied_bytes') is not None or r.get('candidate_estimate_bytes') is not None]
-    candidates.sort(key=lambda r: (r['category'] in specific,
-                    max(r.get('occupied_bytes') or 0, r.get('candidate_estimate_bytes') or 0)), reverse=True)
+    candidates.sort(key=lambda r: (max(r.get('occupied_bytes') or 0, r.get('candidate_estimate_bytes') or 0),
+                    r['category'] in specific), reverse=True)
     selected, seen = [], set()
     for row in candidates:
         # Same semantic category can occur in parent and child analyze output.
@@ -284,5 +284,7 @@ def render_summary(data, plan):
     total = size(clean.get('candidate_estimate_bytes'))
     text = text.replace('## Mole 磁盘占用与候选决策表', '## 优先复核的磁盘发现')
     text = text.replace('10 分钟有效。', '10 分钟有效。编号是原始证据 ID，跳号正常；完整分类与未入选证据保留在本地报告/方案。')
+    if any(d.get('drilldown_budget_exhausted') for d in sources.get('mole-analyze', {}).get('drilldowns', [])):
+        text += '\n下钻覆盖 PARTIAL：已达到调用/时间预算，仍有公开工具根未测；已完成类别保留各自测量状态。\n'
     text += '\nMole clean 预览总计：候选约 ' + total + '（' + STATUS.get(clean.get('completeness'), 'UNKNOWN') + '）。分类是总计的解释，不额外相加；这不是实际释放或已授权操作。\n'
     return text

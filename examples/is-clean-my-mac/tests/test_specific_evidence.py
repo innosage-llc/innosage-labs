@@ -1,5 +1,7 @@
 """Public-root collection, independent completeness and decision evidence."""
 import json
+import contextlib
+import io
 from pathlib import Path
 import tempfile
 import time
@@ -80,3 +82,55 @@ class SpecificEvidenceTests(unittest.TestCase):
         self.assertIn('| 3 |',text);self.assertIn('不能相加',text)
         self.assertEqual(plans.select(plan,[3],plan['plan_id'],now=2)['status'],'BLOCKED')
         self.assertTrue(all(not r['actionable'] for r in plan['rows']))
+
+    def test_dominant_unknown_is_not_hidden_by_small_public_tool(self):
+        data={'sources':[dict(source='mole-analyze',categories=[dict(category='other',observed_bytes=9000000,measured_entries=1,completeness='PARTIAL'),dict(category='codex_sessions',observed_bytes=4096,measured_entries=1,completeness='COMPLETE')])]}
+        text=report.render_summary(data,plans.build_plan(data))
+        self.assertIn('9,000,000 B',text)
+        self.assertLess(text.index('| 1 |'),text.index('| 2 |'))
+
+    def test_colliding_private_tool_names_are_not_public_tool_evidence(self):
+        with patch.object(Path,'home',return_value=Path('/synthetic')):
+            for path in ('/private/.codex/sessions','/synthetic/private/.colima','/synthetic/private/Android/sdk'):
+                self.assertEqual(adapter.category(path),'other')
+
+    def test_budget_exhaustion_is_separate_from_complete_measurement(self):
+        data={'sources':[dict(source='mole-analyze',completeness='COMPLETE',categories=[dict(category='codex_sessions',observed_bytes=4096,measured_entries=1,completeness='COMPLETE')],drilldowns=[dict(drilldown_budget_exhausted=True)])]}
+        text=report.render_summary(data,plans.build_plan(data))
+        self.assertIn('下钻覆盖 PARTIAL',text);self.assertIn('（COMPLETE）',text)
+
+    def test_recognized_preview_does_not_retain_parse_failure_marker(self):
+        value=adapter.parse('clean','Potential space: 12.00 MB\nDry run complete - no changes made',version='1.72.0')
+        self.assertEqual(value['candidate_estimate_bytes'],12000000)
+        self.assertEqual(value['presence'],'PRESENT')
+        self.assertEqual(value['error_category'],value['reason'])
+        self.assertNotEqual(value['error_category'],'unrecognized_output')
+
+    def test_colima_symlink_probe_is_rejected_and_parent_total_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory).resolve();(home/'private').mkdir();(home/'.colima').symlink_to(home/'private')
+            raw=document([entry(home,8192)],True)
+            calls=[]
+            def capture(command,*args):
+                calls.append(command[-1]);return 0,document([]),adapter.CaptureDiagnostics(False)
+            with patch.object(Path,'home',return_value=home),patch.object(adapter,'guarded_capture',side_effect=capture):
+                source=adapter.analyze(raw,False,'1.72.0')
+                source['drilldowns']=adapter.largest_entry_drilldowns(raw,'1.72.0',time.monotonic()+10)
+            self.assertEqual(calls,[str(home)]);self.assertEqual(source['occupied_bytes'],8192)
+
+    def test_symlink_ancestor_blocks_android_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory).resolve();(home/'private/Android/sdk').mkdir(parents=True);(home/'Library').symlink_to(home/'private')
+            with patch.object(Path,'home',return_value=home),patch.object(adapter,'guarded_capture') as call:
+                details=adapter.largest_entry_drilldowns(document([entry(home/'Library/Android/sdk')],True),'1.72.0',time.monotonic()+10)
+            call.assert_not_called();self.assertEqual(details,[])
+
+    def test_analyze_preflight_consumes_same_total_deadline(self):
+        elapsed=[0.0];limits=[]
+        def capture(command,limit,*args):
+            limits.append(limit);elapsed[0]+=2
+            text='Mole version 1.72.0' if '--version' in command else '--json' if '--help' in command else document([])
+            return 0,text,adapter.CaptureDiagnostics(False)
+        with patch.object(adapter.time,'monotonic',side_effect=lambda:elapsed[0]),patch.object(adapter,'guarded_capture',side_effect=capture),patch('sys.argv',['audit-mole.py','--source','analyze','--timeout','5']),contextlib.redirect_stdout(io.StringIO()):
+            adapter.main()
+        self.assertEqual(limits,[5.0,3.0,1.0])

@@ -438,6 +438,7 @@ def parse(source, text, rc=0, stderr=False, version='1.54.0'):
                reason='preview_summary_only_scope_and_overlap_unverified')
     if stderr:
         out['reason'] = 'stderr_present_preview_may_be_incomplete'
+    out.update(error_category=out['reason'], presence='PRESENT')
     return out
 
 
@@ -454,8 +455,13 @@ def main():
     try:
         if not 0 < args.timeout <= 300:
             raise ValueError('invalid_timeout')
+        def budget(limit):
+            remaining = started + args.timeout - time.monotonic()
+            if args.source == 'analyze' and remaining <= 0:
+                raise ValueError('command_timeout')
+            return min(limit, remaining) if args.source == 'analyze' else limit
         stage = 'version'
-        rc, version, diagnostics = guarded_capture(['mo', '--version'], 10)
+        rc, version, diagnostics = guarded_capture(['mo', '--version'], budget(10))
         if rc:
             raise ValueError('guarded_version_command_failed')
         match = re.search(r'Mole version (\d+\.\d+\.\d+)\b', version)
@@ -464,7 +470,7 @@ def main():
         version_id = match[1]
         # Even help is guarded: upstream may source configuration before dispatch.
         stage, rc, diagnostics = 'help', None, False
-        rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], 10)
+        rc, help_text, diagnostics = guarded_capture(['mo', args.source, '--help'], budget(10))
         flag = '--json' if args.source == 'analyze' else '--dry-run'
         if rc or flag not in help_text:
             raise ValueError('installed_help_incompatible')
@@ -477,7 +483,7 @@ def main():
             command.append(str(args.analyze_root))
         preview_started = time.time_ns()
         stage, rc, diagnostics = 'audit', None, False
-        rc, raw, diagnostics = guarded_capture(command, args.timeout, args.source)
+        rc, raw, diagnostics = guarded_capture(command, budget(args.timeout), args.source)
         out = parse(args.source, raw, rc, diagnostics, version=match[1])
         if args.source == 'analyze' and args.analyze_root is None and out['completeness'] != 'FAILED':
             out['drilldowns'] = largest_entry_drilldowns(raw, version_id, started + args.timeout)
