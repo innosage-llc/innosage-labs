@@ -9,7 +9,7 @@ description: 在本地 macOS 用官方 Mole 审核磁盘、解释主要占用和
 
 ## 六步审核
 
-1. 确认官方 Skill、平台和版本。依赖缺失时走 [唯一安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，具体计划经真实 owner 同意后安装/更新；安装不扫描。运行入口是**当前已读 SKILL.md 同目录**的 `scripts/audit-all.py`：`python3 -B <该 Skill 目录>/scripts/audit-all.py`。不从工作目录猜路径，不手造证据。入口先受保护验证版本/帮助，采集官方 status 的容量投影和 analyze overview；status 只输出同一系统卷容量/已用/差额，未知保持 UNKNOWN。
+1. 确认官方 Skill、平台和版本。依赖缺失时走 [唯一安装入口](https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt)，可信 owner 已明确请求同范围安装/更新时，检查并说明实际计划后直接提交 INSTALL，不重复询问；仅审核请求不授权安装。owner 要求先批计划、范围变化或平台强制确认仍须等待。wrapper 更新不升级 Mole/前置工具/其他 Skills；安装不扫描。运行入口是**当前已读 SKILL.md 同目录**的 `scripts/audit-all.py`：`python3 -B <该 Skill 目录>/scripts/audit-all.py`。不从工作目录猜路径，不手造证据。入口先受保护验证版本/帮助，采集官方 status 的容量投影和 analyze overview；status 只输出同一系统卷容量/已用/差额，未知保持 UNKNOWN。
 2. 诊断失败而不绕过。analyze 启动可能改缓存，purge 启动可能写配置；**版本、帮助、status、下钻、预览全部保留现有拒绝主机写入/网络边界**。clean 仅允许更新精确本地 clean-list。不得因官方通用示例而裸跑命令、改配置、权限或升级包。失败不变零；purge 保留阶段/退出码/观察标记，不推断根因。
 3. 在共享总预算内先解释最大的未解释允许范围。analyze 最多八次测量（顶层加七次下钻），固定公开物理/同设备工具根，不跟链接。会话/worktree 用父级大小，不枚举其子目录；Colima 固定根是上游跳过父扫描后的显式测量。独立清单只给数量和分配字节/覆盖，**不是完成 Git 或活动安全审查**。未知个人目录、Other 留未知，不加新扫描器或读内容。
 4. 顺序收集预览；当前 **purge 在任何子进程启动前暂停**，返回 `purge_lifecycle_unverified`，不能绕过或视为零候选。clean 仍单独处理，不能代替 purge。仅本地适配器读取官方预览清单，模型接收类别/舍入估算，不接收原始路径，不从聚合预览生成删除清单。预览值不是实际释放或唯一范围下界。说明永久删除、重下/重建、模拟器/容器唯一状态和未保护 Trash 风险；聚合命令重扫，无法按本表行号缩小。

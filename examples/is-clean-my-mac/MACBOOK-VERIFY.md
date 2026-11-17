@@ -1,8 +1,10 @@
 # MacBook 最小验证
 
+明确更新请求已覆盖同范围普通操作时，Agent 检查并说明实际计划后直接提交 INSTALL，不再二次询问；保留 owner 要求先批计划、范围变化和平台强制确认。URL 本身不是同意。
+
 先让本地 Agent 安全更新（现有 Mole/官方 Skill 不升级，历史备份不处理）：
 
-> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，先说明具体计划并获得我的同意，不要扫描或清理磁盘。
+> 请阅读 https://raw.githubusercontent.com/innosage-llc/innosage-labs/main/examples/is-clean-my-mac/llms.txt 并替我更新 is-clean-my-mac，只更新受管理的 wrapper，保留 Mole 和其他 Skills，不要扫描或清理磁盘。
 
 更新后启动新 Luna 会话，保持原来的设置，只发：
 
@@ -10,7 +12,7 @@
 
 这次应以官方 Mole Skill 为主，在主答简洁说明主要占用、3–5 个具体优先选项及会改变选择的限制；容量未知就明说。保留会话和重要缓存候选，Other 作为解释缺口，不占据全部建议。主答不能只有链接，也不应粘贴整份证据表。`audit.zh.md` 是简短决定视图，`audit-details.zh.md` 和 ledger 保存精确字节、稳定证据 ID、来源、覆盖及矛盾，需有可打开的详情链接。
 
-讨论选项的编号不授权删除。独立 worktree 数量/已测分配字节与 Mole 目录大小口径不同，Git/活动安全仍未知；不能相减算缺口。clean 总计与分类不重复相加，clean 的部分结果不能替代 purge，PARTIAL 不统一称下界。下钻有界；不做全 Home 普查，不默认收集删除对象。占用不是可回收量，预览不是删除批准。
+讨论选项的编号不授权删除。独立 worktree 数量/已测分配字节与 Mole 目录大小口径不同，Git/活动安全仍未知；不能相减算缺口。clean 总计与分类不重复相加，clean 的部分结果不能替代 purge，PARTIAL 不统一称下界。下钻有界；不做全 Home 普查，不默认生成已授权删除清单。占用不是可回收量，预览不是删除批准。
 
 当前 purge 预览已主动暂停：应显示 `purge_lifecycle_unverified`，且未启动该来源的外部命令。原因是官方 timeout 后端的独立子组取消边界尚未验证，不是零候选，也不是权限调整提示。本轮只交付简洁报告和明确的不完整状态，**没有完成“让 purge 预览成功”**；不要关闭 sandbox、改写配置或裸跑 purge 来制造成功。其他来源独立报告，但未新增全部后代生命周期保证。无需内部测试清单或删除批准。
 
