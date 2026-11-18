@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
-import { BackHandler, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, FlatList, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useAudioPlayer,
@@ -23,10 +23,12 @@ import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
 import { getCaptureSession } from './captureOwner';
 
-const recordings = new Directory(Paths.document, 'recordings');
+// Web launch/navigation is supported; native filesystem capture/import is not.
+// Never construct the native Directory at Web module initialization.
+const recordings = Platform.OS === 'web' ? undefined : new Directory(Paths.document, 'recordings');
 
 function listRecordings() {
-  if (!recordings.exists) return [];
+  if (!recordings?.exists) return [];
   return recordings.list()
     .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.m4a'))
     .sort((a, b) => Number(b.name.split('-')[1]) - Number(a.name.split('-')[1]));
@@ -136,6 +138,7 @@ function RecorderScreen() {
 
 
   async function importAudio() {
+    if (!recordings) return;
     if (session.getSnapshot().phase !== 'idle') return;
     setCapturePhase('importing');
     dispatchHandoff({ type: 'reset' });
@@ -271,7 +274,7 @@ function RecorderScreen() {
           </View> : null}
           <RecordControl phase={phase} onPress={phase === 'recording' ? stop : start} />
           {!showSavedFeedback ? <Text style={[styles.support, { textAlign: 'center' }]}>
-            Recordings are stored on this device.
+            {Platform.OS === 'web' ? 'Recording and file import are available in the Android and iOS apps. This browser supports Record, Library and Settings navigation.' : 'Recordings are stored on this device.'}
           </Text> : null}
         </View>
       </ScrollView> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
@@ -285,7 +288,7 @@ function RecorderScreen() {
         </View>
       </ScrollView> : <View style={{ flex: 1, paddingHorizontal: spacing.lg, gap: spacing.md }}>
       <ActionButton title={phase === 'importing' ? 'Importing…' : 'Import audio'} fullWidth={false}
-        disabled={phase !== 'idle'} variant="text" onPress={importAudio} />
+        disabled={phase !== 'idle' || !recordings} variant="text" onPress={importAudio} />
       <FlatList
         ref={library}
         onLayout={() => setLibraryReady(true)}

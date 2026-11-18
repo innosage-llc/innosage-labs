@@ -1,0 +1,141 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
+import { main, mergeArguments, reviewGate } from '../auto-merge-ci.mjs';
+import { xmlControl } from './android.mjs';
+import { aggregate } from './aggregate.mjs';
+import { run, integrationRevision, sourceIdentity } from './host.mjs';
+
+const c = { repo: REPO, pr: 101, head: 'a'.repeat(40), base: 'b'.repeat(40), tested: 'c'.repeat(40), tree: 'd'.repeat(40) };
+const review = { candidate: c, decision: 'PASS', role: 'independent-reviewer', model: 'gpt-6.1-sol', effort: 'high', catalog_sha256: 'e'.repeat(64), report_sha256: 'f'.repeat(64) };
+const sample = { identity: 'pid/start', alive: true, foreground: true, ready: true, fatal: false };
+const green = platform => ({ status: 'PASS', platform, candidate: c, monitor_started_before_launch: true, screenshots:Array.from({length:platform==='web'?2:1},()=>({bytes:100,sha256:'3'.repeat(64)})), artifact: { sha256: '1'.repeat(64), files: [{ path: 'embedded', bytes: 1, sha256: '2'.repeat(64) }] }, target: 'synthetic owned target', runtime: 'synthetic fixture', commands: ['fixture'], observation: { readiness_ms: 300, stable_ms: 5000, identity: sample.identity, responsive: true, samples: [{ ...sample, elapsed_ms: 300 }, { ...sample, elapsed_ms: 5300 }], final: sample } });
+
+test('impact accounts for rename/delete/shared/unknown paths; only known other examples skip Recorder', () => {
+  assert.deepEqual(changedPaths('R100\0examples/ai-recorder/App.tsx\0examples/studio-workspace/moved.tsx\0D\0package-lock.json\0'), ['examples/ai-recorder/App.tsx', 'examples/studio-workspace/moved.tsx', 'package-lock.json']);
+  for (const paths of [[], ['README.md'], ['scripts/auto-merge-ci.mjs'], ['package-lock.json'], ['examples/unknown/file'], ['examples/studio-workspace/a', 'examples/ai-recorder/App.tsx']]) assert.equal(recorderImpact(paths).affected, true);
+  assert.equal(recorderImpact(['examples/studio-workspace/src/model.ts']).affected, false);
+  assert.throws(() => changedPaths('R100\0only-one\0'));
+  assert.throws(() => changedPaths('UNKNOWN\0path\0'));
+});
+
+test('observation waits bounded readiness then a full five monotonic seconds and rechecks after response', async () => {
+  let clock = 0; let responsive = 0;
+  const result = await observe({ now: () => clock, sleep: async ms => { clock += ms; }, probe: async () => ({ ...sample, ready: clock >= 27000 }), responsive: async () => { responsive++; return true; } });
+  assert.equal(result.readiness_ms, 27000); assert.equal(result.stable_ms, 5000); assert.equal(clock, 32000); assert.equal(responsive, 1);
+});
+for (const failure of ['dead', 'restart', 'fatal', 'background', 'control disappears', 'splash', 'unresponsive', 'final', 'clock', 'gap']) test(`observation blocks ${failure}`, async () => {
+  let clock = 0; let calls = 0; let response = false;
+  const probe = async () => {
+    calls++; const s = { ...sample };
+    if (clock >= 1000) {
+      if (failure === 'dead') s.alive = false;
+      if (failure === 'restart') s.identity = 'another';
+      if (failure === 'fatal') s.fatal = true;
+      if (failure === 'background') s.foreground = false;
+      if (failure === 'control disappears') s.ready = false;
+    }
+    if (failure === 'splash') s.ready = false;
+    if (failure === 'final' && response) s.ready = false;
+    return s;
+  };
+  await assert.rejects(observe({ now: () => clock, sleep: async ms => { clock += failure === 'gap' ? 2000 : failure === 'clock' ? -1 : ms; }, probe, responsive: async () => { response = true; return failure !== 'unresponsive'; } }));
+});
+
+test('artifact digest covers content and names, rejects symlinks and empty files', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-artifact-')); writeFileSync(join(dir, 'a'), 'bundle');
+  const first = artifact(dir).sha256; writeFileSync(join(dir, 'a'), 'changed'); assert.notEqual(artifact(dir).sha256, first);
+  symlinkSync('a', join(dir, 'link')); assert.throws(() => artifact(dir), /symlink/);
+});
+test('Android accessibility requires actual labelled control with positive visible bounds', () => {
+  assert.deepEqual(xmlControl('<node content-desc="Start recording" bounds="[10,20][110,220]"/>', 'Start recording'), { x: 60, y: 120 });
+  assert.equal(xmlControl('<node text="Start recording" bounds="[0,0][0,0]"/>', 'Start recording'), null);
+  assert.equal(xmlControl('<node text="Splash" bounds="[0,0][20,20]"/>', 'Start recording'), null);
+});
+
+async function fixture(change = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'labs-merge-spy-')); const output = join(dir, 'evidence'); mkdirSync(output);
+  const cp = join(dir, 'candidate.json'), rp = join(dir, 'review.json'); writeJSON(cp, c); writeJSON(rp, review);
+  const calls = []; const events = []; let snapshots = 0;
+  const deps = {
+    clean: () => {}, sourceIdentity: () => {}, head: () => c.head,
+    snapshot: () => { snapshots++; return { ...c, draft:false, ...(snapshots > 1 ? change.drift : {}) }; },
+    assertSnapshot: (a,b) => { assert.equal(a.head,b.head,'head drift'); assert.equal(a.base,b.base,'base drift'); },
+    checkout: () => {}, paths: () => change.paths ?? ['examples/ai-recorder/App.tsx'],
+    ci: async () => { events.push('ci'); if (change.ciThrows) throw new Error('failed CI command'); return { status: change.ci ?? 'PASS' }; },
+    aggregate: async () => { events.push('platforms'); const platforms = Object.fromEntries(['android','ios','web'].map(p => [p,green(p)])); if (change.platform) platforms[change.platform] = change.result;
+      return { status: change.aggregate ?? 'PASS', candidate: change.staleAggregate ? { ...c, head: '0'.repeat(40) } : c, platforms }; },
+    merge: async candidate => { events.push('merge'); calls.push(mergeArguments(candidate)); return { merged: true, sha: '9'.repeat(40) }; },
+    ...change.deps,
+  };
+  const args = ['--repo',REPO,'--pr',String(c.pr),'--head',c.head,'--base',c.base,'--candidate',cp,'--review',rp,'--output',output];
+  let error; try { await main(args, deps); } catch (e) { error = e; }
+  return { calls, events, error, receipt: existsSync(join(output,'merge-gate.json')) ? JSON.parse(readFileSync(join(output,'merge-gate.json'),'utf8')) : null };
+}
+test('actual CLI controller makes exactly one repository/head-guarded merge request after gates', async () => {
+  const f = await fixture(); assert.ifError(f.error); assert.deepEqual(f.events,['ci','platforms','merge']); assert.deepEqual(f.calls,[['api','--method','PUT',`repos/${REPO}/pulls/101/merge`,'-f',`sha=${c.head}`,'-f','merge_method=squash']]);
+});
+for (const platform of ['android','ios','web']) for (const kind of ['failed','missing','stale','incomplete']) test(`merge spy: zero calls for ${platform} ${kind}`, async () => {
+  let result = green(platform);
+  if (kind === 'failed') result.status = 'FAIL';
+  if (kind === 'missing') result = undefined;
+  if (kind === 'stale') result.candidate = { ...c, base: '0'.repeat(40) };
+  if (kind === 'incomplete') delete result.observation.final;
+  const f = await fixture({ platform, result }); assert.ok(f.error); assert.deepEqual(f.calls,[]); assert.equal(f.receipt.merge_attempted,false);
+});
+for (const change of [{ ci:'FAIL' }, { ciThrows:true }, { aggregate:'FAIL' }, { aggregate:undefined, staleAggregate:true }, { drift:{ head:'0'.repeat(40) } }, { drift:{ base:'0'.repeat(40) } }]) test(`merge spy: zero calls for ${JSON.stringify(change)}`, async () => {
+  const f = await fixture(change); assert.ok(f.error); assert.deepEqual(f.calls,[]);
+});
+test('unrelated change still runs applicable local CI and never bypasses a failing CI', async () => {
+  const paths = ['examples/studio-workspace/src/model.ts'];
+  const f = await fixture({ paths }); assert.ifError(f.error); assert.deepEqual(f.events,['ci','platforms','merge']);
+  const red = await fixture({ paths, ci:'FAIL' }); assert.ok(red.error); assert.deepEqual(red.calls,[]); assert.deepEqual(red.events,['ci']);
+});
+test('draft PR and local-head drift are blocked before any CI or merge request',async()=>{
+  for(const deps of [{snapshot:()=>({...c,draft:true})},{head:()=> '0'.repeat(40)}]) {
+    const result=await fixture({deps});assert.ok(result.error);assert.deepEqual(result.events,[]);assert.deepEqual(result.calls,[]);
+  }
+});
+test('review receipts and platform receipts fail on stale head, wrong role and incomplete evidence', () => {
+  assert.throws(() => validatePlatform({ ...green('web'), observation: { ...green('web').observation, stable_ms:4999 } }, c, 'web'));
+  for(const delta of [{candidate:{...c,tested:'0'.repeat(40)}},{role:'implementer'},{effort:'medium'},{decision:'REQUEST_CHANGES'},{catalog_sha256:null}]) assert.throws(()=>reviewGate({...review,...delta},c));
+});
+
+function repository() {
+  const source = mkdtempSync(join(tmpdir(),'labs-git-fixture-'));
+  const g = (...args) => run('git',['-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid',...args],{cwd:source,env:{GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1'}}).trim();
+  g('init','-b','main');writeFileSync(join(source,'base'),'base');g('add','.');g('commit','-m','synthetic base');
+  return { source,g };
+}
+test('exact integration commit combines base/head trees deterministically; clean wrong revision fails identity', () => {
+  const {source,g}=repository();const initial=g('rev-parse','HEAD');
+  g('switch','-c','topic');writeFileSync(join(source,'topic'),'topic');g('add','.');g('commit','-m','topic');const head=g('rev-parse','HEAD');
+  g('switch','main');writeFileSync(join(source,'main-only'),'main advanced');g('add','.');g('commit','-m','main advances');const base=g('rev-parse','HEAD');
+  const first=integrationRevision(base,head,source);assert.deepEqual(first,integrationRevision(base,head,source));
+  assert.equal(g('show','-s','--format=%P',first.tested),`${base} ${head}`);
+  assert.match(g('ls-tree','--name-only',first.tested),/main-only/);assert.match(g('ls-tree','--name-only',first.tested),/topic/);
+  assert.throws(()=>sourceIdentity(source,{tested:initial,tree:first.tree}),/revision/);
+});
+test('actual aggregator runs all three, collects failures and never accepts missing results; unrelated skip is explicit', async () => {
+  const {source}=repository();
+  for(const failing of [null,'android','ios','web']) {
+    const output=mkdtempSync(join(tmpdir(),'labs-aggregate-'));const called=[];
+    const action=aggregate({source,candidate:c,paths:['scripts/recorder-gate/core.mjs'],output,targets:{}},async({platform})=>{called.push(platform);if(platform===failing)return undefined;return green(platform);});
+    if(failing)await assert.rejects(action);else assert.equal((await action).status,'PASS');
+    assert.deepEqual(called,['android','ios','web']);
+    assert.equal(JSON.parse(readFileSync(join(output,'startup-gate.json'),'utf8')).status,failing?'FAIL':'PASS');
+  }
+  const output=mkdtempSync(join(tmpdir(),'labs-aggregate-'));
+  const result=await aggregate({source,candidate:c,paths:['examples/studio-workspace/src/model.ts'],output},()=>{throw new Error('must skip');});
+  assert.equal(result.status,'PASS');assert.equal(result.impact.affected,false);assert.match(result.impact.reason,/local CI/);
+});
+test('readiness budget includes time spent in the normal launcher before probes begin', async()=>{
+  let clock=31000;
+  await assert.rejects(observe({launchedAt:0,now:()=>clock,probe:async()=>sample,responsive:async()=>true,sleep:async()=>{clock+=100;}}),/timeout/);
+});
+test('hung runtime probes are bounded and cannot create an incomplete green receipt',async()=>{
+  await assert.rejects(observe({probe:()=>new Promise(()=>{}),responsive:async()=>true,maxGap:10}),/probe timeout/);
+});
