@@ -1,0 +1,73 @@
+{
+  "verified_at_utc": "2026-11-14T11:20:25.630598+00:00",
+  "original_display_identities": [
+    "11/14/2026, 2:29:54\u202fPM",
+    "11/14/2026, 2:30:58\u202fPM",
+    "11/14/2026, 2:31:54\u202fPM",
+    "11/14/2026, 2:34:33\u202fPM",
+    "11/14/2026, 2:44:42\u202fPM",
+    "11/14/2026, 2:45:00\u202fPM",
+    "11/14/2026, 2:48:20\u202fPM",
+    "11/14/2026, 3:19:13\u202fPM",
+    "11/14/2026, 3:22:43\u202fPM",
+    "11/14/2026, 3:23:33\u202fPM",
+    "11/14/2026, 3:59:20\u202fPM",
+    "11/14/2026, 4:02:35\u202fPM",
+    "11/14/2026, 4:07:20\u202fPM"
+  ],
+  "new_saved_display_identities": [
+    "11/14/2026, 7:02:50\u202fPM",
+    "11/14/2026, 7:05:08\u202fPM"
+  ],
+  "final_display_identities": [
+    "11/14/2026, 2:29:54\u202fPM",
+    "11/14/2026, 2:30:58\u202fPM",
+    "11/14/2026, 2:31:54\u202fPM",
+    "11/14/2026, 2:34:33\u202fPM",
+    "11/14/2026, 2:44:42\u202fPM",
+    "11/14/2026, 2:45:00\u202fPM",
+    "11/14/2026, 2:48:20\u202fPM",
+    "11/14/2026, 3:19:13\u202fPM",
+    "11/14/2026, 3:22:43\u202fPM",
+    "11/14/2026, 3:23:33\u202fPM",
+    "11/14/2026, 3:59:20\u202fPM",
+    "11/14/2026, 4:02:35\u202fPM",
+    "11/14/2026, 4:07:20\u202fPM",
+    "11/14/2026, 7:02:50\u202fPM",
+    "11/14/2026, 7:05:08\u202fPM"
+  ],
+  "original_count": 13,
+  "new_saved_count": 2,
+  "final_count": 15,
+  "extra_third_start": "FAILED; no save/output; no retry/reset/diagnosis",
+  "installed_production_apk_sha256": "1d3581f6f19773a5122647c11916d867608fda91672cfd0abfa48640819b5dee",
+  "installed_js_sha256": "ceb030d7262c0e68a7734201ddd512e9a966b1edc8daa95854d40847685a9a0f",
+  "settings_restored": {
+    "at": "2026-11-14T11:18:08.022067+00:00",
+    "settings": {
+      "system:font_scale": "1.0",
+      "secure:accessibility_enabled": "0",
+      "secure:enabled_accessibility_services": "null",
+      "system:accelerometer_rotation": "1",
+      "system:user_rotation": "0",
+      "wm_size": "Physical size: 1080x2400",
+      "wm_density": "Physical density: 420"
+    },
+    "permission_grants_flags": [
+      "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+      "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+    ],
+    "initial_equal": true,
+    "talkback_display_speech_output": "false, observed restored",
+    "touch_exploration_enabled": "0",
+    "note": "Normal system permission restore may recreate the app; no native-start retry or force-stop performed."
+  },
+  "final_app_state": "Record idle, no playing media; no recording-start retry after failure",
+  "original_and_old_candidate_profiles": "not booted or modified",
+  "owned_only": true,
+  "shutdown": "STOPPED",
+  "shutdown_verified_at_utc": "2026-11-14T11:21:18.163074+00:00",
+  "owned_ports": "all3 released; no owned qemu process; owned serial unavailable",
+  "shutdown_timing_note": "first1s check still reachable; normal async shutdown subsequently confirmed, no extra kill",
+  "old_candidate_source_bytes_unchanged": true
+}

@@ -1,0 +1,16 @@
+{
+  "product": {
+    "apk_sha256": "a81c8a825c6f176ed030b187869eea99fdba522258399b9559f595b1cf07c579",
+    "js_sha256": "d3c19759789408fc85be2766debbe2a0241bf93ed668a7711be4d4ad83b03250",
+    "kind": "product fix, no private diagnostics"
+  },
+  "private_fix_observation": {
+    "apk_sha256": "b5db386f521a537469fa78ad26ae285709bfcf58007eed82a03d012aea54af95",
+    "js_sha256": "54a87c5a8f7ee6bb61b23f7c4589d60e99ab21b36d27411f25fd7a5fbb304c59",
+    "kind": "private observation of corrected product fix; not production timing"
+  },
+  "exact_restored_production": {
+    "apk_sha256": "1d3581f6f19773a5122647c11916d867608fda91672cfd0abfa48640819b5dee",
+    "js_sha256": "ceb030d7262c0e68a7734201ddd512e9a966b1edc8daa95854d40847685a9a0f"
+  }
+}

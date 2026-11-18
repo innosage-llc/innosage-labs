@@ -1,0 +1,14 @@
+{
+  "baseCommit": "20208b8ca69d581dcfafae0260330172a2153acf",
+  "sourceSha256": {
+    "App.tsx": "b2e056d148028272f33d3ad4a309d4629b68c41782c31a7799bfb27be19fc9d9",
+    "ProSettings.tsx": "260f61a88ea3e6f14aa1de771873860d21ed6d4d5f025b4e8e3e636c0a311cae",
+    "Transcript.tsx": "4ea959fe8dcf55101d37a3de01e1b56174aaaf38798f52322298eb96a792169c",
+    "ui/AppChrome.tsx": "3caa7affd1f9cca6da929adacdd63a8d1fb0b8f95b3253469bfd13db12a4b475",
+    "ui/navigation.ts": "2898198a4af4c9e5eb59ff09582165803ad77a368a0bf6acfb90f62bd93d99b0",
+    "ui/navigation.test.mjs": "501a3b732f5dbabcca3b117d83fa2765e395fc7f118ce53e1035e1455c60e245",
+    "package.json": "cd30ac14141e010fd73a9536e4d6e061044a634e5d56dc6a81f87b5f40aefe96",
+    "package-lock.json": "826413237b938cd42880ac873c7c4580e960bd59153eeedc0f4bf5f2e09a9004"
+  },
+  "apkSha256": "8eba0aff2d2a065cdda3404028ce6fe286ca6d7d24dd6968d8fa906c93cd9de6"
+}

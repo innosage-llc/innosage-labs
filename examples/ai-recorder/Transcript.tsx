@@ -1,6 +1,6 @@
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { RecorderSwitch } from './RecorderSwitch';
 import { supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,9 @@ import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
+import { AppHeader } from './ui/AppChrome';
+import { ActionButton } from './ui/ActionButton';
+import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
@@ -17,6 +20,7 @@ import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { connectGateway, type Gateway } from './GatewayConnection';
+import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 type SpeakerResult = { requested: boolean; status: string; transcript?: string };
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 const stateLabels: Record<string, string> = {
@@ -32,7 +36,7 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-export function Transcript({ recording, onClose }: { recording: File; onClose: () => void }) {
+export function Transcript({ recording, recordingTitle, onClose }: { recording: File; recordingTitle: string; onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
   const [gateway, setGateway] = useState<Gateway>();
@@ -52,8 +56,10 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   const [job, setJob] = useState<Job>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [statusUnknown, setStatusUnknown] = useState(false);
   const [summaryLocked, setSummaryLocked] = useState(false);
   const [draft, setDraft] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
@@ -84,8 +90,8 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       }
       setService(restoredService);
       setPaidOperation(paid);
-      setProAvailable(!!profile);
-      setUsePro(!!paid || (!savedOperation && !!profile));
+      setProAvailable(supportsProUpload && !!profile);
+      setUsePro(!!paid || (supportsProUpload && !savedOperation && !!profile));
       const speakers: SpeakerResult | undefined = speakerText ? JSON.parse(speakerText) : undefined;
       if (originalText !== undefined) {
         setJob({ state: 'COMPLETED', transcript: originalText, speakerLabeling: speakers });
@@ -99,7 +105,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         if (active) setOpenAIConfigured(configured);
         return;
       }
-      if (restoredService === 'production' || paid || (!savedOperation && profile)) return;
+      if (restoredService === 'production' || paid || (supportsProUpload && !savedOperation && profile)) return;
       if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
         const config = await connectGateway();
         if (active) setGateway(config);
@@ -116,6 +122,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
   async function request(config: Gateway | undefined, id: string, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined) {
     let result: Job;
     if (paid) {
+      if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
       const operationClient = clientForOperation(paid);
       result = upload
         ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal)
@@ -132,14 +139,13 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         signal,
       });
       if (response.status === 422) {
-        const failure = await response.json();
+        const failure = await response.json().catch(() => ({}));
         if (failure.detail?.code === 'SPEAKER_UNAVAILABLE') setJob({ state: 'FAILED' });
-        throw new Error(typeof failure.detail === 'string' ? failure.detail
+        throw new KnownServiceFailure(typeof failure.detail === 'string' ? failure.detail
           : failure.detail?.message ?? 'This recording could not be transcribed.');
       }
-      if (!response.ok) throw new Error(response.status === 413
-        ? 'This recording exceeds the Free upload limit.'
-        : 'Could not reach or complete the transcription. Check the connection and retry.');
+      if (response.status === 413) throw new KnownServiceFailure('This recording exceeds the Free upload limit.');
+      if (!response.ok) throw new Error('Could not reach or complete the transcription. Check the connection and retry.');
       result = await response.json();
     }
     await persistResult(result);
@@ -170,8 +176,11 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       try {
         const result = await request(gateway!, operation!, false, controller.signal, paidOperation);
         if (pending.has(result.state) && !controller.signal.aborted) timer = setTimeout(poll, 3000);
-      } catch {
-        if (!controller.signal.aborted) setMessage('Connection interrupted. Retry to resume this operation.');
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setStatusUnknown(true);
+          setMessage(statusRecoveryMessage(error));
+        }
       }
     }
     void poll();
@@ -203,12 +212,37 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     }
   }
 
-  async function submit() {
-    if ((!supportsProUpload && usePro) || connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
+  async function checkOperationStatus() {
+    if (!operation || (!gateway && !paidOperation) || busy || submission.current) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
+    try {
+      const result = await readOperationWithDeadline(
+        signal => request(gateway, operation, false, signal, paidOperation), controller.signal,
+      );
+      setStatusUnknown(false);
+      setMessage(pending.has(result.state)
+        ? 'The same operation is still in progress. This check did not upload your audio again.'
+        : result.state === 'COMPLETED' ? 'Transcript recovered from the same operation.' : 'This operation has ended. Review its status before starting another transcription.');
+    } catch (error) {
+      setStatusUnknown(true);
+      setMessage(statusRecoveryMessage(error));
+    } finally {
+      if (submission.current === controller) submission.current = null;
+      setBusy(false);
+    }
+  }
+
+  async function submit() {
+    if ((!supportsProUpload && (usePro || service === 'production')) || connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
+    setBusy(true);
+    setMessage('');
+    const controller = new AbortController();
+    submission.current = controller;
+    let openAIRequestStarted = false;
+    let serviceRequestStarted = false;
     try {
       if (isOpenAI) {
         if (recording.size <= 0 || recording.size >= openAIMaxBytes) {
@@ -217,6 +251,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
         const id = operation ?? randomUUID();
         await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
         setOperation(id);
+        openAIRequestStarted = !unsavedOpenAI;
         const transcript = unsavedOpenAI ?? await openAIAccess.transcribe(recording, controller.signal);
         setUnsavedOpenAI(transcript);
         try {
@@ -230,6 +265,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
       let paid = terminal ? undefined : paidOperation;
       if ((!operation || terminal) && usePro) {
+        if (!supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
         if (!profile) throw new Error('Configure your InnoSage Pro API key first.');
@@ -246,13 +282,30 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
       controller.signal.throwIfAborted();
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
       try {
+        serviceRequestStarted = true;
         await request(gateway, id, true, controller.signal, paid);
+        setStatusUnknown(false);
       } finally {
         clearTimeout(timeout);
       }
     } catch (error) {
+      const failure = error instanceof Error ? error.message : undefined;
+      const openAIDefinitiveFailure = !!failure && /^(OpenAI rejected this API key\.|Check that your OpenAI project key|Check your OpenAI project quota|OpenAI rejected the recording size\.|Choose a non-empty M4A recording|Enter an OpenAI Platform API key\.)/.test(failure);
+      const knownServiceFailure = error instanceof KnownServiceFailure || error instanceof ProServiceError || !!failure && /^(This recording exceeds the supported file size\.|This recording or speaker identification is unavailable\.|This source exceeds 512 MiB or has changed\.|This source exceeds the service limit\.)/.test(failure);
+      if (isOpenAI) {
+        setStatusUnknown(false);
+        setMessage(openAIRequestStarted && !openAIDefinitiveFailure
+          ? 'OpenAI transcription may have completed, but its status cannot be checked here. Confirm before retrying to avoid duplicate submission; the original audio remains on this device.'
+          : failure ?? 'Could not save the transcript.');
+      } else {
+        const uncertainOperation = serviceRequestStarted && !knownServiceFailure;
+        if (uncertainOperation) setStatusUnknown(true);
+        else setStatusUnknown(false);
+        setMessage(uncertainOperation
+          ? 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.'
+          : failure ?? 'Could not submit the recording.');
+      }
       if (error instanceof ProServiceError && error.code === 'speaker_unavailable') setJob({ state: 'FAILED' });
-      setMessage(error instanceof Error ? error.message : 'Could not submit the recording.');
     } finally {
       if (submission.current === controller) submission.current = null;
       setBusy(false);
@@ -263,6 +316,7 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     setBusy(true);
     try {
       await saveText(revision, draft);
+      setDirty(false);
       setMessage('Revision saved on this device.');
     } catch {
       setMessage('Could not save the revision.');
@@ -271,75 +325,120 @@ export function Transcript({ recording, onClose }: { recording: File; onClose: (
     }
   }
 
+  const canGoBack = canLeaveTranscript(busy, summaryLocked, !!unsavedOpenAI);
+  function requestClose() {
+    if (!canGoBack) return;
+    if (dirty) {
+      Alert.alert('Discard unsaved revision?', 'Your saved transcript will not change.', [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ]);
+    } else onClose();
+  }
+
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
-    <Modal onRequestClose={() => { if (!summaryLocked && (!isOpenAI || !busy)) onClose(); }}>
+    <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-          <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Transcript</Text>
-          <Text style={{ color: palette.muted }}>{services[service].label}</Text>
+        <AppHeader title="Transcript" onBack={requestClose} backLabel="Back to library" backDisabled={!canGoBack} />
+        <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
+          <Text style={{ color: palette.text }}>{recordingTitle}</Text>
+          {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
+          <View style={styles.serviceCard}>
+            <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
+            <Text style={{ color: palette.muted }}>{isOpenAI
+              ? 'Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.'
+              : !supportsProUpload && (service === 'production' || usePro) ? 'Pro uploads are unavailable on iOS.'
+              : service === 'production'
+                ? 'Transcription uploads this M4A recording to InnoSage Production for speech recognition.'
+                : usePro
+                  ? 'Transcription uploads this M4A recording to InnoSage Staging Pro for speech recognition.'
+                  : 'Transcription uploads this M4A recording through InnoSage Staging to Edge Speech for recognition.'}</Text>
+            <Text style={{ color: palette.muted }}>{isOpenAI
+              ? 'Limit: M4A under 25 MB.'
+              : !supportsProUpload && (service === 'production' || usePro) ? 'For new transcriptions choose staging Free access or OpenAI direct.'
+              : service === 'production' || usePro
+                ? 'InnoSage Pro limit: up to 4 hours and 512 MiB.'
+                : proAvailable
+                  ? 'Free staging limit: up to 15 minutes and 50 MB. Staging Pro supports up to 4 hours and 512 MiB.'
+                  : supportsProUpload ? 'Free staging limit: up to 15 minutes and 50 MB. Configure a staging Pro key for recordings up to 4 hours and 512 MiB.'
+                    : 'Free staging limit: up to 15 minutes and 50 MB.'}</Text>
+          </View>
           {!complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {complete ? (
             <>
-              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Original' : 'Editable revision'}</Text>
+              <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: '600' }}>{showOriginal ? 'Original transcript' : 'Editable revision'}</Text>
+              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Saved locally; read-only' : dirty ? 'Unsaved changes' : revision.exists ? 'Saved locally' : 'Not saved yet'}</Text>
               {job?.speakerLabeling?.requested ? <Text style={{ color: palette.muted }}>
                 {job.speakerLabeling.status === 'completed'
                   ? 'Speakers identified. Labels distinguish voices, not people’s names.'
                   : 'Speaker identification could not be completed. The transcript is available.'}
               </Text> : null}
-              <TextInput accessibilityLabel="Transcript text" multiline editable={!showOriginal}
-                value={showOriginal ? job?.transcript : draft} onChangeText={setDraft}
+              <TextInput accessibilityLabel="Transcript text" multiline editable={canEditTranscript(showOriginal, busy)}
+                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
-              <Button title={showOriginal ? 'Show revision' : 'Show original'} onPress={() => setShowOriginal(!showOriginal)} />
-              {!showOriginal ? <Button title="Save revision" disabled={busy} onPress={save} /> : null}
+              <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
+              {!showOriginal ? <ActionButton title="Save revision" variant="primary" disabled={busy} onPress={save} /> : null}
               <TranscriptSummary original={original} revision={revision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
             </>
           ) : isOpenAI ? (
             <>
-              <Text style={{ color: palette.text }}>OpenAI · M4A under 25 MB</Text>
+              <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
               {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
-                <Button title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} onPress={submit} />
+                <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
               ) : (
                 <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
               )}
             </>
           ) : gateway || usePro ? (
             <>
-              <Text style={{ color: palette.text }}>{usePro ? 'Pro · up to 4 hours · 512 MiB' : 'Free · up to 15 minutes · 50 MB'}</Text>
+              <Text style={{ color: palette.muted }}>{usePro ? 'InnoSage Pro · up to 4 hours · 512 MiB' : 'Free staging · up to 15 minutes · 50 MB'}</Text>
               {proAvailable ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Use InnoSage Pro</Text>
-                <RecorderSwitch value={usePro} enabled={canChooseSpeakers && service === 'staging'} onCheckedChange={value => {
+                <View style={{ minWidth: 60 }}>
+                  <RecorderSwitch value={usePro} enabled={canChooseSpeakers && service === 'staging' && (supportsProUpload || usePro)} onCheckedChange={value => {
                     setUsePro(value);
                     if (!value && !gateway) void connect();
                   }} label="Use InnoSage Pro" />
+                </View>
               </View> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: palette.text }}>Identify speakers</Text>
-                <RecorderSwitch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
+                <View style={{ minWidth: 60 }}>
+                  <RecorderSwitch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
                     label="Identify speakers" />
+                </View>
               </View>
               <Text style={{ color: palette.muted }}>Add speaker labels to this transcript. May take longer.</Text>
               {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
               {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
-              {!supportsProUpload && usePro ? <Text style={{ color: palette.muted }}>InnoSage Pro uploads require separate iOS support. Choose OpenAI direct or staging Free access.</Text> : null}
-              <Button title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} disabled={busy || (!supportsProUpload && usePro)} onPress={submit} />
+              {statusUnknown && operation ? <ActionButton title={busy ? 'Checking status…' : 'Check same operation'} variant="outlined" disabled={busy} onPress={checkOperationStatus} /> : null}
+              {!supportsProUpload && usePro ? <Text style={{ color: palette.muted }}>Pro uploads are unavailable on iOS. Choose staging Free access or OpenAI direct. Existing Pro results can still be read.</Text> : null}
+              <ActionButton title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} variant="primary" disabled={busy || (!supportsProUpload && usePro)} onPress={submit} />
             </>
           ) : service === 'production' ? (
-            <Text style={{ color: palette.text }}>Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.</Text>
+            <Text style={{ color: palette.text }}>{supportsProUpload
+              ? 'Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.'
+              : 'Production Pro is unavailable on iOS. Choose staging Free access or OpenAI direct in Transcription service, then reopen this recording.'}</Text>
           ) : (
             <View style={{ gap: spacing.md }}>
               {process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL ? null : <>
               <TextInput accessibilityLabel="Gateway URL" placeholder="https://…" autoCapitalize="none" value={url} onChangeText={setUrl} style={input} />
               <TextInput accessibilityLabel="Pilot access token" placeholder="Pilot access token" secureTextEntry autoCapitalize="none" value={token} onChangeText={setToken} style={input} />
               </>}
-              <Button title={connecting ? "Connecting…" : "Connect"} disabled={connecting} onPress={connect} />
+              <ActionButton title={connecting ? "Connecting…" : "Connect"} variant="primary" disabled={connecting} onPress={connect} />
             </View>
           )}
-          <Button title="Back to recordings" onPress={onClose} disabled={busy || summaryLocked} />
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
 }
+
+const styles = {
+  serviceCard: { padding: 16, gap: 8, backgroundColor: '#F3EDF7', borderRadius: 20 } as const,
+};

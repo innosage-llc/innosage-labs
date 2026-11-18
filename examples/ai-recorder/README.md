@@ -5,6 +5,90 @@ or another app is in front. Recordings are AAC in an M4A container. Finished fil
 are stored in the app's documents directory and available for offline playback
 after reopening the app.
 
+## Product promise and release status
+
+**Promise:** AI Recorder is intended to make Android conversation capture and
+local review straightforward: record from the app, continue while the screen is
+locked or another app is open, then find and play the M4A locally, including
+without a network connection. Transcription and summaries are separate,
+user-started actions: the selected service receives the audio or transcript
+needed for that request. This is hybrid capture and AI processing, not fully
+offline AI. There is no cross-device sync or backup promise. Uninstall removes
+app-private files and saved results; it does not delete an original transcript
+already retained by the staging Gateway.
+
+### Available in the current Android `main`
+
+- **Capture and review:** Record, Library, and Settings destinations; a large,
+  centered recording control; local M4A recording, playback, and relaunch access.
+  Android M4A import makes a local copy. Import is a Library action.
+- **Transcription choices:** Free access through the staging Gateway; separate
+  InnoSage Staging and Production Pro profiles; and a personal OpenAI Android
+  pilot. Staging remains the upgrade default. Production needs a production Pro
+  key and never falls back to staging; Free Gateway access is staging-only.
+- **Transcript work:** Optional speaker labels (off by default), a preserved
+  original, and separately saved local revisions. A completed transcript can be
+  reopened offline. The staging Gateway commits original transcripts server-side.
+- **Summaries:** Meeting Essentials or a saved Custom recipe from the chosen
+  original or revision, using a configured OpenAI Platform key. The user selects
+  an available compatible model and thinking level. Custom recipes can require
+  web search; returned inline source links are saved with the summary.
+
+Limits are service-specific. The app displays a staging Free limit of up to
+15 minutes and 50 MB ([source](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/Transcript.tsx#L361));
+the Gateway rejects source files over 50,000,000 bytes
+([limit](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/server/gateway.py#L20),
+[check](https://github.com/innosage-llc/innosage-labs/blob/40d95184a1e7c903b3994818767e59357bbf7392/examples/ai-recorder/server/gateway.py#L203));
+the Router owns decoded-duration and admission limits. InnoSage Pro allows up
+to four hours and 512 MiB; the direct OpenAI transcription pilot accepts a new
+M4A smaller than 25,000,000 bytes. OpenAI requests use the user's project quota.
+A provider's availability, quota, and service limits still apply. See the
+sections below for key handling, recovery, data flow, and details.
+
+### Evidence and maturity
+
+**Status snapshot:** 2026-11-14, repository `main` at
+[`40d9518`](https://github.com/innosage-llc/innosage-labs/commit/40d95184a1e7c903b3994818767e59357bbf7392).
+This describes source and verification status, not a production distribution
+commitment.
+
+| State | What this document means |
+| --- | --- |
+| Implemented in `main` | The Android capture, Library, Settings, import, transcription, transcript editing, and summary flows described below exist in source. This is not a claim that every provider operation or failure mode has passed live acceptance. |
+| Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. PR #61's bounded six-run main-versus-candidate control check was 5 PASS / 1 PARTIAL; its original Start error was NOT_REPRODUCED / NOT_FIXED. A later, separate PR #62 run observed a new native Start failure with unknown cause and stage. |
+| In development | [PR #62](https://github.com/innosage-llc/innosage-labs/pull/62) is a draft UI refinement: one native action for the circle and label, shared disabled behavior, removal of the competing idle “Ready to record” line, and clearer saved copy. It is not in `main` and is not a released feature. |
+| Not established | PR #61's original Start error remains NOT_REPRODUCED / NOT_FIXED; this describes only that bounded check. PR #62 later observed a separate Start failure (“Could not start recording…”) with no successful output and unknown cause/stage. A separately authorized one-Start production Saved proof passed at 320 dp / 200% text for top/bottom reachability, native bounds, and Library handoff; lower Start activation was NOT_TESTED ([immutable report at `14fa865`](https://github.com/innosage-llc/innosage-labs/blob/14fa865f95d2d7ed61bc603d2e63c9c9069e7df2/examples/ai-recorder/docs/single-action/production-small-30m/README.md)). The fresh Start failure and config-transition interrupted capture remain unresolved. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
+| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; the original candidate was signed, installed and launched on a USB test iPhone; the reconciled source and the complete physical-device journey remain distinct checks. TestFlight delivery is not established. Web is unsupported. |
+
+The merged [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61)
+centers the Android recording control. Its merge records source integration, not
+a reliability fix or full release acceptance. See the [bounded control evidence](docs/centered-control/ab-native-start/README.md)
+and [Android runtime audit](docs/android-runtime-audit/README.md) for the exact
+scope and gaps. Engineering inspection tools and design-review artifacts are
+QA aids; they are not AI Recorder features or supported app platforms.
+
+### Acceptance and release gates
+
+- **Capture:** On a physical Android phone, verify spoken markers before screen
+  lock, while locked, and in another app remain in the saved M4A in order; verify
+  local playback after relaunch and offline. Emulator evidence alone does not
+  close physical-phone acceptance.
+- **Provider and data flow:** For each offered service, verify the selected route,
+  key/quota requirements, exact size and duration limits, original/revision
+  distinction, and same-operation recovery behavior. Clearly disclose that
+  remote requests leave the device and that staging Gateway retains original
+  transcripts server-side; do not describe AI processing as offline or all data
+  as local.
+- **UI follow-up:** The bounded PR #62 production Saved proof passed top/bottom
+  reachability, native bounds, and Library handoff at 320 dp / 200% text; lower
+  Start activation was NOT_TESTED. PR #62 remains draft/blocked pending a fresh
+  user risk decision because the separate new Start failure and config-transition
+  interrupted capture remain unresolved. Do not infer reliability from PR #61's
+  5 PASS / 1 PARTIAL check.
+- **Platform claims:** Claim iOS availability only after the signed installation
+  and physical-device capture, playback, import, relaunch, and supported-provider
+  journey are verified. Do not claim web support from Expo compatibility alone.
+
 Use Node 24, a JDK and an Android SDK compatible with Expo SDK 58. Connect an
 Android phone with USB debugging or start an emulator, then run:
 
@@ -66,8 +150,8 @@ requires an explicit new transcription. Global ASR concurrency remains one.
 The Gateway commits the original transcript before reporting completion and
 cleaning up the upstream artifact. Original and edited transcripts are also
 retained separately on the phone. Reopening a saved transcript works offline.
-The staging Gateway stores originals server-side. It does not provide server-side
-editing or cross-device synchronization in this milestone.
+The staging Gateway commits original transcripts server-side. It does not
+provide server-side editing or cross-device synchronization in this milestone.
 
 ### Identify speakers
 
@@ -121,9 +205,9 @@ project quota. The result and any revisions are stored locally. Reopen the
 recording to read or manually play the original audio.
 
 Paid transcription follows the existing four-hour decoded-duration policy.
-This sample enforces the effective512MiB source limit. Router's larger source
-advertisement is tracked separately in Infra #205. Audio hashing reads1MiB at a
-time; the Android Expo module uploads the app-private file in64KiB chunks using
+This sample enforces the effective 512 MiB source limit. Router's larger source
+advertisement is tracked separately in Infra #205. Audio hashing reads 1 MiB at a
+time; the Android Expo module uploads the app-private file in 64 KiB chunks using
 fixed-length HTTPS, redirect refusal and cancellation. Originals and attributed
 text are saved before remote cleanup. Retained capabilities allow same-operation
 cleanup recovery. This Android milestone's real Pro and long-audio acceptance is
@@ -154,8 +238,41 @@ high thinking. Use **Custom recipe** to enter and save reusable instructions.
 Enable **Search the web** for a custom recipe to require an OpenAI web search
 during generation. Source links appear inline and persist with the summary.
 
-## iPhone development
+## Android app shell
 
-See [IOS_DEVELOPMENT.md](IOS_DEVELOPMENT.md) for local Xcode/team/device setup, build/debug commands, supported provider boundaries, and the physical-device acceptance checklist. iOS prebuild and JavaScript bundling do not establish physical-iPhone acceptance.
+The bounded Android shell uses the installed Expo UI Material 3 `NavigationBar`,
+`NavigationBarItem`, `TopAppBar`, and `IconButton`, plus official
+`@expo/material-symbols` assets. The three roots are **Record**, **Library**, and
+**Settings**. Import is a Library action, not a destination. Transcription service
+is a Settings detail; a recording's Transcript is a Library detail. These detail
+screens retain the existing modal lifecycle and now have a fixed native top bar.
+This is not an Expo Router migration or an iOS navigation implementation.
 
-For installation without connecting a phone to this Mac, use the prepared [TestFlight delivery path](TESTFLIGHT.md). It requires verified Expo/App Store Connect accounts and distribution signing; no TestFlight build has been uploaded yet.
+The recorder/player controller stays mounted above root content changes. During
+recording, other roots show a return-to-recording action. Starting, saving, and
+importing temporarily lock root controls. Android system Back from a secondary
+root returns to Record; from a detail it uses the same guard as the top Back
+button. Transcript Back waits for submission/save/summary operations and unsaved
+OpenAI results, and confirms before discarding an edited revision. A background
+remote job retains its existing recovery identity. No navigation action submits
+new audio or verifies a key.
+
+Safe area ownership is explicit: React Native owns top/side insets; the native
+bottom bar owns bottom system insets. Detail content scrolls below its fixed
+header. Status-bar icons follow the existing application theme. Library remains
+virtualized. This compact Android baseline does not invent a phone drawer,
+expanded rail, or new product destinations. Future larger-screen or iOS support
+needs its platform-native adapter and runtime verification.
+
+Run `npm run test:navigation` alongside typecheck and the transcript tests.
+For future apps, first inventory their installed native controls and navigator,
+write a destination/action and state-ownership contract, and reuse those controls.
+Do not copy this bounded modal controller into a deeper route hierarchy: evaluate
+the SDK-compatible Expo Router native stack/tabs and preserve long-lived audio
+state above route mounts. See [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
+and [Expo native tabs](https://docs.expo.dev/router/advanced/native-tabs/).
+
+### Local iPhone development
+See [Physical iPhone development](IOS_DEVELOPMENT.md) for the local build path,
+signed-device requirements and verification limits. [TestFlight preparation](TESTFLIGHT.md)
+is separate; a local build does not publish or submit an app.

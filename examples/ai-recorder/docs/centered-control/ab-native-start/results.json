@@ -1,0 +1,969 @@
+{
+  "readiness": "BLOCKED pending coordinator finite residual-risk decision; A/B budget completed",
+  "budget_started_at_utc": "2026-11-14T07:37:13+00:00",
+  "deadline_utc": "2026-11-14T09:07:13+00:00",
+  "runtime_cleanup_complete_at_utc": "2026-11-14T08:09:22.237607+00:00",
+  "elapsed_through_runtime_cleanup_minutes": 32.15396011666667,
+  "report_generated_at_utc": "2026-11-14T08:12:30.041626+00:00",
+  "elapsed_through_report_generation_minutes": 35.2840271,
+  "scenario_execution_count": 6,
+  "maximum": 6,
+  "pass": 5,
+  "partial": 1,
+  "failed": 0,
+  "not_run": 0,
+  "production_native_start_failure_observed": false,
+  "original_failure": "NOT_REPRODUCED / NOT_FIXED",
+  "original_failed_stage": "UNKNOWN",
+  "root_cause": "UNKNOWN",
+  "baseline": "Frozen c1 actually tested in three production cases; no matching failure or causal evidence; preexisting defect NOT_ESTABLISHED",
+  "repair": "NONE; no production mutation or instrumentation",
+  "private_diagnostic_build": "NOT_RUN; no scenario replay/baseline beyond six slots",
+  "original_profile_all_bytes_unchanged": true,
+  "copy_data": "Both original ten sets retained plus exactly three known outputs each; restored settings/grants/flags; both copies STOPPED; original stays stopped",
+  "cases": [
+    {
+      "slot": "main-1",
+      "status": "PASS",
+      "started_at_utc": "2026-11-14T07:47:46.051973+00:00",
+      "ended_at_utc": "2026-11-14T07:49:29.997100+00:00",
+      "duration_seconds": 103.945127,
+      "source_commit": "c1cafcce07ef156418ba89528807188271923bef",
+      "apk_sha256": "601356b408536d9bc63b9f4dfb483d0c4aebef1098c183f7d9e2d9999298ecbe",
+      "embedded_js_sha256": "fb87470cffc7c42bf2cd727707756c8277c70b7506a15ef70f1546a599cef4f2",
+      "test_copy_label": "A",
+      "result": {
+        "status": "PASS",
+        "timer": [
+          "0:00",
+          "0:03"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "count_before": 10,
+        "count_after": 11,
+        "all_original_retained": true,
+        "saved_identity": "11/14/2026, 3:48:36 PM",
+        "note": "physical audio not assessed; UI/native playback progression only"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "process_observations": {},
+      "states": [
+        {
+          "stage": "case1-cold-before",
+          "observation_started_at_utc": "2026-11-14T07:47:46.677170+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-mic-prompt",
+          "observation_started_at_utc": "2026-11-14T07:47:49.456635+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to record audio?",
+            "While using the app",
+            "Only this time",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-after-mic",
+          "observation_started_at_utc": "2026-11-14T07:47:52.169068+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to send you notifications?",
+            "Allow",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-record-early",
+          "observation_started_at_utc": "2026-11-14T07:48:04.769491+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case1-save",
+          "observation_started_at_utc": "2026-11-14T07:48:36.423794+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ]
+    },
+    {
+      "slot": "main-2",
+      "status": "PASS",
+      "started_at_utc": "2026-11-14T07:50:08.545346+00:00",
+      "ended_at_utc": "2026-11-14T07:53:05.535000+00:00",
+      "duration_seconds": 176.989654,
+      "source_commit": "c1cafcce07ef156418ba89528807188271923bef",
+      "apk_sha256": "601356b408536d9bc63b9f4dfb483d0c4aebef1098c183f7d9e2d9999298ecbe",
+      "embedded_js_sha256": "fb87470cffc7c42bf2cd727707756c8277c70b7506a15ef70f1546a599cef4f2",
+      "test_copy_label": "A",
+      "result": {
+        "status": "PASS",
+        "timer": [
+          "0:00",
+          "0:25"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "count_before": 11,
+        "count_after": 12,
+        "all_original_retained": true,
+        "saved_identity": "11/14/2026, 3:52:01 PM",
+        "note": "actual UI/native time progression; physical audio not assessed"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "process_observations": {
+        "os_process_gone_after_revocation": true,
+        "recreated_before_denials": true,
+        "same_process_manual_allow_to_record": true
+      },
+      "states": [
+        {
+          "stage": "case2-reset-mic-nav0",
+          "observation_started_at_utc": "2026-11-14T07:50:08.935223+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Archive",
+            "Uninstall",
+            "Force stop",
+            "Notifications",
+            "Off",
+            "Permissions",
+            "No permissions granted",
+            "Storage & cache",
+            "43.37 MB used in internal storage",
+            "Mobile data usage",
+            "No data used",
+            "Screen time",
+            "45 minutes today",
+            "App battery usage",
+            "No battery use since last full charge",
+            "Open by default",
+            "App info"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-revoked",
+          "observation_started_at_utc": "2026-11-14T07:50:17.313286+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Microphone access for this app",
+            "Allow only while using the app",
+            "Ask every time",
+            "Don’t allow",
+            "See all apps with this permission"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-normal-return-3",
+          "observation_started_at_utc": "2026-11-14T07:50:27.943629+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-deny-first-result",
+          "observation_started_at_utc": "2026-11-14T07:50:33.417284+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Allow microphone access to record.",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-permanent-result",
+          "observation_started_at_utc": "2026-11-14T07:50:38.829538+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Allow microphone access to record.",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-permanent-retry",
+          "observation_started_at_utc": "2026-11-14T07:50:41.631516+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Allow microphone access to record.",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-manual-allow",
+          "observation_started_at_utc": "2026-11-14T07:51:09.601411+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Microphone access for this app",
+            "Allow only while using the app",
+            "Ask every time",
+            "Don’t allow",
+            "See all apps with this permission"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-record-early",
+          "observation_started_at_utc": "2026-11-14T07:51:21.109013+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case2-save",
+          "observation_started_at_utc": "2026-11-14T07:52:01.563038+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ]
+    },
+    {
+      "slot": "main-3",
+      "status": "PASS",
+      "started_at_utc": "2026-11-14T07:53:26.746706+00:00",
+      "ended_at_utc": "2026-11-14T07:55:43.714903+00:00",
+      "duration_seconds": 136.968197,
+      "source_commit": "c1cafcce07ef156418ba89528807188271923bef",
+      "apk_sha256": "601356b408536d9bc63b9f4dfb483d0c4aebef1098c183f7d9e2d9999298ecbe",
+      "embedded_js_sha256": "fb87470cffc7c42bf2cd727707756c8277c70b7506a15ef70f1546a599cef4f2",
+      "test_copy_label": "A",
+      "result": {
+        "status": "PASS",
+        "timer": [
+          "0:00",
+          "0:26"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "count_before": 12,
+        "count_after": 13,
+        "all_original_retained": true,
+        "saved_identity": "11/14/2026, 3:54:48 PM",
+        "note": "actual UI/native time progression; physical audio not assessed"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "process_observations": {
+        "os_process_gone_after_notification_off": true,
+        "recreated_before_recording": true
+      },
+      "states": [
+        {
+          "stage": "case3-notifications-on-precondition",
+          "observation_started_at_utc": "2026-11-14T07:53:32.630750+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "All AI Recorder notifications",
+            "Notification categories",
+            "Audio Recording",
+            "About 1 notification per day",
+            "Show unused categories",
+            "App settings",
+            "Allow notification dot"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-notifications-off-target",
+          "observation_started_at_utc": "2026-11-14T07:53:35.385914+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "All AI Recorder notifications",
+            "You haven't allowed notifications from this app",
+            "App settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-start-response",
+          "observation_started_at_utc": "2026-11-14T07:53:43.601566+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to send you notifications?",
+            "Allow",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-record-early",
+          "observation_started_at_utc": "2026-11-14T07:54:08.161924+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case3-save",
+          "observation_started_at_utc": "2026-11-14T07:54:48.378403+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Keep the thought. Even without internet.",
+            "Recordings stay on this device. Nothing is uploaded until you choose to transcribe.",
+            "Made for the moment",
+            "Capture now. Choose later if you want a transcript or summary.",
+            "Start recording",
+            "Offline first · No account needed to record",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ]
+    },
+    {
+      "slot": "candidate-1",
+      "status": "PARTIAL",
+      "started_at_utc": "2026-11-14T07:58:45.297663+00:00",
+      "ended_at_utc": "2026-11-14T08:00:08.882056+00:00",
+      "duration_seconds": 83.584393,
+      "source_commit": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+      "apk_sha256": "522983e55f30567529bd4a61384c8ebc34c169905800573a5ce931795f4d6997",
+      "embedded_js_sha256": "22422cccec847c87cce73e1d51a8cbcbbdeb86f70eb819c8055d5c4141464575",
+      "test_copy_label": "B",
+      "result": {
+        "status": "PARTIAL",
+        "timer": [
+          "0:00",
+          "0:03"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "core_record_save_locate_user_playback": "PASS",
+        "post_playback_pause_and_immediate_retention_check": "AUTOMATION_FAILED / NOT_COMPLETED",
+        "no_additional_record_start": true,
+        "saved_identity": "11/14/2026, 3:59:20 PM",
+        "count_before": 10,
+        "count_after_at_case_end": "NOT_VERIFIED",
+        "later_retention": "candidate2 fresh enumeration12 includes ten originals and both new scenario files",
+        "restart_explanation": "INFERENCE: immediate pre-tap control not captured; later PNG visibly Pause0:10, fresh XML unavailable"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "process_observations": {},
+      "states": [
+        {
+          "stage": "case1-cold-before",
+          "observation_started_at_utc": "2026-11-14T07:58:45.945308+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Ready to record",
+            "Start recording",
+            "Recordings are stored on this device.",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-mic-prompt",
+          "observation_started_at_utc": "2026-11-14T07:58:48.647508+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to record audio?",
+            "While using the app",
+            "Only this time",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-after-mic",
+          "observation_started_at_utc": "2026-11-14T07:58:51.339007+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to send you notifications?",
+            "Allow",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case1-record-early",
+          "observation_started_at_utc": "2026-11-14T07:58:54.697006+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case1-save",
+          "observation_started_at_utc": "2026-11-14T07:59:21.136635+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Start recording",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ],
+      "qualification": "PARTIAL: core timer/save/locate/user playback observed. Pause-tail fresh hierarchy UNAVAILABLE/assertion failed; initial PASS mislabel corrected, original ledger retained. Timing+later PNG are consistent with late tap restarting finished playback; pre-tap control was not captured, so this causal explanation is inference. No scenario replay. Count11/Record-return not verified at case end; all ten originals plus this output verified later in case2/final13."
+    },
+    {
+      "slot": "candidate-2",
+      "status": "PASS",
+      "started_at_utc": "2026-11-14T08:00:19.293667+00:00",
+      "ended_at_utc": "2026-11-14T08:03:34.682718+00:00",
+      "duration_seconds": 195.389051,
+      "source_commit": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+      "apk_sha256": "522983e55f30567529bd4a61384c8ebc34c169905800573a5ce931795f4d6997",
+      "embedded_js_sha256": "22422cccec847c87cce73e1d51a8cbcbbdeb86f70eb819c8055d5c4141464575",
+      "test_copy_label": "B",
+      "result": {
+        "status": "PASS",
+        "timer": [
+          "0:00",
+          "0:25"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "count_before": 11,
+        "count_after": 12,
+        "all_original_retained": true,
+        "saved_identity": "11/14/2026, 4:02:35 PM",
+        "note": "actual UI/native time progression; physical audio not assessed",
+        "count_before_kind": "11 inferred from one prior successful save; no fresh immediate11 enumeration; later12 and final13 verified"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "process_observations": {
+        "os_process_gone_after_revocation": true,
+        "recreated_before_denials": true,
+        "same_process_manual_allow_to_record": true
+      },
+      "states": [
+        {
+          "stage": "case2-reset-mic-nav0",
+          "observation_started_at_utc": "2026-11-14T08:00:19.674883+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Archive",
+            "Uninstall",
+            "Force stop",
+            "Notifications",
+            "Off",
+            "Permissions",
+            "No permissions granted",
+            "Storage & cache",
+            "43.30 MB used in internal storage",
+            "Mobile data usage",
+            "No data used",
+            "Screen time",
+            "42 minutes today",
+            "App battery usage",
+            "No battery use since last full charge",
+            "Open by default",
+            "App info"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-revoked",
+          "observation_started_at_utc": "2026-11-14T08:00:27.975448+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Microphone access for this app",
+            "Allow only while using the app",
+            "Ask every time",
+            "Don’t allow",
+            "See all apps with this permission"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-normal-return-3",
+          "observation_started_at_utc": "2026-11-14T08:00:38.570449+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Ready to record",
+            "Start recording",
+            "Recordings are stored on this device.",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-deny-first-result",
+          "observation_started_at_utc": "2026-11-14T08:00:43.977936+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Microphone access was not allowed. Tap Start recording to ask again.",
+            "Start recording",
+            "Recordings are stored on this device.",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-permanent-result",
+          "observation_started_at_utc": "2026-11-14T08:00:49.347271+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Microphone access is blocked. In Android device Settings, open Apps > AI Recorder > Permissions > Microphone. Allow access, return here, then tap Start recording.",
+            "Start recording",
+            "Recordings are stored on this device.",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-permanent-retry",
+          "observation_started_at_utc": "2026-11-14T08:00:52.136068+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Microphone access is blocked. In Android device Settings, open Apps > AI Recorder > Permissions > Microphone. Allow access, return here, then tap Start recording.",
+            "Start recording",
+            "Recordings are stored on this device.",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-manual-allow",
+          "observation_started_at_utc": "2026-11-14T08:01:33.371693+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "AI Recorder",
+            "Microphone access for this app",
+            "Allow only while using the app",
+            "Ask every time",
+            "Don’t allow",
+            "See all apps with this permission"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case2-record-early",
+          "observation_started_at_utc": "2026-11-14T08:01:44.821094+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case2-save",
+          "observation_started_at_utc": "2026-11-14T08:02:35.734448+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Start recording",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ],
+      "qualification": "Setup began from Library after candidate1 PARTIAL, with continued/restarted playback. The predefined microphone revocation ended that process/player; after reset/recreation the flags and denial/manual-recovery entry conditions matched main2. Preserve this initial setup variance; do not claim fully clean end-to-end parity."
+    },
+    {
+      "slot": "candidate-3",
+      "status": "PASS",
+      "started_at_utc": "2026-11-14T08:05:25.892943+00:00",
+      "ended_at_utc": "2026-11-14T08:08:03.786971+00:00",
+      "duration_seconds": 157.894028,
+      "source_commit": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+      "apk_sha256": "522983e55f30567529bd4a61384c8ebc34c169905800573a5ce931795f4d6997",
+      "embedded_js_sha256": "22422cccec847c87cce73e1d51a8cbcbbdeb86f70eb819c8055d5c4141464575",
+      "test_copy_label": "B",
+      "result": {
+        "status": "PASS",
+        "timer": [
+          "0:00",
+          "0:26"
+        ],
+        "playback": [
+          "0:00",
+          "0:03"
+        ],
+        "count_before": 12,
+        "count_after": 13,
+        "all_original_retained": true,
+        "saved_identity": "11/14/2026, 4:07:20 PM",
+        "note": "actual UI/native time progression; physical audio not assessed"
+      },
+      "before_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "after_save_permissions": [
+        "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+        "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+      ],
+      "process_observations": {
+        "os_process_gone_after_notification_off": true,
+        "recreated_before_recording": true
+      },
+      "states": [
+        {
+          "stage": "case3-notifications-on-precondition",
+          "observation_started_at_utc": "2026-11-14T08:05:31.709169+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "All AI Recorder notifications",
+            "Notification categories",
+            "Audio Recording",
+            "About 1 notification per day",
+            "Show unused categories",
+            "App settings",
+            "Allow notification dot"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-notifications-off-target",
+          "observation_started_at_utc": "2026-11-14T08:05:34.489521+00:00",
+          "foreground": "OWN_APP_ANDROID_SETTINGS",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "All AI Recorder notifications",
+            "You haven't allowed notifications from this app",
+            "App settings"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-start-response",
+          "observation_started_at_utc": "2026-11-14T08:05:42.621539+00:00",
+          "foreground": "SYSTEM_PERMISSION_DIALOG",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Allow AI Recorder to send you notifications?",
+            "Allow",
+            "Don’t allow"
+          ],
+          "xml_status": "fresh"
+        },
+        {
+          "stage": "case3-record-early",
+          "observation_started_at_utc": "2026-11-14T08:06:21.663529+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [],
+          "xml_status": "NOT_REQUESTED: live timer; visually inspect PNG"
+        },
+        {
+          "stage": "case3-save",
+          "observation_started_at_utc": "2026-11-14T08:07:20.710213+00:00",
+          "foreground": "OWN_APP_MAIN_ACTIVITY",
+          "permissions": [
+            "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_FIXED|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+            "android.permission.RECORD_AUDIO: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]"
+          ],
+          "ui_texts": [
+            "Record",
+            "Recording saved on this device.",
+            "View in Library",
+            "Start recording",
+            "Record",
+            "Library",
+            "Settings"
+          ],
+          "xml_status": "fresh"
+        }
+      ]
+    }
+  ]
+}

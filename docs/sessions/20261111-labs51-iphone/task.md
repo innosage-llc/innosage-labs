@@ -1,5 +1,9 @@
 # AI Recorder physical-iPhone development (#51)
 
+Historical snapshot from 2026-11-11. The observations below apply to the original
+preparation at that date, not the later local USB sign/install/launch or the
+reconciled SwiftUI adapter candidate tracked by #91.
+
 State: implementation reviewed; revised delivery target is owner-only TestFlight, with account/signing prerequisites unverified. Issue remains open.
 Base: Labs `20208b8ca69d581dcfafae0260330172a2153acf`.
 Scope: reproducible iOS developer configuration/build instructions and native platform boundaries; no production release.
