@@ -80,8 +80,10 @@ export function DraftSummary(props:Props) {
     signal.throwIfAborted();
     setCandidate(next); setRecipes(false); setFormBusy(false); setMessage('');
     if (next.basedOnRevision === 0) {
+      working.current = true; setBusy(true);
       try { await accept(next); }
       catch { setMessage('Generation finished. Retry saving this result without generating again.'); }
+      finally { working.current = false; setBusy(false); }
     }
   }
   async function refreshOwner() {
@@ -89,7 +91,8 @@ export function DraftSummary(props:Props) {
     const status = await publication!.status();
     setOwner(status); setOwnerKnown(true);
   }
-  const text = snapshot ? draftText(snapshot) : '';
+  const text = useMemo(() => snapshot ? draftText(snapshot) : '',[snapshot]);
+  const characters = useMemo(() => sharing ? Array.from(text) : [],[sharing,text]);
   const citations = useMemo(() => snapshot?.generation ? editedSummaryCitations(text,snapshot.generation) : [],[snapshot,text]);
   const secondary = {color:palette.muted};
   return <View style={{gap:spacing.sm}}>
@@ -121,7 +124,7 @@ export function DraftSummary(props:Props) {
       <Text selectable style={{color:palette.text}}>{text}</Text>
       {citations.map((citation,i) => {
         const anchor = citation as {start?:number;end?:number};
-        const quote = anchor.start !== undefined && anchor.end !== undefined ? Array.from(text).slice(anchor.start,anchor.end).join('') : '';
+        const quote = anchor.start !== undefined && anchor.end !== undefined ? characters.slice(anchor.start,anchor.end).join('') : '';
         return <Text key={i} accessibilityRole="link" onPress={()=>void run(()=>Linking.openURL(citation.url).then(()=>{}))}
           style={{color:palette.accent}}>{quote ? quote + ' · ' : 'Source · '}{citation.title || citation.url}</Text>;
       })}
