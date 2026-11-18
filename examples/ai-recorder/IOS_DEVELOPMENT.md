@@ -13,11 +13,56 @@ JavaScript bundle/prebuild success is not evidence of a signed native build or a
 - The developer's authorized Apple account/team and development signing. A free Personal Team can have provisioning/device limits and short-lived profiles; a paid team is not purchased or assumed. Do not commit a team ID, provisioning profile, certificate, device identifier or account details.
 - Use synthetic speech and a synthetic M4A fixture. Never upload private recordings just to pass a test. Do not look for keys in another project, shell history, logs or Keychain.
 
+## Repeatable USB install and launch
+
+Use this path from an iOS-capable development checkout of AI Recorder. The helper
+targets the existing `co.innosage.labs.airecorder` identifier and exactly one
+physical iPhone connected by USB. It does not use a simulator, Metro, TestFlight,
+or a staging service.
+
+1. Run `npm ci` from this directory (Node 24 is recommended). Run `npm run ios:check`
+   for the read-only checklist, or `npm run ios:check -- --host-only` when the phone
+   is elsewhere. `npm run ios:device -- doctor` is the same full checklist.
+2. For a first run, unlock the test phone and connect it with a data cable. If asked,
+   approve Trust This Computer and enable **Settings → Privacy & Security →
+   Developer Mode** on the iPhone, restart, confirm, then unlock again. In Xcode,
+   sign in to the intended Apple developer account and select the intended team for
+   the AIRecorder target. If the workspace has not been generated yet, the runner can
+   prepare it, then stop so you can select the team in **Signing & Capabilities**.
+   Review any required device registration (the device name and ID go to Apple)
+   and handle protected macOS Keychain prompts yourself. Enabling Xcode's External
+   Agent Access is not required.
+3. Run `npm run ios:device -- run`. It generates a missing iOS project without
+   cleaning an existing one, prepares missing CocoaPods, and uses existing local
+   development signing to build a Release configuration with JavaScript embedded.
+   It checks that the signed profile covers the phone, installs in place without
+   uninstalling, reads back the installed version, launches the app, and checks
+   that the process is still running. A normal `run` installs the built app even
+   if that version is already present.
+4. After an interruption, retry the same command. Xcode reuses its incremental
+   cache, but the runner reinstalls in place before verifying the launch. An app
+   already on the phone with the same version/build is not necessarily the same
+   artifact. `npm run ios:device -- run --build-only` does not touch the phone;
+   `npm run ios:device -- verify` checks the existing install/process without
+   installing or launching anything.
+
+The runner does not sign in, choose a team, change Developer Mode or Keychain
+settings, register devices, create credentials, accept terms, or upload anything.
+Ordinary dependency downloads may need access to official package endpoints. A
+CoreDevice permissions or timeout result is not evidence that the iPhone is
+disconnected; first retry from an authorized Mac session. Raw build logs in the
+ignored `ios/.ai-recorder-device/` directory are private and may include signing
+or local machine details. Do not share them without review.
+
+A running process only verifies install and startup, not recording, playback,
+import, live provider behavior, or release readiness. Run `npm run test:ios-device`
+to test the helper using offline fixtures; it does not use a device.
+
 ## Generate and open the native project
 
 Run from `examples/ai-recorder`:
 
-1. `npm run ios:check`
+1. `npm run ios:check -- --host-only`
 2. `npm run typecheck`
 3. `npm run test:platform`
 4. `npm run test:transcript`
