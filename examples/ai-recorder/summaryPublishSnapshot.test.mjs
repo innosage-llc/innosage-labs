@@ -55,3 +55,14 @@ test('cannot build an upload payload for a stale reviewed revision, transcript o
   assert.throws(()=>buildSummaryPublishSnapshot({...draft,kind:'transcript'},draft,publicId,1),/summary/);
   assert.throws(()=>buildSummaryPublishSnapshot(draft,draft,privateId,1),/public summary identity/);
 });
+
+test('a surviving unique quotation is linked in-place after an insertion; the separate sources remain', async () => {
+  const {store,draft} = await saved();
+  const edited = await store.commit(draft.revision,blocks('📋 Edited: Initial generated result'));
+  // Original [0,8) quotes “Initial ”. Whitespace is not part of the anchor.
+  const body=JSON.parse(buildSummaryPublishSnapshot(edited,edited,publicId,1).blocks[0].content).content;
+  assert.deepEqual(body[0].content,[{type:'text',text:'📋 Edited: '},
+    {type:'text',text:'Initial',marks:[{type:'link',attrs:{href:'https://example.com/source'}}]},
+    {type:'text',text:' generated result'}]);
+  assert.equal(body[2].content[0].text,'Source');
+});

@@ -1,4 +1,4 @@
-import { draftText, readSummaryGeneration, type DraftSnapshot, type SummaryGeneration } from './draftDocumentModel';
+import { citedSummaryParagraphs, editedSummaryCitations, draftText, readSummaryGeneration, type DraftSnapshot, type SummaryGeneration } from './draftDocumentModel';
 import { prepareRecorderOpen } from './recorderDraftProtocol';
 
 export type SummaryCandidate = Readonly<{ pageId: string; generation: SummaryGeneration; basedOnRevision: number }>;
@@ -57,6 +57,15 @@ type NativeSummaryDocument = {
   replaceSummary(baseRevision: number, blocks: unknown, generation: SummaryGeneration): Promise<DraftSnapshot>;
 };
 
+function seedSummary(pageId:string, generation:SummaryGeneration) {
+  const text=generation.text.replace(/\r\n?/g,'\n');
+  // Keep the same paragraph/size guard as ordinary Draft seeds, including rich markup.
+  if (!prepareRecorderOpen(pageId,'Meeting Summary',text)) return;
+  const content=citedSummaryParagraphs(text,editedSummaryCitations(text,generation));
+  const blocks=[{id:pageId,type:'tiptap',content:JSON.stringify({type:'doc',content})}];
+  return prepareRecorderOpen(pageId,'Meeting Summary','',{revision:0,blocks});
+}
+
 /** Adopt an older generated summary once, without deleting the legacy source. */
 export async function loadSummaryDocument(
   document: NativeSummaryDocument,
@@ -68,7 +77,7 @@ export async function loadSummaryDocument(
   if (!legacy) return undefined;
   const generation = readSummaryGeneration(legacy.data, legacy.id);
   if (!generation) throw new Error('Could not read the previous summary.');
-  const candidate = prepareRecorderOpen(document.pageId, 'Meeting Summary', generation.text);
+  const candidate = seedSummary(document.pageId,generation);
   if (!candidate) throw new Error('The previous summary is too large for Draft.');
   try {
     return await document.replaceSummary(0, candidate.blocks, generation);
@@ -82,7 +91,7 @@ export async function loadSummaryDocument(
 
 export function saveSummaryCandidate(document: NativeSummaryDocument, candidate: SummaryCandidate) {
   if (candidate.pageId !== document.pageId) throw new Error('This candidate belongs to another summary document.');
-  const seeded = prepareRecorderOpen(document.pageId, 'Meeting Summary', candidate.generation.text);
+  const seeded = seedSummary(document.pageId,candidate.generation);
   if (!seeded) throw new Error('The generated summary is too large for Draft.');
   return acceptSummaryCandidate(candidate, seeded.blocks, document);
 }

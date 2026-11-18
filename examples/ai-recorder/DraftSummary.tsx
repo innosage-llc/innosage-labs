@@ -123,8 +123,7 @@ export function DraftSummary(props:Props) {
       <Text accessibilityRole="header" style={{color:palette.text}}>Summary to share</Text>
       <Text selectable style={{color:palette.text}}>{text}</Text>
       {citations.map((citation,i) => {
-        const anchor = citation as {start?:number;end?:number};
-        const quote = anchor.start !== undefined && anchor.end !== undefined ? characters.slice(anchor.start,anchor.end).join('') : '';
+        const quote = citation.start !== undefined && citation.end !== undefined ? characters.slice(citation.start,citation.end).join('') : '';
         return <Text key={i} accessibilityRole="link" onPress={()=>void run(()=>Linking.openURL(citation.url).then(()=>{}))}
           style={{color:palette.accent}}>{quote ? quote + ' · ' : 'Source · '}{citation.title || citation.url}</Text>;
       })}

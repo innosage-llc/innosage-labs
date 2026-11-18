@@ -14,7 +14,7 @@ import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
 import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
-import { draftText } from './draftDocumentModel';
+import { draftText, transcriptSeed } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
@@ -108,7 +108,10 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   async function showCompletion(committed: CompletedTranscript) {
     if (!seededRevision.current) {
       try {
-        const savedRevision = revision.exists ? await revision.text() : undefined;
+        const savedRevision = await transcriptSeed(
+          async () => hasDraftEditor ? (await createDraftDocument(new File(recordingUri),'transcript')).recover() : undefined,
+          async () => revision.exists ? revision.text() : undefined,
+        );
         // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
         if (!seededRevision.current) {
           seededRevision.current = true;

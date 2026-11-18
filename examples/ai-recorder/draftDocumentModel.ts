@@ -163,7 +163,8 @@ export function draftText(snapshot: DraftSnapshot): string {
 
 
 /** Re-anchor an unambiguous original quote in edited text. Never retain stale offsets. */
-export function editedSummaryCitations(text: string, generation: SummaryGeneration) {
+type LinkedQuote = {url:string; title:string; start?:number; end?:number};
+export function editedSummaryCitations(text: string, generation: SummaryGeneration): LinkedQuote[] {
   const original = Array.from(generation.text);
   return (generation.citations ?? []).flatMap(value => {
     const candidate = safeCitation(value);
@@ -185,4 +186,35 @@ export function summaryPublicProjection(snapshot: DraftSnapshot) {
   const text = draftText(snapshot).trim();
   if (!text) throw new Error('The edited summary is empty.');
   return {title:'Meeting Summary', text, citations:editedSummaryCitations(text, snapshot.generation)};
+}
+
+/** Assign only verified non-overlapping quotes to editor links. Other sources remain in the sources view. */
+export function citedSummaryParagraphs(text:string, citations:LinkedQuote[]) {
+  const anchors = citations.flatMap(c => c.start !== undefined && c.end !== undefined
+    ? [{start:c.start,end:c.end,url:c.url}] : []).sort((a,b)=>a.start-b.start);
+  let pos=0, index=0;
+  return text.split('\n').map(line => {
+    const chars=Array.from(line), limit=pos+chars.length;
+    const content:Array<{type:'text';text:string;marks?:[{type:'link';attrs:{href:string}}]}>=[];
+    let cursor=pos;
+    while(index<anchors.length && anchors[index].start<limit) {
+      const a=anchors[index], start=Math.max(pos,a.start), end=Math.min(limit,a.end);
+      if(start>=cursor && end>start) {
+        if(start>cursor) content.push({type:'text',text:chars.slice(cursor-pos,start-pos).join('')});
+        content.push({type:'text',text:chars.slice(start-pos,end-pos).join(''),marks:[{type:'link',attrs:{href:a.url}}]});
+        cursor=end;
+      }
+      if(a.end>limit) break;
+      index++;
+    }
+    if(cursor<limit) content.push({type:'text',text:chars.slice(cursor-pos).join('')});
+    pos=limit+1;
+    return {type:'paragraph' as const,...(content.length?{content}:{})};
+  });
+}
+
+/** The canonical native page wins over a legacy sidecar, even if the legacy file is unreadable. */
+export async function transcriptSeed(readCanonical:()=>Promise<DraftSnapshot|undefined>, readLegacy:()=>Promise<string|undefined>) {
+  const page=await readCanonical();
+  return page ? draftText(page) : readLegacy();
 }

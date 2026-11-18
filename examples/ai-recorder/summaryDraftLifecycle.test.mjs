@@ -89,3 +89,20 @@ test('a candidate for one recording is never accepted into another recording wit
   assert.equal(await b.recover(),undefined);
   assert.equal((await saveSummaryCandidate(a,privateCandidate)).generation.text,'A summary');
 });
+
+test('seeding the actual Draft document carries a unique citation mark on the original quote', async () => {
+  let raw=null;
+  const document=draftStore({pageId:'summary-cited',kind:'summary'},{read:async()=>raw,write:async v=>{raw=v}});
+  const snap=await saveSummaryCandidate(document,{pageId:document.pageId,basedOnRevision:0,
+    generation:{id:'cite',recipe:'meeting',model:'fixture',source:'original',text:'📋 Read minutes.',
+      citations:[{url:'https://example.org/minutes',title:'Minutes',start:7,end:14}]}});
+  const nodes=JSON.parse(snap.blocks[0].content).content[0].content;
+  assert.equal(nodes[1].text,'minutes');assert.equal(nodes[1].marks[0].attrs.href,'https://example.org/minutes');
+});
+
+test('canonical transcript wins without reading a broken legacy revision', async () => {
+  const {transcriptSeed}=await import('./draftDocumentModel.ts');
+  const page=prepareRecorderOpen('synthetic','Transcript','Saved corrected name');
+  assert.equal(await transcriptSeed(async()=>page,async()=>{throw Error('unreadable old file')}),'Saved corrected name');
+  await assert.rejects(transcriptSeed(async()=>undefined,async()=>{throw Error('unreadable old file')}),/unreadable/);
+});

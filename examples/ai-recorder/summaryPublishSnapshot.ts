@@ -1,4 +1,4 @@
-import { summaryPublicProjection, type DraftSnapshot } from './draftDocumentModel';
+import { citedSummaryParagraphs, summaryPublicProjection, type DraftSnapshot } from './draftDocumentModel';
 
 type TextNode = {type: 'text'; text: string; marks?: [{type: 'link'; attrs: {href: string}}]};
 type Paragraph = { type: 'paragraph'; content?: TextNode[] };
@@ -19,9 +19,7 @@ export function buildSummaryPublishSnapshot(
   if (typeof publicDocumentId !== 'string' || !/^pub_(?:rec_)?[a-f0-9]{32}$/.test(publicDocumentId) ||
       !Number.isSafeInteger(createdAt) || createdAt <= 0) throw new Error('A separate public summary identity is required.');
   const projection = summaryPublicProjection(latest);
-  const paragraphs: Paragraph[] = projection.text.split('\n').map(text => ({
-    type:'paragraph', ...(text ? {content:[{type:'text',text}]} : {}),
-  }));
+  const paragraphs: Paragraph[] = citedSummaryParagraphs(projection.text,projection.citations);
   if (projection.citations.length) {
     paragraphs.push({type:'paragraph', content:[{type:'text',text:'Sources'}]});
     for (const source of projection.citations) {
