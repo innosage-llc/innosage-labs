@@ -6,6 +6,22 @@ A concrete, **example-first** InnoSage Labs workflow for updating a previously p
 
 > **Scope:** One supplied X post URL, screenshot, or copied quote at a time. This does **not** monitor Tibo, verify every user's quotas, or publish to Xiaohongshu/WeChat.
 
+## Reproducible deterministic mode (preferred for this example)
+
+The source image remains **one canonical file** in project `assets/`. Run [`build_skill.py`](build_skill.py) from a clean repo checkout to create a portable, hash-verified Skill ZIP **without committing a second image**. The package includes `assets/base-poster.png`, the local Pillow [renderer](.agents/skills/tibo-reset-post-generator/scripts/render_poster.py), its [layout](.agents/skills/tibo-reset-post-generator/references/layout.json) and [example JSON](.agents/skills/tibo-reset-post-generator/examples/deterministic-input.json). No fonts are included.
+
+```sh
+python3 -m pip install 'Pillow>=12.1,<14'
+python3 examples/tibo-reset-post-generator/build_skill.py
+python3 examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/scripts/render_poster.py \
+  --input examples/tibo-reset-post-generator/.agents/skills/tibo-reset-post-generator/examples/deterministic-input.json \
+  --out-dir /tmp/tibo-render
+```
+
+The JSON file is a **fictional, synthetic smoke input**. The agent must source-check a real Tibo post and prepare distinct evidence/claim/post-time/deadline fields first. This renderer never fetches X. Validated output includes a real 3:4 PNG, separate social title/caption and machine-readable `qa.json` with exact source-image identity and protected/outside-slot pixel differences. Missing font, original image, inaccurate/unsupported source claim or overflow must fail closed. For portable installation, extract the generated ZIP and execute its `scripts/render_poster.py` using its bundled verified image; no Git required.
+
+See [deterministic mode details](.agents/skills/tibo-reset-post-generator/references/deterministic-render.md).
+
 ## Try it in ChatGPT Web (no installed Skill needed)
 
 1. [Open and download the committed example base image](assets/codex-10-26极简重置更新公告海报.png); attach its actual PNG bytes to ChatGPT Web so GPT can **edit that image directly**. The logo/avatar/layout are intentionally part of this example.
@@ -29,9 +45,9 @@ If image generation is unavailable, the agent must report **INCOMPLETE**. It may
 
 ## Across environments
 
-**ChatGPT Web — ordinary chat:** follow the workflow; attach the **actual committed base PNG** and new Tibo post evidence, plus `SKILL.md` and references (or verify GitHub file reads). The logo/profile should remain, with only relevant text edited. A ChatGPT conversation does **not** automatically discover a Skill from GitHub. If the image bytes or editing tool aren't available, report `INCOMPLETE` rather than drawing a lookalike from scratch.
+**ChatGPT Web — ordinary chat:** follow the workflow; attach the **actual committed base PNG** and new Tibo evidence, plus `SKILL.md` and references (or verify actual file reads). A ChatGPT conversation does not automatically discover a Skill from GitHub or provide a local Python/Pillow runtime. If Web can't run the deterministic renderer, use an authorized local execution lane; alternatively use GPT image editing with **generative** fidelity claims, never a false deterministic pixel QA result.
 
-**ChatGPT Skills (eligible users/workspaces):** the instructions live in `.agents/skills/tibo-reset-post-generator/`; they can be installed where supported. The **default PNG is outside this folder**, so attach the base image in Web even when the Skill is installed. Installation, activation and image-tool availability are account-dependent and not verified for every plan. See [OpenAI's current Skills guidance](https://help.openai.com/en/articles/20001066-skills-in-chatgpt).
+**ChatGPT Skills (eligible users/workspaces):** a bare project Skill folder does not contain the base asset, but `build_skill.py` creates a portable ZIP that includes the verified poster copy. Upload/install where supported; do not infer that ChatGPT can execute bundled Python or that the default asset is automatically attached to an image editor. Client entitlement and runtime capabilities must be checked separately. See [OpenAI Skills guidance](https://help.openai.com/en/articles/20001066-skills-in-chatgpt).
 
 **Codex CLI/Desktop:** clone the repository and start Codex from this project directory:
 
@@ -41,7 +57,7 @@ codex
 # Use /skills or $tibo-reset-post-generator if available
 ```
 
-Codex searches `$CWD/.agents/skills`; starting from the repository **root** does not guarantee discovery of this nested Skill. In this checkout the default image is `assets/codex-10-26极简重置更新公告海报.png`. Codex has no guaranteed image-editing tool; if absent, it must report `INCOMPLETE` and hand off to ChatGPT Web.
+Codex searches `$CWD/.agents/skills`; starting from the repository root does not guarantee discovery of this nested Skill. In a checkout, the deterministic local Python renderer can run if Pillow and CJK fonts are present; otherwise report `INCOMPLETE`. Do not claim Codex provides image editing by default.
 
 No plugin packaging, paid service, GitHub Action or extra backend is needed for v1.
 

@@ -154,12 +154,43 @@
           "Uber"
         ]
       }
+    },
+    {
+      "id": "short_banked_progress",
+      "source": {
+        "kind": "DIRECT_SOURCE",
+        "author_handle": "@thsottiaux",
+        "reset_related": true,
+        "source_text": "Banked 1/2",
+        "context_source_text": "Next two days will be resets… banked…",
+        "post_published_at": "2026-11-01T00:43:20Z",
+        "reset_event_iso": null,
+        "viewer_timezone": "Asia/Shanghai"
+      },
+      "base_image_accessible": true,
+      "expected": {
+        "disposition": "DRAFT",
+        "claim_status": "CLAIMED",
+        "post_time_beijing": "2026-11-01T08:43:20+08:00",
+        "reset_time_beijing": null,
+        "poster_time": "Banked 1/2",
+        "poster_label": "原帖摘要",
+        "poster_copy": "Tibo 更新：Banked 1/2",
+        "caption_must_include": [
+          "Usage",
+          "https://x.com/thsottiaux/status/EXAMPLE"
+        ],
+        "must_not_claim_all_accounts": true,
+        "must_not_claim_second_arrived": true,
+        "must_not_infer_expiration": true,
+        "render_mode": "text_region_edit"
+      }
     }
   ],
   "template": {
     "default_base_image": "assets/codex-10-26极简重置更新公告海报.png",
     "git_blob_sha": "44fee2832dd283e8f168a7ca1eee6a71bd3e0416",
-    "default_render_mode": "edit_existing_poster",
+    "default_render_mode": "text_region_edit",
     "missing_base_outcome": "INCOMPLETE — BASE_IMAGE_UNAVAILABLE",
     "protected_regions": [
       "OpenAI/Codex logo",
@@ -180,6 +211,14 @@
       "separate Chinese title",
       "separate Chinese caption",
       "evidence ledger"
+    ],
+    "fallback_render_mode": "gpt_image_edit",
+    "portable_asset": "assets/base-poster.png",
+    "qa_required": [
+      "base_git_blob_sha",
+      "protected_pixel_differences",
+      "pixels_changed_outside_editable_regions",
+      "text_bounds_pass"
     ]
   }
 }
