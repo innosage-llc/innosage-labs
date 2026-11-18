@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
 import { main, mergeArguments, reviewGate } from '../auto-merge-ci.mjs';
-import { xmlControl } from './android.mjs';
+import { xmlControl, confirmAndroidMonitor } from './android.mjs';
 import { aggregate } from './aggregate.mjs';
 import { run, integrationRevision, sourceIdentity } from './host.mjs';
 import { criticalHTTP } from './web.mjs';
@@ -15,6 +15,22 @@ const c = { repo: REPO, pr: 101, head: 'a'.repeat(40), base: 'b'.repeat(40), tes
 const review = { candidate: c, decision: 'PASS', role: 'independent-reviewer', model: 'gpt-6.1-sol', effort: 'high', catalog_sha256: 'e'.repeat(64), report_sha256: 'f'.repeat(64) };
 const sample = { identity: 'pid/start', alive: true, foreground: true, ready: true, fatal: false };
 const green = platform => ({ status: 'PASS', platform, candidate: c, monitor_started_before_launch: true, screenshots:Array.from({length:platform==='web'?2:1},()=>({bytes:100,sha256:'3'.repeat(64)})), artifact: { sha256: '1'.repeat(64), files: [{ path: 'embedded', bytes: 1, sha256: '2'.repeat(64) }] }, target: 'synthetic owned target', runtime: 'synthetic fixture', commands: ['fixture'], observation: { readiness_ms: 300, stable_ms: 5000, identity: sample.identity, responsive: true, samples: [{ ...sample, elapsed_ms: 300 }, { ...sample, elapsed_ms: 5300 }], final: sample } });
+
+test('Android pre-launch log handshake recovers a marker lost before the reader attaches', async () => {
+  let clock = 0; let writes = 0; let text = ''; const deadlines = [];
+  await confirmAndroidMonitor({ marker: 'own-marker', log: { text: () => text }, now: () => clock, sleep: async ms => { clock += ms; }, write: async remaining => { writes++; deadlines.push(remaining); if (clock >= 200) text += 'own-marker'; } });
+  assert.equal(writes, 3); assert.equal(clock, 200); assert.deepEqual(deadlines, [5000,4900,4800]);
+});
+test('Android log handshake rejects a missing or exited monitor without reaching launch', async () => {
+  let clock = 0; let writes = 0; let launched = false;
+  await assert.rejects(async () => { await confirmAndroidMonitor({ marker: 'own-marker', log: { text: () => '' }, now: () => clock, sleep: async ms => { clock += ms; }, write: async () => { writes++; } }); launched = true; }, /monitor readiness timeout/);
+  assert.equal(clock, 5000); assert.equal(writes, 50); assert.equal(launched, false);
+  await assert.rejects(confirmAndroidMonitor({ marker: 'own-marker', log: { text: () => { throw Error('scoped monitor exited'); } }, write: async () => { throw Error('must not write'); } }), /scoped monitor exited/);
+});
+test('Android log handshake rejects an over-budget writer even if its late marker arrives', async () => {
+  let clock = 0; let text = '';
+  await assert.rejects(confirmAndroidMonitor({ marker: 'own-marker', log: { text: () => text }, now: () => clock, write: async () => { clock = 5001; text = 'own-marker'; } }), /monitor readiness timeout/);
+});
 
 test('impact accounts for rename/delete/shared/unknown paths; only known other examples skip Recorder', () => {
   assert.deepEqual(changedPaths('R100\0examples/ai-recorder/App.tsx\0examples/studio-workspace/moved.tsx\0D\0package-lock.json\0'), ['examples/ai-recorder/App.tsx', 'examples/studio-workspace/moved.tsx', 'package-lock.json']);

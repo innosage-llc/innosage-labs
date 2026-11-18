@@ -13,6 +13,20 @@ export function xmlControl(xml, label) {
   const [x1,y1,x2,y2] = bounds.slice(1).map(Number);
   return x2 > x1 && y2 > y1 ? { x: Math.round((x1+x2)/2), y: Math.round((y1+y2)/2) } : null;
 }
+// adb may not have attached logcat when the first marker is written. Repeat the
+// pre-launch handshake until the actual stream echoes it, under one deadline.
+export async function confirmAndroidMonitor({ log, marker, write, timeout = 5000, now = () => performance.now(), sleep = ms => new Promise(r => setTimeout(r, ms)) }) {
+  const began = now();
+  for (;;) {
+    const remaining = timeout - (now() - began);
+    requireThat(remaining > 0, 'monitor readiness timeout');
+    if (log.text().includes(marker)) return;
+    await write(remaining);
+    requireThat(now() - began <= timeout, 'monitor readiness timeout');
+    if (log.text().includes(marker)) return;
+    await sleep(Math.min(100, timeout - (now() - began)));
+  }
+}
 export async function androidObservation({ command, asyncCommand, output, serial, apk, fault, onFault = () => {} }) {
   requireThat(/^emulator-\d+$/.test(serial ?? ''), 'dedicated Android emulator serial required');
   const adb = (...args) => command('adb', ['-s', serial, ...args], { timeout: 10000 });
@@ -28,8 +42,7 @@ export async function androidObservation({ command, asyncCommand, output, serial
   async function foreground(signal) { return (await read(signal,'shell','dumpsys','activity','activities')).split('\n').some(line => /(?:mResumedActivity|topResumedActivity)/.test(line) && line.includes(BUNDLE)); }
   try {
     const marker = `labs85-${randomUUID()}`;
-    adb('shell','log','-p','i','-t','Labs85Monitor',marker);
-    await log.waitFor(marker);
+    await confirmAndroidMonitor({ log, marker, write: remaining => asyncCommand('adb', ['-s', serial, 'shell','log','-p','i','-t','Labs85Monitor',marker], { timeout: Math.max(1, Math.floor(remaining)) }) });
     const start = performance.now();
     const launch = adb('shell', 'am', 'start', '-W', '-a', 'android.intent.action.MAIN', '-c', 'android.intent.category.LAUNCHER', '-n', `${BUNDLE}/.MainActivity`);
     requireThat(/Status: ok/.test(launch), 'launcher failed');
