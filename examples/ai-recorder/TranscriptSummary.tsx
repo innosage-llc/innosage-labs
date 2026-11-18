@@ -13,13 +13,14 @@ import { ActionButton } from './ui/ActionButton';
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
 type Props = {
   original: File;
-  revision: File;
+  hasRevision: boolean;
+  readRevision: () => Promise<string | undefined>;
   output: File;
   save: (file: File, text: string) => Promise<void>;
   onLockChange: (locked: boolean) => void;
 };
 
-export function TranscriptSummary({ original, revision, output, save, onLockChange }: Props) {
+export function TranscriptSummary({ original, hasRevision, readRevision, output, save, onLockChange }: Props) {
   const { palette, spacing } = useTheme();
   const [open, setOpen] = useState(false);
   const [recipe, setRecipe] = useState<string>();
@@ -141,14 +142,14 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
         {choosing ? models.map(id => (
           <ActionButton key={id} title={id} disabled={busy} variant="text" onPress={() => { setModel(id); setChoosing(false); }} />
         )) : null}
-        {revision.exists ? <ActionButton title={source === 'original' ? 'Source: Original · Switch to saved revision' : 'Source: Saved revision · Switch to original'}
+        {hasRevision ? <ActionButton title={source === 'original' ? 'Source: Original · Switch to saved revision' : 'Source: Saved revision · Switch to original'}
           disabled={busy} onPress={() => setSource(source === 'original' ? 'revision' : 'original')} /> : null}
         <Text style={{ color: palette.muted }}>Only the selected transcript text is sent to OpenAI for this summary. The source, model, and thinking budget are saved with the result on this device. Summary generation uses your OpenAI project quota.
           {recipe === 'custom' && webSearch ? ' Web search is on. OpenAI may use relevant details from the text to form public web queries.' : ' Web search is off.'}</Text>
         <ActionButton title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'} variant="primary"
           disabled={busy || (!unsaved && (!recipe || !model || (recipe === 'custom' && !instructions.trim())))} onPress={() => void run(async signal => {
             if (unsaved) { await persist(unsaved); return; }
-            const transcript = (await (source === 'revision' ? revision : original).text()).trim();
+            const transcript = ((await (source === 'revision' ? readRevision() : original.text())) ?? '').trim();
             if (!transcript) throw new Error('The selected transcript is empty.');
             if (!recipe) return;
             const searchEnabled = recipe === 'custom' && webSearch;

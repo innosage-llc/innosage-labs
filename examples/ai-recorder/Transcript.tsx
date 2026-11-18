@@ -1,5 +1,5 @@
 import { TranscriptSummary } from './TranscriptSummary';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { Host, Switch } from '@expo/ui/jetpack-compose';
 import { semantics } from '@expo/ui/jetpack-compose/modifiers';
@@ -12,6 +12,9 @@ import { AppHeader } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
+import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
+import { draftText } from './draftDocumentModel';
+import { RecorderDraftHost } from './RecorderDraftHost';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
 import { openAIAccess } from './OpenAIAccess';
@@ -61,6 +64,24 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const hasDraftEditor = useMemo(draftEditorIsBundled, []);
+  const [draftDocument, setDraftDocument] = useState<Awaited<ReturnType<typeof createDraftDocument>>>();
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [draftRevision, setDraftRevision] = useState(0);
+  const autoOpened = useRef(false);
+  const recordingUri = recording.uri;
+  useEffect(() => {
+    if (!hasDraftEditor) return;
+    let active = true;
+    void createDraftDocument(new File(recordingUri), 'transcript').then(async document => {
+      const latest = await document.recover();
+      if (active) {
+        setDraftRevision(latest?.revision ?? 0);
+        setDraftDocument(document);
+      }
+    }).catch(() => { if (active) setMessage('Could not recover this recording’s Draft document.'); });
+    return () => { active = false; };
+  }, [hasDraftEditor, recordingUri]);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
@@ -167,6 +188,17 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   const complete = job?.state === 'COMPLETED';
+  useEffect(() => {
+    if (complete && !busy && draftDocument && !autoOpened.current) {
+      autoOpened.current = true;
+      setEditingDraft(true);
+    }
+  }, [complete, busy, draftDocument]);
+  async function readCommittedRevision() {
+    const snapshot = await draftDocument?.recover();
+    if (snapshot) return draftText(snapshot);
+    return revision.exists ? revision.text() : undefined;
+  }
   useEffect(() => {
     if ((!gateway && !paidOperation) || !operation || busy || complete) return;
     const controller = new AbortController();
@@ -366,18 +398,23 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
           {complete ? (
             <>
               <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: '600' }}>{showOriginal ? 'Original transcript' : 'Editable revision'}</Text>
-              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Saved locally; read-only' : dirty ? 'Unsaved changes' : revision.exists ? 'Saved locally' : 'Not saved yet'}</Text>
+              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Saved locally; read-only' : dirty ? 'Unsaved changes' : draftRevision > 0 || revision.exists ? 'Saved locally' : 'Not saved yet'}</Text>
               {job?.speakerLabeling?.requested ? <Text style={{ color: palette.muted }}>
                 {job.speakerLabeling.status === 'completed'
                   ? 'Speakers identified. Labels distinguish voices, not people’s names.'
                   : 'Speaker identification could not be completed. The transcript is available.'}
               </Text> : null}
-              <TextInput accessibilityLabel="Transcript text" multiline editable={canEditTranscript(showOriginal, busy)}
+              {showOriginal || !hasDraftEditor ? <TextInput
+                accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && canEditTranscript(showOriginal, busy)}
                 value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
-                style={[input, { minHeight: 180, textAlignVertical: 'top' }]} />
+                style={[input, { minHeight: 180, textAlignVertical: 'top' }]} /> : null}
+              {!showOriginal && hasDraftEditor ? <ActionButton
+                title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument}
+                onPress={() => setEditingDraft(true)} /> : null}
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
-              {!showOriginal ? <ActionButton title="Save revision" variant="primary" disabled={busy} onPress={save} /> : null}
-              <TranscriptSummary original={original} revision={revision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
+              {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy} onPress={save} /> : null}
+              <TranscriptSummary original={original} hasRevision={draftRevision > 0 || revision.exists}
+                readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
             </>
           ) : isOpenAI ? (
             <>
@@ -427,6 +464,8 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {editingDraft && draftDocument ? <RecorderDraftHost document={draftDocument} title={recordingTitle}
+        initial={draft} onClose={() => setEditingDraft(false)} onCommitted={snapshot => setDraftRevision(snapshot.revision)} /> : null}
     </Modal>
   );
 }
