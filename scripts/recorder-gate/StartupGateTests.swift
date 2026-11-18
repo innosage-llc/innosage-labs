@@ -1,8 +1,6 @@
 import XCTest
 
-// Attached to the normally launched app. Never calls launch(), activate(), Start,
-// recording, permission APIs or a provider. Process lifetime is also monitored
-// outside XCTest by the local driver, beginning before simctl launch.
+// Attach to the normal launch; never launch/activate, capture or request input.
 final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
@@ -10,32 +8,33 @@ final class StartupGateTests: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         let launched = try XCTUnwrap(Double(env["LABS85_LAUNCH_UPTIME"] ?? ""))
         let ready = app.buttons["Start recording"].firstMatch
-        while ProcessInfo.processInfo.systemUptime - launched < 30 {
-            XCTAssertEqual(app.state, .runningForeground)
-            if ready.exists && ready.isHittable { break }
+        var window = StabilityWindow(launchedAt: launched)
+        var announced = false
+        while true {
+            let started = ProcessInfo.processInfo.systemUptime
+            let foreground = app.state == .runningForeground
+            let visible = ready.exists && ready.isHittable
+            let completed = ProcessInfo.processInfo.systemUptime
+            let complete = try window.record(started: started, completed: completed, foreground: foreground, ready: visible)
+            if window.readyAt != nil && !announced { print("LABS85_READY"); announced = true }
+            if complete { break } // only a successful completing query ends the window
             Thread.sleep(forTimeInterval: 0.1)
         }
-        XCTAssertLessThanOrEqual(ProcessInfo.processInfo.systemUptime - launched, 30)
-        XCTAssertTrue(ready.exists && ready.isHittable, "Record home not ready")
-        let readyAt = ProcessInfo.processInfo.systemUptime
-        print("LABS85_READY")
-        var observations = 0
-        repeat {
-            XCTAssertEqual(app.state, .runningForeground)
-            XCTAssertTrue(ready.exists && ready.isHittable, "Record control disappeared")
-            observations += 1
-            Thread.sleep(forTimeInterval: 0.1)
-        } while ProcessInfo.processInfo.systemUptime - readyAt < 5
-        // A harmless navigation round trip proves the normal app responds.
+        let readyAt = try XCTUnwrap(window.readyAt)
+        let responseStarted = ProcessInfo.processInfo.systemUptime
         app.buttons["Library"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Your recordings live here"].waitForExistence(timeout: 2))
         app.buttons["Record"].firstMatch.tap()
         XCTAssertTrue(ready.waitForExistence(timeout: 2) && ready.isHittable)
         XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertLessThanOrEqual(ProcessInfo.processInfo.systemUptime - responseStarted, 10, "Responsiveness deadline")
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Record home after stability and navigation"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        print("LABS85_OBSERVATION ready_ms=\((readyAt-launched)*1000) stable_ms=\((ProcessInfo.processInfo.systemUptime-readyAt)*1000) samples=\(observations)")
+        // Exact sample times are retained in xctest.log and parsed by the host.
+        let samples = window.completedAt.filter { $0 >= readyAt }.map { ($0 - launched) * 1000 }
+        let data = try JSONSerialization.data(withJSONObject: ["ready_ms": (readyAt-launched)*1000, "stable_ms": window.stableDuration*1000, "max_gap_ms": window.maxGap*1000, "observed_max_gap_ms": window.maxObservedGap*1000, "samples_ms": samples])
+        print("LABS85_OBSERVATION_JSON \(String(decoding: data, as: UTF8.self))")
     }
 }

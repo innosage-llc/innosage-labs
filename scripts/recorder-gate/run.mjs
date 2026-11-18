@@ -19,7 +19,7 @@ async function main() {
     receipt.ci = localCI(source, paths, output); sourceIdentity(source,candidate);
     receipt.startup = await aggregate({ source,candidate,paths,output,targets:{ android:o.android,iosRuntime:o['ios-runtime'] } });
     sourceIdentity(source,candidate); assertSnapshot(candidate,prSnapshot(candidate.repo,candidate.pr)); receipt.status='PASS';
-  } catch(e) { receipt.error=e.message; throw e; }
+  } catch(e) { receipt.error=e.message; if(e.ciReceipt) receipt.ci=e.ciReceipt; throw e; }
   finally { writeJSON(join(output,'local-gate.json'),receipt); }
 }
 main().catch(e=>{ console.error(e.message);process.exitCode=1; });

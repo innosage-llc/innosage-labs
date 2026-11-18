@@ -50,7 +50,7 @@ export async function mergeCandidate({ candidate, review, output, targets }, dep
     receipt.merge = await deps.merge(candidate);
     requireThat(receipt.merge?.merged === true && /^[a-f0-9]{40}$/.test(receipt.merge.sha ?? ''), 'server refused merge');
     receipt.status = 'PASS'; return receipt;
-  } catch (error) { receipt.error = error.message; throw error; }
+  } catch (error) { receipt.error = error.message; if (error.ciReceipt) receipt.ci = error.ciReceipt; throw error; }
   finally { writeJSON(join(output, 'merge-gate.json'), receipt); }
 }
 

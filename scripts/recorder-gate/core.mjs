@@ -28,10 +28,18 @@ export function artifact(path) {
   return { sha256: sha(JSON.stringify(files)), files };
 }
 export function writeJSON(path, value) { writeFileSync(path, JSON.stringify(value, null, 2) + '\n'); }
-async function bounded(action, ms, label) {
-  let timer;
-  try { return await Promise.race([Promise.resolve().then(action),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout`)),Math.max(1,ms));})]); }
-  finally { clearTimeout(timer); }
+export async function bounded(action, ms, label) {
+  const began = performance.now();
+  requireThat(Number.isFinite(ms) && ms > 0, `${label} timeout`);
+  let timer; const controller = new AbortController();
+  try {
+    const result = await Promise.race([Promise.resolve().then(() => action(controller.signal)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout`)),ms);})]);
+    // A synchronous callback can prevent the timer from running. Its result is
+    // never accepted after the wall-clock deadline, even if it resolves first.
+    requireThat(performance.now() - began <= ms, `${label} timeout`);
+    return result;
+  }
+  finally { clearTimeout(timer); controller.abort(); }
 }
 
 // Parse every name in git diff --name-status -z, including both sides of renames.
@@ -77,6 +85,7 @@ export async function observe({ probe, responsive, now = () => performance.now()
   }
   requireThat(await bounded(responsive, 10000, 'responsiveness'), 'runtime unresponsive');
   const final = await bounded(probe, maxGap, 'final runtime probe'); const ended = now();
+  requireThat(Number.isFinite(ended) && ended >= last, 'non-monotonic final observation');
   requireThat(final.ready && final.alive && final.foreground && !final.fatal && final.identity === identity, 'final Record/instance/foreground check failed');
   return { launched_ms: launched, ready_ms: readyAt, ended_ms: ended, readiness_ms: readyAt - launched, stable_ms: last - readyAt, max_gap_ms: maxGap, identity, samples, final, responsive: true };
 }

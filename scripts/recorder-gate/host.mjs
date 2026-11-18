@@ -9,8 +9,27 @@ export const appPath = 'examples/ai-recorder';
 export function run(command, args, { cwd = root, timeout = 120000, env = {}, onResult, ...rest } = {}) {
   const result = spawnSync(command, args, { cwd, timeout, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'], ...rest });
   onResult?.(result);
-  if (result.error || result.status !== 0 || result.signal) throw Object.assign(result.error ?? new Error(`${command} failed (${result.status ?? result.signal})`), { status: result.status, stdout: result.stdout, stderr: result.stderr });
+  if (result.error || result.status !== 0 || result.signal) throw Object.assign(result.error ?? new Error(`${command} failed (${result.status ?? result.signal})`), { status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr });
   return result.stdout;
+}
+// Observation subprocesses stay asynchronous so their enclosing probe deadline
+// can abort the active process immediately; no blocked JavaScript timeout race.
+export function runAsync(command, args, { cwd = root, timeout = 10000, env = {}, onResult, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, stdio: ['ignore','pipe','pipe'], signal, killSignal: 'SIGKILL' });
+    let stdout = ''; let stderr = ''; let error;
+    const timer = setTimeout(() => { error = new Error(`${command} timeout`); child.kill('SIGKILL'); }, timeout);
+    for(const [stream,key] of [[child.stdout,'stdout'],[child.stderr,'stderr']]) stream.on('data',data=>{
+      if(key==='stdout') stdout+=data; else stderr+=data;
+      if(stdout.length+stderr.length>32*1024*1024) { error=new Error('command output limit');child.kill('SIGKILL'); }
+    });
+    child.on('error',e=>{error=e;});
+    child.on('close',(status,terminated)=>{
+      clearTimeout(timer); const result={status,signal:terminated,stdout,stderr,error};onResult?.(result);
+      if(error || status!==0 || terminated) reject(Object.assign(error??new Error(`${command} failed (${status??terminated})`),result));
+      else resolve(stdout);
+    });
+  });
 }
 export const git = (...args) => run('git', args).trim();
 export function clean(cwd = root) { requireThat(!run('git', ['status', '--porcelain=v1', '--untracked-files=normal'], { cwd }).trim(), 'candidate worktree is dirty'); }

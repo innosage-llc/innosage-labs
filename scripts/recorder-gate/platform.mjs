@@ -3,7 +3,7 @@ import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { artifact, sha, requireThat, writeJSON } from './core.mjs';
-import { run, clean, cli, loadCandidate, outDir, appPath } from './host.mjs';
+import { run, runAsync, clean, cli, loadCandidate, outDir, appPath } from './host.mjs';
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
 import { webObservation } from './web.mjs';
@@ -25,6 +25,16 @@ export async function platformGate({ platform, source, candidate, output, target
     else writeFileSync(join(output, `command-${receipt.commands.length}.log`), `${result}\n${stderr}`);
     return result;
   }
+  async function asyncCommand(cmd, args, options = {}) {
+    const index = receipt.commands.length + 1;
+    const entry = { command:cmd, args:args.map(a=>String(a).replaceAll(source,'<candidate>').replaceAll(output,'<evidence>')), stage:receipt.stage };
+    receipt.commands.push(entry); const began=performance.now();let captured;
+    try { return await runAsync(cmd,args,{cwd:app,...options,onResult:r=>{captured=r;}}); }
+    finally {
+      entry.exit_code=captured?.status??null;entry.signal=captured?.signal??null;entry.duration_ms=performance.now()-began;
+      writeFileSync(join(output,`command-${index}.log`),`${captured?.stdout??''}\n${captured?.stderr??''}`);
+    }
+  }
   try {
     clean(source); requireThat(run('git', ['rev-parse', 'HEAD'], { cwd: source }).trim() === candidate.tested, 'platform source revision mismatch');
     receipt.inputs = Object.fromEntries(['app.json','package.json','package-lock.json'].map(name => [name, sha(readFileSync(join(app,name)))]));
@@ -42,7 +52,7 @@ export async function platformGate({ platform, source, candidate, output, target
       const apk = join(app, 'android/app/build/outputs/apk/release/app-release.apk');
       requireThat(/assets\/index.android.bundle/.test(command('unzip', ['-l', apk])), 'embedded Android JS missing');
       receipt.artifact = artifact(apk);
-      receipt.stage = 'launch-observe'; Object.assign(receipt, await androidObservation({ command, output, serial: targets.android, apk, fault, onFault }));
+      receipt.stage = 'launch-observe'; Object.assign(receipt, await androidObservation({ command, asyncCommand, output, serial: targets.android, apk, fault, onFault }));
     } else if (platform === 'ios') {
       requireThat(/^com\.apple\.CoreSimulator\.SimRuntime\.iOS-[\d-]+$/.test(targets.iosRuntime ?? ''), 'explicit installed iOS runtime required');
       const runtime = JSON.parse(command('xcrun', ['simctl', 'list', 'runtimes', '-j'], { timeout: 10000 })).runtimes.find(r => r.identifier === targets.iosRuntime && r.isAvailable);

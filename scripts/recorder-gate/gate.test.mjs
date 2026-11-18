@@ -159,3 +159,68 @@ test('actual platform entry points fail closed for absent native targets and una
     if(platform!=='web')assert.deepEqual(result.commands,[]);
   }
 });
+
+test('synchronous callbacks cannot beat a delayed timeout timer; final probe is also bounded', async()=>{
+  const { bounded }=await import('./core.mjs');
+  const stall=()=>{const until=performance.now()+25;while(performance.now()<until){};return true;};
+  for(const label of ['runtime probe','responsiveness','final runtime probe'])await assert.rejects(bounded(stall,5,label),new RegExp(`${label} timeout`));
+  let clock=0,responded=false;
+  await assert.rejects(observe({now:()=>clock,sleep:async()=>{clock+=1;},window:10,maxGap:5,probe:()=>{if(responded)stall();return sample;},responsive:()=>{responded=true;return true;}}),/final runtime probe timeout/);
+});
+test('asynchronous observation subprocess is cancelled by its enclosing deadline',async()=>{
+  const { bounded }=await import('./core.mjs');const { runAsync }=await import('./host.mjs');let result;
+  await assert.rejects(bounded(signal=>runAsync(process.execPath,['-e','setTimeout(()=>{},10000)'],{signal,onResult:r=>{result=r;}}),50,'fixture subprocess'),/timeout/);
+  for(let i=0;i<100&&!result;i++)await new Promise(r=>setTimeout(r,10));
+  assert.ok(result);assert.equal(result.signal,'SIGKILL');
+});
+test('compiled iOS sampling contract rejects runner pause, stalled query, disappearance, background and clock regressions',async()=>{
+  const { parseAccessibility }=await import('./ios.mjs');
+  const root=new URL('.',import.meta.url).pathname;const dir=mkdtempSync(join(tmpdir(),'labs-swift-fixture-'));const exe=join(dir,'samples');
+  run('xcrun',['swiftc','-module-cache-path',join(dir,'cache'),join(root,'StabilityWindow.swift'),join(root,'StabilityWindowFixture.swift'),'-o',exe]);
+  assert.match(run(exe,['healthy']),/PASS healthy/);
+  const healthy={ready_ms:100,stable_ms:5000,max_gap_ms:1500,observed_max_gap_ms:1000,samples_ms:[100,1100,2100,3100,4100,5100]};
+  assert.equal(parseAccessibility(`LABS85_OBSERVATION_JSON ${JSON.stringify(healthy)}`).stable_ms,5000);
+  for(const mode of ['runner-pause','query-stall','disappeared','background','clock']) {
+    assert.match(run(exe,[mode]),new RegExp(`REJECT ${mode}`));
+    const f=await fixture({deps:{aggregate:()=>{assert.match(run(exe,[mode]),new RegExp(`REJECT ${mode}`));throw new Error('controlled iOS observation rejected');}}});assert.deepEqual(f.calls,[]);
+  }
+  assert.throws(()=>parseAccessibility(`LABS85_OBSERVATION_JSON ${JSON.stringify({...healthy,samples_ms:[100,200,6200],stable_ms:6100})}`),/coverage gap/);
+});
+test('required Mac CI stages each prevent the real controller merge, with complete failed-command evidence',async()=>{
+  const { localCI }=await import('./local-ci.mjs');
+  for(const stage of ['tests/check_runtime_boundary.py','required-mac-fixtures.py','unittest']) {
+    let output;
+    const f=await fixture({paths:['examples/is-clean-my-mac/scripts/change.py'],deps:{ci:(source,paths,dir)=>{
+      output=dir;return localCI(source,paths,dir,{clean:()=>{},run:(command,args,opts)=>{
+        const failing=args.some(a=>a===stage||a.endsWith('/'+stage));
+        if(failing) return run(process.execPath,['-e','console.log("fixture stdout");console.error("fixture stderr");process.exit(7)'],{onResult:opts.onResult});
+        opts.onResult({status:0,signal:null,stdout:'synthetic prerequisite',stderr:''});return '';
+      }});
+    }}});
+    assert.ok(f.error,stage);assert.deepEqual(f.calls,[]);assert.equal(f.receipt.ci.status,'FAIL');
+    const ci=JSON.parse(readFileSync(join(output,'applicable-ci.json'),'utf8'));assert.deepEqual(f.receipt.ci,ci);
+    const last=ci.commands.at(-1);assert.equal(last.exit_code,7);assert.equal(last.signal,null);assert.ok(last.duration_ms>=0);
+    assert.match(readFileSync(join(output,`ci-${ci.commands.length}.log`),'utf8'),/fixture stdout\n\nfixture stderr/);
+  }
+});
+test('signal-terminated local CI preserves signal/stdout/stderr and blocks merge',async()=>{
+  const { localCI }=await import('./local-ci.mjs');let output;
+  const f=await fixture({deps:{ci:(source,paths,dir)=>{output=dir;return localCI(source,paths,dir,{clean:()=>{},run:(command,args,opts)=>run(process.execPath,['-e','console.log("before signal");console.error("signal diagnostic");process.kill(process.pid,"SIGTERM")'],{onResult:opts.onResult})});}}});
+  assert.deepEqual(f.calls,[]);assert.ok(f.error);assert.equal(f.receipt.ci.status,'FAIL');
+  const last=f.receipt.ci.commands.at(-1);assert.equal(last.signal,'SIGTERM');assert.equal(last.exit_code,null);
+  assert.match(readFileSync(join(output,'ci-1.log'),'utf8'),/before signal\n\nsignal diagnostic/);
+});
+test('required Mac runner refuses skipped native fixture coverage',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'labs-skipped-mac-fixture-'));
+  writeFileSync(join(dir,'test_skipped.py'),'import unittest\nclass Missing(unittest.TestCase):\n @unittest.skip("fixture unavailable")\n def test_required(self): pass\n');
+  assert.throws(()=>run('python3',['-B',new URL('required-mac-fixtures.py',import.meta.url).pathname,dir]),/failed/);
+});
+
+test('over-budget synchronous probes and slow final probes make zero controller merge calls',async()=>{
+  for(const finalOnly of [false,true]) {
+    let clock=0,responded=false;
+    const f=await fixture({deps:{aggregate:()=>observe({now:()=>clock,sleep:async()=>{clock+=1;},window:10,maxGap:5,
+      probe:()=>{if(!finalOnly||responded){const until=performance.now()+25;while(performance.now()<until){}}return sample;},responsive:()=>{responded=true;return true;}})}});
+    assert.match(f.error.message,finalOnly?/final runtime probe timeout/:/runtime probe timeout/);assert.deepEqual(f.calls,[]);
+  }
+});

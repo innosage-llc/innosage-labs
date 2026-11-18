@@ -52,10 +52,28 @@ print(p)`, derived, String(uptime)]);
     }, 250);
     const code = await Promise.race([result,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('XCTest observation deadline exceeded')),95000);})]).finally(() => { clearTimeout(termination);clearTimeout(deadline); });
     requireThat(code === 0 && done && !fatal, fatal ?? 'XCTest failed');
-    const metrics = text.match(/LABS85_OBSERVATION ready_ms=([\d.]+) stable_ms=([\d.]+) samples=(\d+)/);
-    requireThat(metrics && Number(metrics[1]) <= 30000 && Number(metrics[2]) >= 5000 && Number(metrics[3]) >= 2 && pidSamples.length >= 2, 'XCTest evidence incomplete');
+    const metrics = parseAccessibility(text);
+    requireThat(pidSamples.length >= 2, 'Simulator process evidence incomplete');
     sim('io', uuid, 'screenshot', join(output, 'screen.png'));
     const final = { identity: firstPid, ready: true, alive: true, foreground: true, fatal: false };
-    return { artifact: artifact(app), target: { kind: 'fresh task Simulator', uuid }, runtime: 'Simulator (exact OS/build recorded by platform driver)', monitor_started_before_launch: true, observation: { readiness_ms: Number(metrics[1]), stable_ms: Number(metrics[2]), identity: firstPid, responsive: true, samples: pidSamples, final, accessibility: 'XCTest; retained startup.xcresult' } };
+    return { artifact: artifact(app), target: { kind: 'fresh task Simulator', uuid }, runtime: 'Simulator (exact OS/build recorded by platform driver)', monitor_started_before_launch: true, observation: { readiness_ms: metrics.ready_ms, stable_ms: metrics.stable_ms, max_gap_ms: metrics.max_gap_ms, accessibility_samples_ms: metrics.samples_ms, observed_max_gap_ms: metrics.observed_max_gap_ms, identity: firstPid, responsive: true, samples: pidSamples, final, accessibility: 'XCTest; retained startup.xcresult' } };
   } finally { clearInterval(timer); clearTimeout(deadline); child?.kill('SIGTERM'); await log.stop(); writeFileSync(join(output, 'xctest.log'), text); requireThat(!child || child.exitCode !== null || child.signalCode !== null, 'XCTest cleanup unverified'); }
+}
+
+// Independently check the XCTest accessibility timeline rather than trusting a
+// duration summary. PID samples remain a separate process-lifetime observation.
+export function parseAccessibility(text) {
+  const lines = [...text.matchAll(/LABS85_OBSERVATION_JSON (\{[^\n]+\})/g)];
+  requireThat(lines.length === 1, 'XCTest observation missing or duplicated');
+  const m = JSON.parse(lines[0][1]);
+  requireThat(Number.isFinite(m.ready_ms) && m.ready_ms >= 0 && m.ready_ms <= 30000 && m.max_gap_ms === 1500, 'XCTest readiness/bound incomplete');
+  requireThat(Array.isArray(m.samples_ms) && m.samples_ms.length >= 2 && m.samples_ms[0] === m.ready_ms, 'XCTest accessibility samples missing');
+  let maximum = 0;
+  for (let i=0;i<m.samples_ms.length;i++) {
+    const at=m.samples_ms[i];
+    requireThat(Number.isFinite(at), 'XCTest sample time invalid');
+    if(i) { const gap=at-m.samples_ms[i-1];requireThat(gap>=0 && gap<=m.max_gap_ms,'XCTest accessibility coverage gap');maximum=Math.max(maximum,gap); }
+  }
+  requireThat(m.stable_ms >= 5000 && Math.abs(m.stable_ms-(m.samples_ms.at(-1)-m.ready_ms))<0.01 && Math.abs(m.observed_max_gap_ms-maximum)<0.01, 'XCTest stability evidence incomplete');
+  return m;
 }
