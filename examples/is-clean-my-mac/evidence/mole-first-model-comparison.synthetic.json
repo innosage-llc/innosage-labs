@@ -1,0 +1,60 @@
+{
+  "provenance": "Independent fresh agents on the same Mac Studio; shared synthetic Mole1.72 observations; no live scans or cleanup",
+  "prompt": "全面审核我的 Mac 磁盘，给我清理计划，先不要清理。",
+  "source_fixture": "evals/fixtures/mole-first.shared.synthetic.json",
+  "fast_mode": "NOT_AVAILABLE_as_agent_control; not claimed",
+  "runs": [
+    {
+      "model": "gpt-6-luna",
+      "reasoning": "xhigh",
+      "mode": "official_skill_baseline",
+      "numbered_inline": false,
+      "worktree_count": 11,
+      "worktree_observed_bytes": 17000000000,
+      "workspace_unknown": true,
+      "purge_failure_reported": true,
+      "overlap_and_no_cleanup_preserved": true,
+      "worktree_lower_bound_preserved": false,
+      "category_interpretation_issue": "User essentials preview heading interpreted as important user content; fixture category is user caches/logs"
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "mode": "official_skill_baseline",
+      "numbered_inline": true,
+      "worktree_count": 11,
+      "worktree_observed_bytes": 17000000000,
+      "workspace_unknown": true,
+      "purge_failure_reported": true,
+      "overlap_and_no_cleanup_preserved": true,
+      "worktree_lower_bound_preserved": true
+    },
+    {
+      "model": "gpt-6-luna",
+      "reasoning": "xhigh",
+      "mode": "official_skill_plus_harness",
+      "numbered_inline": true,
+      "worktree_count": 11,
+      "worktree_observed_bytes": 17000000000,
+      "workspace_unknown": true,
+      "purge_failure_reported": true,
+      "purge_stage_and_exit_reported": true,
+      "overlap_and_no_cleanup_preserved": true,
+      "exact_row_identity": true,
+      "renderer_row_count": 9,
+      "official_skill_and_reference_read": true,
+      "helper_stub_executed": true,
+      "worktree_lower_bound_preserved": true
+    }
+  ],
+  "limitations": [
+    "One corrected shared synthetic scenario per model/mode, not statistical parity",
+    "Baselines were supplied the same inventory observations; this does not test their ability to discover worktrees unaided",
+    "Harness audit command was a fixture stub using the actual current renderer; actual collectors covered separately by tests",
+    "Initial trial used malformed clean summary; adapter failed closed; corrected fixture rerun with fresh agents",
+    "No live MacBook usefulness or cleanup acceptance; no Fast-mode reproduction",
+    "An earlier targeted Luna pass looked in the wrong helper location and manually regrouped rows; Skill-relative lookup and no hand-built-plan rule added",
+    "Final harness session initially hit fixture-only Python3.9 stub encoding error; corrected to ASCII-escaped source, then successfully reran",
+    "No live discovery comparison: all models receive the same synthetic inventory observation"
+  ]
+}

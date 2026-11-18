@@ -1,0 +1,105 @@
+{
+  "budget_start_utc": "2026-11-14T11:31:55Z",
+  "deadline_utc": "2026-11-14T12:31:55Z",
+  "runtime_stopped_verified_utc": "2026-11-14T11:50:12.898788+00:00",
+  "readiness": "Draft/BLOCKED",
+  "start_cap": 2,
+  "starts_used": 2,
+  "slots": [
+    {
+      "slot": 1,
+      "kind": "PRIVATE_DIAGNOSTIC",
+      "status": "SUCCEEDED",
+      "host_started_ledger_at": "2026-11-14T11:43:53.964709+00:00",
+      "hypothesis": "Sample original awaited boundaries; diagnose failure only if it recurs.",
+      "observed": "mic one-time grant; actual notification denial; mic/notification/audio_mode/prepare returned; record call returned; timer0:00\u21920:04; Saved +one diagnostic identity",
+      "native_failed_stage": "NONE observed in this diagnostic sample; earlier failure remains UNKNOWN"
+    },
+    {
+      "slot": 2,
+      "kind": "EXACT_PRODUCTION",
+      "status": "FAILED_CONFIGURATION_TRANSITION_EVIDENCE_ATTEMPT",
+      "host_started_ledger_at": "2026-11-14T11:45:20.204490+00:00",
+      "hypothesis": "One production save to obtain small Saved full-scroll evidence.",
+      "observed": "Recording0:00\u21920:04; size+font changed during capture; actual UIidle Start recording before Stop/save input. Same process/ActivityRecord, React surface remounted.",
+      "native_failed_stage": "No new native-start rejection observed; configuration trigger and post-remount recorder state UNKNOWN",
+      "P2": "NOT_RUN/unfulfilled; no production Saved this continuation; loweractivation NOT_TESTED"
+    }
+  ],
+  "original15_display_identities": [
+    "11/14/2026, 2:29:54\u202fPM",
+    "11/14/2026, 2:30:58\u202fPM",
+    "11/14/2026, 2:31:54\u202fPM",
+    "11/14/2026, 2:34:33\u202fPM",
+    "11/14/2026, 2:44:42\u202fPM",
+    "11/14/2026, 2:45:00\u202fPM",
+    "11/14/2026, 2:48:20\u202fPM",
+    "11/14/2026, 3:19:13\u202fPM",
+    "11/14/2026, 3:22:43\u202fPM",
+    "11/14/2026, 3:23:33\u202fPM",
+    "11/14/2026, 3:59:20\u202fPM",
+    "11/14/2026, 4:02:35\u202fPM",
+    "11/14/2026, 4:07:20\u202fPM",
+    "11/14/2026, 7:02:50\u202fPM",
+    "11/14/2026, 7:05:08\u202fPM"
+  ],
+  "final16_display_identities": [
+    "11/14/2026, 2:29:54\u202fPM",
+    "11/14/2026, 2:30:58\u202fPM",
+    "11/14/2026, 2:31:54\u202fPM",
+    "11/14/2026, 2:34:33\u202fPM",
+    "11/14/2026, 2:44:42\u202fPM",
+    "11/14/2026, 2:45:00\u202fPM",
+    "11/14/2026, 2:48:20\u202fPM",
+    "11/14/2026, 3:19:13\u202fPM",
+    "11/14/2026, 3:22:43\u202fPM",
+    "11/14/2026, 3:23:33\u202fPM",
+    "11/14/2026, 3:59:20\u202fPM",
+    "11/14/2026, 4:02:35\u202fPM",
+    "11/14/2026, 4:07:20\u202fPM",
+    "11/14/2026, 7:02:50\u202fPM",
+    "11/14/2026, 7:05:08\u202fPM",
+    "11/14/2026, 7:44:03\u202fPM"
+  ],
+  "new_diagnostic_saves": 1,
+  "new_production_saves": 0,
+  "settings_restored_exact": {
+    "system:font_scale": "1.0",
+    "secure:accessibility_enabled": "0",
+    "secure:enabled_accessibility_services": "null",
+    "system:accelerometer_rotation": "1",
+    "system:user_rotation": "0",
+    "secure:touch_exploration_enabled": "0",
+    "wm_size": "Physical size: 1080x2400",
+    "wm_density": "Physical density: 420"
+  },
+  "permission_grants_flags_restored_exact": [
+    "android.permission.POST_NOTIFICATIONS: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]",
+    "android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|ONE_TIME]"
+  ],
+  "production_exact_readback": {
+    "apk_sha256": "1d3581f6f19773a5122647c11916d867608fda91672cfd0abfa48640819b5dee",
+    "apk_bytes": 26102283,
+    "js_sha256": "ceb030d7262c0e68a7734201ddd512e9a966b1edc8daa95854d40847685a9a0f"
+  },
+  "owned_resources_stopped": true,
+  "owned_ports_free": true,
+  "owned_profile_closed": true,
+  "host_audio_input_output_disabled": true,
+  "TalkBack_changed_this_continuation": false,
+  "TalkBack_audible": "NOT_VERIFIED",
+  "prior_original61": "NOT_REPRODUCED/NOT_FIXED; cause unknown",
+  "prior_sixslot_AB": "5PASS1PARTIAL unchanged",
+  "prior_PR62_third_start": "FAILED generic start; await/cause unknown",
+  "regression_attribution": "UNPROVEN; no matched baseline in two-slot budget",
+  "production_source_changed": false,
+  "new_product_fix": "NONE; no speculative repair",
+  "new_remote_workflow": false,
+  "remote_workflow_inventory": 0,
+  "historical_production_gates": "39tests/typecheck/offlineRelease/fullnative lint PASS historical; NOT_RERUN because source unchanged",
+  "diagnostic_only_gates": {
+    "typecheck": "PASS",
+    "offlineRelease": "PASS",
+    "fullnative_lint": "NOT_RUN; not a production gate"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "verified_at_utc": "2026-11-14T12:19:02.667555+00:00",
+  "elapsed_minutes_including_setup_runtime_review_publication_to_checkpoint": 16.59,
+  "budget_minutes": 30,
+  "deadline_utc": "2026-11-14T12:32:27Z",
+  "evidence_commit": "4e05b398cb80faf117a21ee53d5c18e58d9d5744",
+  "exact_remote_PNG_byte_checks": 6,
+  "images": [
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/start-observe-3.png",
+      "sha256": "657e241c40f58978d0e6bb5ba023a39e5395675436532cff40a408ce87bff517",
+      "bytes": 84951,
+      "remote_byte_check": "PASS"
+    },
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/recording-advancing-pre-stop.png",
+      "sha256": "128ebe40dde663d419cfbb0131542ba1f0aa290cd705653aaafbfa93f3230217",
+      "bytes": 88297,
+      "remote_byte_check": "PASS"
+    },
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/saved-TOP.png",
+      "sha256": "4e9ad301822ccf69a0897f137822cff1ec449321e7b0843ecdf8e00c3e773ecc",
+      "bytes": 102012,
+      "remote_byte_check": "PASS"
+    },
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/saved-BOTTOM-measured.png",
+      "sha256": "e0dca1cb480c3f8b8a134f9407f9d648eafe74d6e447f4b89f31f811a005d561",
+      "bytes": 97587,
+      "remote_byte_check": "PASS"
+    },
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/saved-TOP-return.png",
+      "sha256": "b7c3c655685d06cbe47317c15f2ac1751f8a2275e6a9a1ae2a7f3ca6329a5e7b",
+      "bytes": 99805,
+      "remote_byte_check": "PASS"
+    },
+    {
+      "immutable_raw_url": "https://raw.githubusercontent.com/innosage-llc/innosage-labs/4e05b398cb80faf117a21ee53d5c18e58d9d5744/examples/ai-recorder/docs/single-action/production-small-30m/screenshots/library-new-highlight.png",
+      "sha256": "365cb474169d3a5b1c7b935876c883bcf50e0a196b8132d9bf23073bbc312cf3",
+      "bytes": 121106,
+      "remote_byte_check": "PASS"
+    }
+  ],
+  "source": "9d199559f96aedd019d56ee374de8888460eee4c",
+  "45non_doc_hashes_unchanged": true,
+  "production_gates": "historical_same_source_NOT_RERUN",
+  "independent_review": {
+    "model": "gpt-6.1-sol medium",
+    "actual_fresh_invocation_and_resumed_followups": true,
+    "actual_reviewed_PNGs": "TOP,BOTTOM,advancing,TOPreturn,Libraryhighlight",
+    "result": "boundedP2visual_scroll_bounds_handoff satisfied; DraftBLOCKED",
+    "findings_disposition": [
+      "lowerStartactivation NOT_TESTED",
+      "priorgenericstartup/configtransitionfaults UNRESOLVED",
+      "startupgrantinterval wording narrowed to activeRecording",
+      "stop-timefield sampled after killresponse, not exactrequest",
+      "ownedclosure rechecked with explicit rc1 and empty stdout/stderr; originalreceipt preserved"
+    ],
+    "original_private_receipt_hashes": [
+      {
+        "receipt_id": "independent-invocation.txt",
+        "sha256": "a7ea0244dc170270632933aebca50dd8ab78c6bf2a5a6ef2cf13b490519ed8c5",
+        "bytes": 186
+      },
+      {
+        "receipt_id": "independent-review.md",
+        "sha256": "47895b59832ffe3a0b921242c6f588b7e9462184b0d03346bba7ea7d97e79a86",
+        "bytes": 2800
+      },
+      {
+        "receipt_id": "independent-review.jsonl",
+        "sha256": "69f4d14f92c85f76a7efdf49a0c154c893e669912407bf34f2264b8702d0c522",
+        "bytes": 197845
+      },
+      {
+        "receipt_id": "followup-invocation.txt",
+        "sha256": "fd39c187186d1fbbb788e1cbbc96f818d0183c29075f8e5c7c2d71c706c8f2e3",
+        "bytes": 127
+      },
+      {
+        "receipt_id": "independent-followup.md",
+        "sha256": "fe66d09d92ad2e9d084ac4910f029921bdfa45f1bc6feb354832f33a34d7ec3b",
+        "bytes": 1885
+      },
+      {
+        "receipt_id": "independent-followup.jsonl",
+        "sha256": "9f66585603ba29ecc2fa9bfeef31823f47d40a4672a0c87ac990bab2354bff23",
+        "bytes": 52778
+      },
+      {
+        "receipt_id": "closure-invocation.txt",
+        "sha256": "53685b1f3088b3168851feed98291c3a585aa45e1f00c0e235c1545dccb57d61",
+        "bytes": 127
+      },
+      {
+        "receipt_id": "independent-closure.md",
+        "sha256": "7cd2b681bd65c7626ad33e9c7c8f59c8346c0f6fae9a29b940780d591f2a7882",
+        "bytes": 739
+      },
+      {
+        "receipt_id": "independent-closure.jsonl",
+        "sha256": "3b75957488eb3c1a0cb3181f4edf10bf88bbb813f162bdfeb0d5e263c6b0db55",
+        "bytes": 12030
+      }
+    ]
+  },
+  "shutdown_readonly_confirmation": {
+    "at": "2026-11-14T12:17:42.968715+00:00",
+    "both_checks_rc1_empty_stdout_stderr": true
+  },
+  "readiness": "Draft62/BLOCKED"
+}

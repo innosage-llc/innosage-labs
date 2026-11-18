@@ -1,0 +1,8 @@
+{
+  "artifact_matches_returned_markdown": true,
+  "all_expected_bytes_present": true,
+  "workspace_count_present": true,
+  "worktree_count_present": true,
+  "four_sources_present": true,
+  "actual_freed_unknown": true
+}

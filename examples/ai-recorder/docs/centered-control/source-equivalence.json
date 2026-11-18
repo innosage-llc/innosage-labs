@@ -1,0 +1,234 @@
+{
+  "runtime_source_commit": "6d5645f34f88ecd940c730eedd96e6529e6c919a",
+  "scope": "Every tracked file under examples/ai-recorder except docs; includes all product source/native modules, app/config/manifests, tests, package.json and package-lock.json.",
+  "file_count": 45,
+  "aggregate_sha256": "5b2c1df3d705a0019347b673457191a5b93a4e54af08f7ef68371c2562104efa",
+  "working_tree_matches_runtime_source": true,
+  "files": [
+    {
+      "path": "examples/ai-recorder/.gitignore",
+      "sha256": "27dd701035547fd9a3c612dde5873739fe7f6ca6dab1b3e1edf8d3d30f470b1a",
+      "size_bytes": 62
+    },
+    {
+      "path": "examples/ai-recorder/.innosage-ui-manifest.json",
+      "sha256": "846af7872d56ea0459bfbb5096cfe456e6803ba27b1f737e8cc12fe53b8d9d41",
+      "size_bytes": 2693
+    },
+    {
+      "path": "examples/ai-recorder/App.tsx",
+      "sha256": "06f035041a87accc7a3693923d03877d6b7002f120e0e96bd04b94345e28d927",
+      "size_bytes": 19638
+    },
+    {
+      "path": "examples/ai-recorder/GatewayConnection.ts",
+      "sha256": "582808ffa3cbe78ecb81e031806fe68087c64aea6e2d68c8781714c05dd36149",
+      "size_bytes": 1397
+    },
+    {
+      "path": "examples/ai-recorder/NativeUpload.ts",
+      "sha256": "e0d21758c3f99d89603e3b53d181fe66864d728e167a4132bc046435e1541368",
+      "size_bytes": 1224
+    },
+    {
+      "path": "examples/ai-recorder/OpenAIAccess.ts",
+      "sha256": "2d646c71e0b47014651dc37db071ac6bbfe072d9b2fb2f35d8ef10dc9df6ab75",
+      "size_bytes": 1353
+    },
+    {
+      "path": "examples/ai-recorder/OpenAIClient.test.mjs",
+      "sha256": "5f0f4f0c21fd0a657710afa45832c058d1ba5c1e836f3e506c0135f9d6d6c1f1",
+      "size_bytes": 4038
+    },
+    {
+      "path": "examples/ai-recorder/OpenAIClient.ts",
+      "sha256": "0f826bce3d28253cb26625c819ff6cd7700e783a219d28656062097696804f49",
+      "size_bytes": 7091
+    },
+    {
+      "path": "examples/ai-recorder/ProAccess.ts",
+      "sha256": "68785f10646eff457bc412264e21394095eb53abada456a89f522ded0d7b70bc",
+      "size_bytes": 1622
+    },
+    {
+      "path": "examples/ai-recorder/ProClient.test.mjs",
+      "sha256": "41c6af2886d62f1cb9492db93f7d95804a718ce7a65f6f6f31168b2160b3600d",
+      "size_bytes": 8063
+    },
+    {
+      "path": "examples/ai-recorder/ProClient.ts",
+      "sha256": "45528e8933e03174218af23f09e724bd514f224aa9b00444ff6ea88c217441c2",
+      "size_bytes": 13860
+    },
+    {
+      "path": "examples/ai-recorder/ProSettings.tsx",
+      "sha256": "abb9350fb1dd42c49d7a92ea05b9c720725294d10f89e855ec613920938ff8f8",
+      "size_bytes": 6612
+    },
+    {
+      "path": "examples/ai-recorder/README.md",
+      "sha256": "937d626c5b3291fb07fb7711d021290144fe69a63ecd3e3cdd602d43f331b7d9",
+      "size_bytes": 11070
+    },
+    {
+      "path": "examples/ai-recorder/ServiceConfig.test.mjs",
+      "sha256": "23981c1cf4db2393c4b6e4fe40d8fac23b3aba7a6a43389e98c025c13f6de9a7",
+      "size_bytes": 2363
+    },
+    {
+      "path": "examples/ai-recorder/ServiceConfig.ts",
+      "sha256": "47504043981314c19380a146d0f4b87c232742727d6fa6113b71475a936d672f",
+      "size_bytes": 1143
+    },
+    {
+      "path": "examples/ai-recorder/Transcript.tsx",
+      "sha256": "976f318bd467bc3d0bf0d92b068e7fb103260a0a0f8c8a3727bafa5041afc632",
+      "size_bytes": 25196
+    },
+    {
+      "path": "examples/ai-recorder/TranscriptSummary.tsx",
+      "sha256": "6a727986064ad931602509abaf9b5d3315b5807f6f8a4650d01db331619bdb25",
+      "size_bytes": 11442
+    },
+    {
+      "path": "examples/ai-recorder/app.json",
+      "sha256": "cbf04f7015ed441b39523e17d3ed8fb886b1f342ac66be8819e7f15a71e5fd9a",
+      "size_bytes": 461
+    },
+    {
+      "path": "examples/ai-recorder/index.ts",
+      "sha256": "3cc816440c81db1b45a7d796c25ee6b45e19cfa2d64f1f934e42b1384c82d90b",
+      "size_bytes": 100
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/.gitignore",
+      "sha256": "6b8763d23b5b38ae40bcdede4e3651fb39d19180893f5b1b0e996a60c5c03cf1",
+      "size_bytes": 49
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/android/build.gradle",
+      "sha256": "0ad697c865632f9091aa871405afb12410d3a09aa1e8a04510bad58325310661",
+      "size_bytes": 165
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/android/src/main/AndroidManifest.xml",
+      "sha256": "343d5be1ac17cdd45d1a2f2ddc616c509290e655869125a9422a96d88aa66066",
+      "size_bytes": 72
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/android/src/main/java/co/innosage/recorderupload/RecorderUploadModule.kt",
+      "sha256": "422e2de1d3eb818c9ade7316b0182f1d2b885978fb2ea9976cfbd6293533094f",
+      "size_bytes": 3423
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/expo-module.config.json",
+      "sha256": "a69dbb5f925c23efb81246d01128369d90e7e24887e7a11bbeb9ee1c91077e01",
+      "size_bytes": 100
+    },
+    {
+      "path": "examples/ai-recorder/modules/recorder-upload/package.json",
+      "sha256": "ee4466bd5b058e950d25584b74c1d1bc4fee0059c37309cd69ff09b932fde5e3",
+      "size_bytes": 60
+    },
+    {
+      "path": "examples/ai-recorder/operationRecovery.test.mjs",
+      "sha256": "3b9320d57dc39dca565f2118a0d9d151345fee394cf2081b91274f92d9b0752a",
+      "size_bytes": 4406
+    },
+    {
+      "path": "examples/ai-recorder/operationRecovery.ts",
+      "sha256": "e6cd3dd9ffd7e5ffd64fd7e937d8072fa18b8bfe3cfe0387571f4dca49345e96",
+      "size_bytes": 722
+    },
+    {
+      "path": "examples/ai-recorder/package-lock.json",
+      "sha256": "826413237b938cd42880ac873c7c4580e960bd59153eeedc0f4bf5f2e09a9004",
+      "size_bytes": 234322
+    },
+    {
+      "path": "examples/ai-recorder/package.json",
+      "sha256": "48af8680538dd9fdb10ead1600a37de314816fe66dcc53a4106e2a5c69f43016",
+      "size_bytes": 1060
+    },
+    {
+      "path": "examples/ai-recorder/server/gateway.py",
+      "sha256": "df1a747fea1d7c2ae7b24879942ad941b2d980aa1179da9f970f1c0ae123c591",
+      "size_bytes": 10257
+    },
+    {
+      "path": "examples/ai-recorder/server/requirements.txt",
+      "sha256": "0c876b5aae18672428ae9ee96ffc27176e28c2702553641730d13df8a2ac0082",
+      "size_bytes": 311
+    },
+    {
+      "path": "examples/ai-recorder/server/test_gateway.py",
+      "sha256": "444b4c9f16827ed38ca4ed9d4a50b67a8d0d493fa842c6d5987a29672693bbf5",
+      "size_bytes": 10426
+    },
+    {
+      "path": "examples/ai-recorder/speakerTranscript.test.mjs",
+      "sha256": "26c6de8c8fc2a6838d8f1e6cd656ff40cc63a0bfe3a41179ea7c4bc1a987b4a5",
+      "size_bytes": 1685
+    },
+    {
+      "path": "examples/ai-recorder/speakerTranscript.ts",
+      "sha256": "b8acdbc936442df29e9b407dd0e0f7baba90dc4fa7d11486c5b6d25d2ab25214",
+      "size_bytes": 2452
+    },
+    {
+      "path": "examples/ai-recorder/tsconfig.json",
+      "sha256": "2867bd877564d0fe0d01b9905f8b19b670c90b6bc66d9b4c4540d41293fccfb7",
+      "size_bytes": 79
+    },
+    {
+      "path": "examples/ai-recorder/ui/ActionButton.tsx",
+      "sha256": "8a4bbab65726af2bfef1dce144e490a307cb7bea3663d2823fcd93fb116c577c",
+      "size_bytes": 1952
+    },
+    {
+      "path": "examples/ai-recorder/ui/AppChrome.tsx",
+      "sha256": "d8d58034c180b4166f59e86072358565a8bdb366977a2699c7eb003bcf795653",
+      "size_bytes": 2952
+    },
+    {
+      "path": "examples/ai-recorder/ui/LICENSE",
+      "sha256": "db4672ff5a0dd39b1ef38aa7b4ff99c0fc00d24ed719964fa30fd8c4f95c171e",
+      "size_bytes": 1065
+    },
+    {
+      "path": "examples/ai-recorder/ui/RecordControl.android.tsx",
+      "sha256": "c7b0e3ddd1de2b7002875e7dc85a6c820ed310046873c222f7a90a56cfb4648e",
+      "size_bytes": 1688
+    },
+    {
+      "path": "examples/ai-recorder/ui/libraryHandoff.test.mjs",
+      "sha256": "a0eeecc92dbce0818dae11bdc0f86563fb65d8e2b90e8ffc4bbb73950e76d7c5",
+      "size_bytes": 5491
+    },
+    {
+      "path": "examples/ai-recorder/ui/libraryHandoff.ts",
+      "sha256": "3ba8d00a66c7b8351d4f72d203b5c71db9e201e13efad52b11592f5a52e56104",
+      "size_bytes": 1881
+    },
+    {
+      "path": "examples/ai-recorder/ui/navigation.test.mjs",
+      "sha256": "501a3b732f5dbabcca3b117d83fa2765e395fc7f118ce53e1035e1455c60e245",
+      "size_bytes": 1326
+    },
+    {
+      "path": "examples/ai-recorder/ui/navigation.ts",
+      "sha256": "2898198a4af4c9e5eb59ff09582165803ad77a368a0bf6acfb90f62bd93d99b0",
+      "size_bytes": 772
+    },
+    {
+      "path": "examples/ai-recorder/ui/recordFeedback.ts",
+      "sha256": "180ebfe638b58624ead196e06578380f04c0bcee83447b6587008a13c2fb4b43",
+      "size_bytes": 816
+    },
+    {
+      "path": "examples/ai-recorder/ui/theme.tsx",
+      "sha256": "c3880da83adf54ffd7c7b7640a8949b04ef058ca2dcf4fec3a90ad037a38800f",
+      "size_bytes": 2345
+    }
+  ]
+}

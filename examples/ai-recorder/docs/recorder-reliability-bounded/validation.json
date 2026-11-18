@@ -1,0 +1,53 @@
+{
+  "source_sha256": {
+    "App.tsx": "095676e76f8fd2f54f136a4871b63222a47ab8eb0561893afa325ce58bb22e1c",
+    "captureSession.ts": "c8d775b6ed9b11e454d057380215b33ea34836e91b8f4eb72399fcfeebf342eb",
+    "captureOwner.ts": "e4b8a96d038608816fa61397844ec858dabe4583cba6b7a9977a00c4243d4b11",
+    "captureSession.test.mjs": "4d06ea874f9b9dbf05ff862146520aa85b10f904ceade2186e9b1b7aab946d61",
+    "package.json": "24e0c9551f3fef1ef15a98e412de2e2540fc25684354f22a7f4249f6fd6be43e",
+    "modules/recorder-upload/android/src/main/java/co/innosage/recorderupload/RecorderUploadModule.kt": "422e2de1d3eb818c9ade7316b0182f1d2b885978fb2ea9976cfbd6293533094f"
+  },
+  "gates": {
+    "candidate-v1/aggregate-tests.txt": {
+      "sha256": "e528de65c658780caea1975b66d0337ef8ee7e136bf20acdc9bcfc11157b6473",
+      "bytes": 12140
+    },
+    "candidate-v1/typecheck.txt": {
+      "sha256": "b5774cc7cc9a393ad05c6770d32467b61d37b8840dff8271601cbcae7ed60788",
+      "bytes": 56
+    },
+    "candidate-v1/product-release-full-lint.txt": {
+      "sha256": "a9b5ceaa7005475a3a4d2b2b904468d2c6b4535c124867e09706206767ce95b7",
+      "bytes": 43783
+    },
+    "fix/diagnostic-isolation.json": {
+      "sha256": "e40e614d0d6c44fd3ae654e4e03f3d8d5b2102c6705a635fd73e93a49241c34f",
+      "bytes": 187
+    },
+    "fix/diagnostic-typecheck.txt": {
+      "sha256": "b5774cc7cc9a393ad05c6770d32467b61d37b8840dff8271601cbcae7ed60788",
+      "bytes": 56
+    },
+    "fix/diagnostic-build.txt": {
+      "sha256": "529886cce26c91434e8ec2a3aef070bd396fb75a0608c88c6f24c18d275143d0",
+      "bytes": 38077
+    }
+  },
+  "tests": {
+    "transcript_service": 23,
+    "navigation": 16,
+    "capture_binding": 25,
+    "total": 64,
+    "fail": 0
+  },
+  "typecheck": "PASS",
+  "offline_release": "PASS",
+  "full_native_lint": {
+    "result": "PASS",
+    "reports": 8,
+    "warnings": 37,
+    "errors": 0
+  },
+  "final_independent_review": "Completed on exact product source at6e0a160; no blocking code/visual finding; Draft PR and owner acceptance only, not merge approval. See review.md.",
+  "dependencies": "unchanged pinned installed packages; no installs/upgrades"
+}

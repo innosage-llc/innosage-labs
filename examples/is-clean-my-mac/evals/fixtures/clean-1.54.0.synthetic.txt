@@ -1,0 +1,3 @@
+/PRIVATE/synthetic-cache
+Dry run complete - no changes made
+Potential space: 1.00MB | Items: 2 | Categories: 1

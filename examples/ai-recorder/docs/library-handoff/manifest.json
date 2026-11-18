@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "baselineSource": "a139eab543734719e1673fccd114d3b9f4772cb2",
+  "finalCodeCommit": "723ffbba6a6eb242c31759c1ba9d03e71f31d895",
+  "baselineApkSha256": "87438b9aab83afe0f609a16618dd655dd4220572670637dd6192fb2cad103aed",
+  "releaseApkSha256": "079cbf6e17eeda00594e0ee14527de6ec4736d300a476fedd692148d6db0e314",
+  "runtime": {
+    "androidApi": 36,
+    "androidVersion": "16",
+    "abi": "arm64-v8a",
+    "device": "task-created clean Pixel 8 AVD",
+    "serial": "emulator-5584",
+    "dimensions": [
+      1080,
+      2400
+    ],
+    "densityDpi": 420,
+    "theme": "light",
+    "hostAudio": "disabled",
+    "fixture": "local emulator recording plus generated 440Hz tone; no personal content or uploads"
+  },
+  "captures": [
+    {
+      "path": "after/01-record.png",
+      "sha256": "4fb7de2c8cfdeab8a67009f47333c5ffd2ea22dae547f327e5c864214ade2f78",
+      "bytes": 134160,
+      "capturedAtUtc": "2026-11-14T01:37:20.991177+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/02-recording.png",
+      "sha256": "3299ac13a1aa7e9ada24c986bb6662f71e4fbfb79930696c64d445079e1651af",
+      "bytes": 133277,
+      "capturedAtUtc": "2026-11-14T01:37:32.229859+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/03-library-recording.png",
+      "sha256": "9642118245e533ffe676e5dd9c8ae9d2148e0db05481498ffc60c28f13bbc000",
+      "bytes": 100409,
+      "capturedAtUtc": "2026-11-14T01:37:33.410335+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/04-saved.png",
+      "sha256": "8aee335f3412a1853208e5e79971d348716974af363178192b117468932a5730",
+      "bytes": 150161,
+      "capturedAtUtc": "2026-11-14T01:37:36.686783+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/05-highlight.png",
+      "sha256": "45be38422a338b9179dca5fbf1acb299b468bd1abed4aac83a66f51e2431f7ba",
+      "bytes": 113153,
+      "capturedAtUtc": "2026-11-14T01:37:57.607290+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/05-library.png",
+      "sha256": "4ae8bec5e9f611932950f2b16128614ec319d68c462c17b2f503cf7fda97edba",
+      "bytes": 101362,
+      "capturedAtUtc": "2026-11-14T01:38:03.796487+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/06-playing.png",
+      "sha256": "9a1178433aedee2029da374e3b5089fd8cc6340d755a506abf5ce165c2f7970c",
+      "bytes": 108666,
+      "capturedAtUtc": "2026-11-14T01:38:26.924621+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/07-paused.png",
+      "sha256": "47cf0eb4ff8eb82bba0cf984b1587820d721e2a199860efd24d101676ba749be",
+      "bytes": 107574,
+      "capturedAtUtc": "2026-11-14T01:38:28.129109+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/08-import-cancelled.png",
+      "sha256": "5b8018149e2ea093d1e9bfd7d470d9e3b17cd9ea719dc02b316194bc82df4cff",
+      "bytes": 106963,
+      "capturedAtUtc": "2026-11-14T01:39:32.521641+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/09-imported-tone.png",
+      "sha256": "2859c52d7ef1e1fa8025d0e6f13cd84d1bad4bf1618558b902ba618c7f5808a5",
+      "bytes": 122977,
+      "capturedAtUtc": "2026-11-14T01:40:16.192124+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/10-tone-playing.png",
+      "sha256": "a5648d515f2112ba507873fcd0ef61cb6b9f5366332f6debe0239c2d6a6d6256",
+      "bytes": 123034,
+      "capturedAtUtc": "2026-11-14T01:40:59.685949+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/11-tone-root-return.png",
+      "sha256": "521f79efbb716108721c32d84aa327e001558d04d99b8c7a618f8456e3c8f8f7",
+      "bytes": 119402,
+      "capturedAtUtc": "2026-11-14T01:41:01.885577+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/12-tone-paused.png",
+      "sha256": "7935f55d6a4629a708e475418ada9a1e8e615f22ba57012e17c683e6d8c5db28",
+      "bytes": 117405,
+      "capturedAtUtc": "2026-11-14T01:41:03.090858+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/13-background-recording.png",
+      "sha256": "615bc0a254f7a80dc3417a8fd6aa0882248826412b115fd754fd15c4686b95ae",
+      "bytes": 132747,
+      "capturedAtUtc": "2026-11-14T01:41:40.464100+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/14-recording-library.png",
+      "sha256": "a45b2e393237daefe0fb93fa6bf59cc4426cf3984b94f71957c7d4f5ba3a5fa3",
+      "bytes": 120945,
+      "capturedAtUtc": "2026-11-14T01:41:41.635623+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/15-repeated-save.png",
+      "sha256": "5ede04d9969d8d375f380e360430915ba393996839db9b3973809d5bdd9de813",
+      "bytes": 149861,
+      "capturedAtUtc": "2026-11-14T01:41:44.931406+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/16-repeated-handoff.png",
+      "sha256": "8b0b107023245de41969912dba5394596d84653a1f6c93f2455dfe5fc21c3b67",
+      "bytes": 129645,
+      "capturedAtUtc": "2026-11-14T01:42:19.701658+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/17-no-stale-highlight.png",
+      "sha256": "0f3aaa3fe43de015cbffd0f9aa4e83d5a2ecc52a7b4d4f9d0f1047c2932b21dd",
+      "bytes": 116521,
+      "capturedAtUtc": "2026-11-14T01:42:26.963410+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/18-large-text-library.png",
+      "sha256": "08c56d53e157548dbb4680f2bbe6fc8fec0ef3cfe2537c126eeab3691c7feded",
+      "bytes": 161560,
+      "capturedAtUtc": "2026-11-14T01:42:59.000523+00:00",
+      "fontScale": 1.5
+    },
+    {
+      "path": "after/19-unsupported-import.png",
+      "sha256": "bd7d0986c82a0e2045b81a8a8a3efbfd0865bdf428d5a5a7d0d91bb571e56e5e",
+      "bytes": 170994,
+      "capturedAtUtc": "2026-11-14T01:43:49.879079+00:00",
+      "fontScale": 1.5
+    },
+    {
+      "path": "after/20-relaunch-persisted.png",
+      "sha256": "326d233fd8bc5b70f20f91f2ada93ab10ae1dbfb926aeb5b3f2b103ce19f2819",
+      "bytes": 117581,
+      "capturedAtUtc": "2026-11-14T01:43:57.341046+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/21-seek-paused.png",
+      "sha256": "3c51398ed2b821d2ff68789b4a77e76ad28a0fa6ce12c764ab4036183511819a",
+      "bytes": 117879,
+      "capturedAtUtc": "2026-11-14T01:45:50.596294+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "after/22-library-bottom.png",
+      "sha256": "6e337295b398c0bb1458b90a7691744d8e94005f9942e2605dfe68656c751d09",
+      "bytes": 112844,
+      "capturedAtUtc": "2026-11-14T01:45:54.252936+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/01-record.png",
+      "sha256": "091b399d8b5b38bfa0bcfd94da108f88aaf719a6ba474efe0465de730c748363",
+      "bytes": 133782,
+      "capturedAtUtc": "2026-11-14T01:27:38.811038+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/02-recording.png",
+      "sha256": "dc35120a5f4916a42dd87d980fbe8ff7729c0ece4902de8f35a03055ea412d32",
+      "bytes": 131802,
+      "capturedAtUtc": "2026-11-14T01:28:23.333319+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/03-library-recording.png",
+      "sha256": "ccc972a96e87c38686e053650e5473dd7e5a61d6a38c43178b2aaa789be71d07",
+      "bytes": 102504,
+      "capturedAtUtc": "2026-11-14T01:28:27.600207+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/04-saved.png",
+      "sha256": "0a4c7a71d3ecdbafd20941d80fe092164bd9d5daef5c60fe464de100b57fcc42",
+      "bytes": 145103,
+      "capturedAtUtc": "2026-11-14T01:31:05.780468+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/05-library.png",
+      "sha256": "d8ad4ca299569f41cbd6d40ff13d536672041409a53e6eb115cf9b8b31867045",
+      "bytes": 71430,
+      "capturedAtUtc": "2026-11-14T01:30:27.711056+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/06-playing.png",
+      "sha256": "13eb3d31594207a845b2b9ffe73dac5017985fe405545a27683bf4b1c299f050",
+      "bytes": 80622,
+      "capturedAtUtc": "2026-11-14T01:30:30.907509+00:00",
+      "fontScale": 1.0
+    },
+    {
+      "path": "before/07-paused.png",
+      "sha256": "6b708d1be8368280ffef1f30c7f4fe4844aa1ff7e0fbda38bcae3a2db727efd3",
+      "bytes": 79370,
+      "capturedAtUtc": "2026-11-14T01:30:32.082555+00:00",
+      "fontScale": 1.0
+    }
+  ]
+}

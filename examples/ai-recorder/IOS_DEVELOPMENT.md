@@ -39,6 +39,13 @@ After the initial signing/trust setup, `npm run ios` runs `expo run:ios --device
 
 Do not publish full Xcode/Metro/device-console logs without reviewing them for keys, transcripts, local paths, device IDs and provisioning details. Debug builds are development artifacts, not production secrets storage guarantees. No custom native uploader is loaded on iOS.
 
+## Reconciled platform controls
+
+Native iOS controls are loaded from SwiftUI platform adapters; Android keeps
+the existing Compose controls, capture owner, and native uploader. The local
+development build is not TestFlight delivery, and a startup check alone does
+not verify recording, playback, Files import, relaunch, or live AI providers.
+
 ## Supported provider paths
 
 - **OpenAI direct:** candidate iOS path via `expo/fetch` multipart upload, the saved OpenAI project key and the existing transcription/summary clients. M4A must be nonempty and below 25 MB. The model-access check is not a quota/billing or end-to-end verification. Transcription and summary requests may incur API charges and transmit the selected recording/transcript to OpenAI. Use only an explicitly authorized project key and synthetic content; enter the key directly into the app's secure key field. Never place it in chat, docs, environment bundles or evidence. The app saves it in SecureStore. Remove the test key afterward if appropriate.
@@ -51,7 +58,7 @@ Do not publish full Xcode/Metro/device-console logs without reviewing them for k
 Record only model, iOS version and exact candidate commit. Do not include serial number, UDID, account identifiers, credentials or private speech.
 
 1. Build/sign/install the exact candidate. Launch from Xcode, attach the native debugger, set a JS breakpoint and observe it hit. Record each outcome separately.
-2. Grant microphone access on the phone. Record 5–10 seconds of synthetic speech, stop, confirm the saved row, play/pause it and use Back/Forward 10 seconds. Check VoiceOver labels/actions where practical.
+2. Grant microphone access on the phone. Record 5–10 seconds of synthetic speech, stop, confirm the saved row, play/pause it and use the native playback seek control. Check VoiceOver labels/actions where practical.
 3. Choose Import audio, select a synthetic `.m4a` from Files, and play it. Cancel the picker once; verify controls remain usable. Empty/wrong-extension inputs should fail safely.
 4. Terminate and relaunch **without uninstalling**. Confirm both recording and imported file remain listed and playable. Include background/foreground behavior as an additional observation, not a substitute for relaunch.
 5. Open Transcript and Transcription service settings. Confirm native iOS switches, radio choices and secure text entry work. Confirm Pro upload is unavailable without a missing-module crash or reservation.

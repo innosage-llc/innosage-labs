@@ -34,6 +34,10 @@ Run from `examples/ai-recorder`, using the official `eas-cli` npm package:
 
 No Apple account identity, team ID, device identifier or credential belongs in public evidence. Report only app/build identity, exact revision, processing/testing status, and redacted outcomes. Keep issue #51 open until the revised acceptance and any retained local-debugging requirement are satisfied or explicitly changed by its owner.
 
-## Current readiness
+## Distribution readiness
 
-Code/configuration preparation, iOS prebuild/export, shared tests, independent review and Android regression are complete. Actual cloud build, signed IPA, upload, App Store Connect processing and TestFlight installation have not occurred. This Mac has no saved Expo authentication, exposed Apple upload credentials or valid signing identity. The intended Apple team's membership/app permissions and tester account are not yet verified. No account was created, no credential generated/transmitted and no cloud build quota was spent during preparation.
+The original candidate's local USB install and launch did not use TestFlight.
+This guide records preparation only: no cloud build, signed distribution IPA,
+upload, App Store Connect processing, TestFlight installation, membership or
+tester approval is asserted. Verify all account, signing, archive, cost and
+compliance prerequisites before any separately authorized distribution work.

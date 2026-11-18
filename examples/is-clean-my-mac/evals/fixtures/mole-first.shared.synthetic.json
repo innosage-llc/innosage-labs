@@ -1,0 +1,75 @@
+{
+  "provenance": "SYNTHETIC shared source observations, not live Mac",
+  "mole_version": "1.72.0",
+  "analyze": {
+    "overview": true,
+    "total_size": 90000000000,
+    "scan_status": "partial",
+    "entries": [
+      {
+        "name": "Home",
+        "path": "/SYNTHETIC/owner",
+        "size": 90000000000,
+        "is_dir": true,
+        "scan_status": "partial"
+      },
+      {
+        "name": "Homebrew Cache",
+        "path": "/SYNTHETIC/owner/Library/Caches/Homebrew",
+        "size": 6000000000,
+        "is_dir": true,
+        "insight": true,
+        "cleanable": true,
+        "scan_status": "complete"
+      }
+    ]
+  },
+  "largest_entry_drilldown": {
+    "overview": false,
+    "total_size": 90000000000,
+    "scan_status": "partial",
+    "entries": [
+      {
+        "name": "Movies",
+        "path": "/SYNTHETIC/owner/Movies",
+        "size": 40000000000,
+        "is_dir": true,
+        "scan_status": "complete"
+      },
+      {
+        "name": "Library",
+        "path": "/SYNTHETIC/owner/Library/Application Support",
+        "size": 30000000000,
+        "is_dir": true,
+        "scan_status": "partial"
+      },
+      {
+        "name": ".codex",
+        "path": "/SYNTHETIC/owner/.codex",
+        "size": 20000000000,
+        "is_dir": true,
+        "scan_status": "complete"
+      }
+    ]
+  },
+  "clean_preview": "Dry run complete - no changes made\nPotential space: 7.14GB | Items: 2 | Categories: 2",
+  "clean_list": "=== Developer tools ===\n/SYNTHETIC/cache  # 6.399GB\n=== User essentials ===\n/SYNTHETIC/cache2  # 741MB\n",
+  "purge": {
+    "exit_code": 1,
+    "diagnostics": [
+      "shell_temporary_file_denied",
+      "operation_not_permitted"
+    ]
+  },
+  "codex_inventory": {
+    "source": "codex-worktree-inventory",
+    "completeness": "PARTIAL",
+    "workspace_count": null,
+    "workspace_count_completeness": "UNKNOWN",
+    "worktree_count": 11,
+    "worktree_count_completeness": "COMPLETE",
+    "observed_worktree_count": 11,
+    "occupied_bytes": null,
+    "observed_allocated_bytes": 17000000000
+  }
+}
