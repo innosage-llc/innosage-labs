@@ -1,0 +1,191 @@
+{
+  "name": "video-style-atlas",
+  "displayName": "Video Style Atlas",
+  "private": true,
+  "type": "module",
+  "main": "index.tsx",
+  "scripts": {
+    "open": "diffusion open .",
+    "context": "diffusion context",
+    "capture": "diffusion capture",
+    "probe": "diffusion probe",
+    "transcribe": "diffusion transcribe",
+    "grab": "diffusion grab",
+    "filmstrip": "diffusion filmstrip",
+    "waveform": "diffusion waveform",
+    "listen": "diffusion listen",
+    "fonts": "diffusion fonts",
+    "logs": "diffusion logs",
+    "screenshot": "diffusion screenshot",
+    "report": "diffusion report"
+  },
+  "devDependencies": {
+    "@diffusionstudio/jsx": "latest",
+    "solid-js": "^1.9.10"
+  },
+  "diffusion": {
+    "export": {
+      "film01": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film02": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film03": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film04": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film05": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film06": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film07": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film08": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film09": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      },
+      "film10": {
+        "format": "mp4",
+        "video": {
+          "enabled": true,
+          "codec": "avc",
+          "bitrate": 8000000,
+          "fps": 30,
+          "resolution": 1080
+        },
+        "audio": {
+          "enabled": true,
+          "codec": "aac",
+          "sampleRate": 48000,
+          "bitrate": 192000
+        }
+      }
+    },
+    "initialized": true
+  }
+}
