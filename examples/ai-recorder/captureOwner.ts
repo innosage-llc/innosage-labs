@@ -22,9 +22,9 @@ export function getCaptureSession() {
     session = new CaptureSession({
       recorder: new AudioModule.AudioRecorder(options),
       microphone: requestRecordingPermissionsAsync,
-      notification: requestNotificationPermissionsAsync,
+      notification: () => Platform.OS === 'android' ? requestNotificationPermissionsAsync() : Promise.resolve(),
       audioMode: () => setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true }),
-      permissionMessage: microphonePermissionMessage,
+      permissionMessage: canAskAgain => microphonePermissionMessage(canAskAgain, Platform.OS),
       savedMessage: recordingSavedMessage,
       save: async url => {
         const source = new File(url);

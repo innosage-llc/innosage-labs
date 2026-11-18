@@ -58,7 +58,7 @@ commitment.
 | Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. PR #61's bounded six-run main-versus-candidate control check was 5 PASS / 1 PARTIAL; its original Start error was NOT_REPRODUCED / NOT_FIXED. A later, separate PR #62 run observed a new native Start failure with unknown cause and stage. |
 | In development | [PR #62](https://github.com/innosage-llc/innosage-labs/pull/62) is a draft UI refinement: one native action for the circle and label, shared disabled behavior, removal of the competing idle “Ready to record” line, and clearer saved copy. It is not in `main` and is not a released feature. |
 | Not established | PR #61's original Start error remains NOT_REPRODUCED / NOT_FIXED; this describes only that bounded check. PR #62 later observed a separate Start failure (“Could not start recording…”) with no successful output and unknown cause/stage. A separately authorized one-Start production Saved proof passed at 320 dp / 200% text for top/bottom reachability, native bounds, and Library handoff; lower Start activation was NOT_TESTED ([immutable report at `14fa865`](https://github.com/innosage-llc/innosage-labs/blob/14fa865f95d2d7ed61bc603d2e63c9c9069e7df2/examples/ai-recorder/docs/single-action/production-small-30m/README.md)). The fresh Start failure and config-transition interrupted capture remain unresolved. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
-| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; a signed install, TestFlight delivery, and physical-iPhone product journey are not established. Web is unsupported. |
+| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; the original candidate was signed, installed and launched on a USB test iPhone; the reconciled source and the complete physical-device journey remain distinct checks. TestFlight delivery is not established. Web is unsupported. |
 
 The merged [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61)
 centers the Android recording control. Its merge records source integration, not
@@ -271,3 +271,8 @@ Do not copy this bounded modal controller into a deeper route hierarchy: evaluat
 the SDK-compatible Expo Router native stack/tabs and preserve long-lived audio
 state above route mounts. See [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
 and [Expo native tabs](https://docs.expo.dev/router/advanced/native-tabs/).
+
+### Local iPhone development
+See [Physical iPhone development](IOS_DEVELOPMENT.md) for the local build path,
+signed-device requirements and verification limits. [TestFlight preparation](TESTFLIGHT.md)
+is separate; a local build does not publish or submit an app.

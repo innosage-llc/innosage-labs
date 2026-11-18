@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput, useNativeState } from "@expo/ui";
-import { Host, RadioButton } from "@expo/ui/jetpack-compose";
+import { Host } from "@expo/ui";
+import { ServiceChoice } from "./ServiceChoice";
+import { supportsProUpload } from "./NativeUpload";
 import { clientForService, selectedService, selectService } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
-import { semantics } from "@expo/ui/jetpack-compose/modifiers";
-import { AppHeader } from "./ui/AppChrome";
+import { DetailShell } from "./ui/DetailShell";
 import { ActionButton } from "./ui/ActionButton";
 import { useTheme } from "./ui/theme";
 
@@ -21,6 +21,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   const [service, setService] = useState<ServiceId>("staging");
   const access = accessFor(service);
   const isOpenAI = service === "openai";
+  const canConfigureKey = isOpenAI || supportsProUpload;
   const [hasKey, setHasKey] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -50,6 +51,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     } finally { setBusy(false); }
   }
   async function save() {
+    if (!canConfigureKey) return;
     setBusy(true);
     setMessage("");
     try {
@@ -86,31 +88,27 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
         if (!busy) onClose();
       }}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <AppHeader title="Transcription service" onBack={onClose} backLabel="Back to settings" backDisabled={busy} />
+      <DetailShell title="Transcription service" onBack={onClose} backLabel="Back to settings" backDisabled={busy}>
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
         >
           <Text style={{ color: palette.muted }}>Choose the service for new transcriptions.</Text>
-          {(['production', 'staging', 'openai'] as const).map(id => (
-            <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Host matchContents style={{ minWidth: 48 }}>
-                <RadioButton selected={service === id} enabled={!busy} onClick={() => void changeService(id)}
-                  modifiers={[semantics({ contentDescription: services[id].label })]} />
-              </Host>
-              <Text onPress={busy ? undefined : () => void changeService(id)} style={{ color: palette.text }}>{services[id].label}</Text>
-            </View>
-          ))}
+          <ServiceChoice service={service} busy={busy} onChange={id => void changeService(id)} />
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services[service].label}</Text>
           <Text style={{ color: palette.muted }}>
-            {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.' : service === 'production' ? 'Requires a production Pro key. Free transcription is currently available only on staging.' : 'Use a staging Pro key, or transcribe with Free access.'}
+            {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.'
+              : !supportsProUpload ? service === 'production'
+                ? 'Production Pro is unavailable on iOS. Select Staging Free access or OpenAI direct.'
+                : 'Use Free access for staging transcriptions. Pro uploads are unavailable on iOS.'
+              : service === 'production' ? 'Requires a production Pro key. Free transcription is currently available only on staging.' : 'Use a staging Pro key, or transcribe with Free access.'}
             {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
           </Text>
           <Text style={{ color: palette.text }}>
             {configured ? "Key saved" : "No key saved for this service"}
           </Text>
+          {canConfigureKey ? <>
           <Text style={{ color: palette.text }}>
             {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}
           </Text>
@@ -135,6 +133,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           </Host>
           <ActionButton title={busy ? "Checking…" : "Verify and save key"} variant="primary"
             disabled={busy || !hasKey} onPress={save} />
+          </> : null}
           {configured ? (
             <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
           ) : null}
@@ -149,7 +148,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
 
         </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </DetailShell>
     </Modal>
   );
 }
