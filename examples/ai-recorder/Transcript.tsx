@@ -22,9 +22,9 @@ import { openAIMaxBytes } from './OpenAIClient';
 import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
+import { persistTranscriptCompletion, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, type Gateway } from './GatewayConnection';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
-type SpeakerResult = { requested: boolean; status: string; transcript?: string };
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
@@ -63,6 +63,11 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   const [summaryLocked, setSummaryLocked] = useState(false);
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
+  function updateDirty(value: boolean) {
+    dirtyRef.current = value;
+    setDirty(value);
+  }
   const [showOriginal, setShowOriginal] = useState(false);
   const hasDraftEditor = useMemo(draftEditorIsBundled, []);
   const [draftDocument, setDraftDocument] = useState<Awaited<ReturnType<typeof createDraftDocument>>>();
@@ -176,15 +181,25 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   async function persistResult(result: Job) {
-    if (result.state === 'COMPLETED' && result.transcript) {
-      if (result.speakerLabeling) await saveText(speakerFile, JSON.stringify(result.speakerLabeling));
-      // The original is the local completion marker. Keep it last so recovery can finish metadata writes.
-      if (!original.exists) await saveText(original, result.transcript);
-      const savedRevision = revision.exists ? await revision.text() : undefined;
-      setDraft(savedRevision !== undefined && savedRevision !== result.speakerLabeling?.transcript
-        ? savedRevision : readableSpeakerTranscript(result.transcript, result.speakerLabeling?.transcript));
+    if (result.state !== 'COMPLETED') {
+      setJob(current => current?.state === 'COMPLETED' ? current : result);
+      return;
     }
-    setJob(result);
+    if (!result.transcript) throw new Error('The service completed without a transcript.');
+    const committed = await persistTranscriptCompletion(original.uri, {
+      readOriginal: async () => original.exists ? original.text() : undefined,
+      readSpeakers: async () => speakerFile.exists ? JSON.parse(await speakerFile.text()) : undefined,
+      writeOriginal: text => saveText(original, text),
+      writeSpeakers: async speakers => {
+        if (speakers) await saveText(speakerFile, JSON.stringify(speakers));
+        else if (speakerFile.exists) speakerFile.delete();
+      },
+    }, { ...result, state: 'COMPLETED', transcript: result.transcript });
+    const savedRevision = revision.exists ? await revision.text() : undefined;
+    // Repeated result callbacks must not overwrite an in-memory edit either.
+    if (!dirtyRef.current) setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
+      ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
+    setJob(committed);
   }
 
   const complete = job?.state === 'COMPLETED';
@@ -346,7 +361,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     setBusy(true);
     try {
       await saveText(revision, draft);
-      setDirty(false);
+      updateDirty(false);
       setMessage('Revision saved on this device.');
     } catch {
       setMessage('Could not save the revision.');
@@ -406,7 +421,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
               </Text> : null}
               {showOriginal || !hasDraftEditor ? <TextInput
                 accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && canEditTranscript(showOriginal, busy)}
-                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
+                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); updateDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} /> : null}
               {!showOriginal && hasDraftEditor ? <ActionButton
                 title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument}
