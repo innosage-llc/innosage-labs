@@ -1,0 +1,440 @@
+{
+  "01": {
+    "title": "雨刷经过的时候",
+    "scene_id": "cut01d",
+    "scene_file": "scenes/01.tsx",
+    "score": "music/01.flac",
+    "wav": "01-pickup.wav",
+    "inputs": [
+      {
+        "name": "palm-stop-wiper-tracked.mp4",
+        "brief": "An uninterrupted windshield view through approach, stop and sweep. Track each readable plate.",
+        "minimum_seconds": 32.0
+      }
+    ],
+    "wav_sha256": "ed3aa16452f8e9c887d194570108966092dbf2eaaa61017404a74eebd04dfe07",
+    "lossless_score_sha256": "8fec0692084bf1a527c802b4dac50317502705c0c0e5760e9eb6aa6a927e4b0f"
+  },
+  "02": {
+    "title": "开饭以前",
+    "scene_id": "cut02e",
+    "scene_file": "scenes/02.tsx",
+    "score": "music/02.flac",
+    "wav": "02-closing.wav",
+    "inputs": [
+      {
+        "name": "lid-opens.mp4",
+        "brief": "The whole action of opening a lid, through its reveal.",
+        "minimum_seconds": 7.8
+      },
+      {
+        "name": "looking-in.mp4",
+        "brief": "A person reacting to the opened container.",
+        "minimum_seconds": 5.8
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "road.mp4",
+        "brief": "Side view through a moving vehicle. Remove identifying details.",
+        "minimum_seconds": 3.5
+      },
+      {
+        "name": "table.mp4",
+        "brief": "A shared table seen in a wide establishing view.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "eat-together.mp4",
+        "brief": "A shared meal with the people serving and eating visible.",
+        "minimum_seconds": 2.4
+      },
+      {
+        "name": "chopsticks-to-bowl.mp4",
+        "brief": "One action from serving dish into a personal bowl, including its landing.",
+        "minimum_seconds": 6.8
+      },
+      {
+        "name": "seated.mp4",
+        "brief": "Two people remaining seated, both faces kept inside the frame.",
+        "minimum_seconds": 5.7
+      }
+    ],
+    "wav_sha256": "5ac4b52f5ed7f64618741b3dc5538b34d874a6ff4a2b1c0815b4d10cf8803e46",
+    "lossless_score_sha256": "521621734ce6db4ee97313f18204b0003842916915481b830e224ba66093821e"
+  },
+  "03": {
+    "title": "把这一拍留给她",
+    "scene_id": "cut03d",
+    "scene_file": "scenes/03.tsx",
+    "score": "music/03.flac",
+    "wav": "03-closing.wav",
+    "inputs": [
+      {
+        "name": "zipper.mp4",
+        "brief": "Hands on a bag zipper. Exclude any phone or laptop screen.",
+        "minimum_seconds": 3.0
+      },
+      {
+        "name": "lid-opens.mp4",
+        "brief": "The whole action of opening a lid, through its reveal.",
+        "minimum_seconds": 7.1
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "lift.mp4",
+        "brief": "A threshold or elevator, with people moving through the frame.",
+        "minimum_seconds": 3.8
+      },
+      {
+        "name": "open-trunk.mp4",
+        "brief": "A close view inside an open luggage compartment.",
+        "minimum_seconds": 1.5
+      },
+      {
+        "name": "road.mp4",
+        "brief": "Side view through a moving vehicle. Remove identifying details.",
+        "minimum_seconds": 4.0
+      },
+      {
+        "name": "sunset-soft.mp4",
+        "brief": "Dusk road with vehicle identifiers treated.",
+        "minimum_seconds": 4.0
+      },
+      {
+        "name": "reach.mp4",
+        "brief": "Chopsticks or a hand reaching across a table.",
+        "minimum_seconds": 3.0
+      },
+      {
+        "name": "palms-soft.mp4",
+        "brief": "A stopped street view, with visible IDs removed.",
+        "minimum_seconds": 2.0
+      },
+      {
+        "name": "looking-in.mp4",
+        "brief": "A person reacting to the opened container.",
+        "minimum_seconds": 4.0
+      },
+      {
+        "name": "table.mp4",
+        "brief": "A shared table seen in a wide establishing view.",
+        "minimum_seconds": 3.0
+      },
+      {
+        "name": "meal.mp4",
+        "brief": "A close view of dishes and hands during a meal.",
+        "minimum_seconds": 2.0
+      },
+      {
+        "name": "lid-reaction-close.mp4",
+        "brief": "The person and opened container, with a crop that follows the face and hands.",
+        "minimum_seconds": 4.5
+      }
+    ],
+    "wav_sha256": "66b6eb80e961770666eb6c19fc1fef255c99f04a3eb43765105303141eb202b4",
+    "lossless_score_sha256": "12630dc7acf7b54bd2ac0551494283af3a2294798c3615284c7bd40693e12297"
+  },
+  "04": {
+    "title": "花的位置",
+    "scene_id": "cut04e",
+    "scene_file": "scenes/04.tsx",
+    "score": "music/04.flac",
+    "wav": "04-petals-return.wav",
+    "inputs": [
+      {
+        "name": "breakfast-remains.mp4",
+        "brief": "Breakfast crockery before clearing.",
+        "minimum_seconds": 6.0
+      },
+      {
+        "name": "stacking.mp4",
+        "brief": "Hands stacking dishes.",
+        "minimum_seconds": 6.0
+      },
+      {
+        "name": "clearing.mp4",
+        "brief": "A hand clearing objects off the same table.",
+        "minimum_seconds": 5.3
+      },
+      {
+        "name": "flower-before.mp4",
+        "brief": "A close tabletop motif before cleaning, centred 30% from left and 60% from top.",
+        "minimum_seconds": 2.5
+      },
+      {
+        "name": "flower-after.mp4",
+        "brief": "The same flower mat later, at a matching scale and position.",
+        "minimum_seconds": 2.8
+      },
+      {
+        "name": "leave-the-flower.mp4",
+        "brief": "A continuous table wipe through the instant the person steps back and the green mat is visible again.",
+        "minimum_seconds": 15.0
+      }
+    ],
+    "wav_sha256": "182f06fd5f08d02595cf676303c32007904cd69ebd53476cf88e73a235fe1a3e",
+    "lossless_score_sha256": "27f0532186cd3289041ccc05ff2b508919887a8aba924ffa793db57a3cf3becd"
+  },
+  "05": {
+    "title": "一筷之间",
+    "scene_id": "cut05f",
+    "scene_file": "scenes/05.tsx",
+    "score": "music/05.flac",
+    "wav": "05-wood-porcelain.wav",
+    "inputs": [
+      {
+        "name": "wheel-in-motion.mp4",
+        "brief": "A moving wheel and painted line visible together from the opening frame.",
+        "minimum_seconds": 5.5
+      },
+      {
+        "name": "painted-arrow.mp4",
+        "brief": "A directional arrow and lane paint passing through the same side view.",
+        "minimum_seconds": 5.5
+      },
+      {
+        "name": "stationary-wheel.mp4",
+        "brief": "A stationary tire alongside a painted lane separator. Hold until the car pulls away and the line remains.",
+        "minimum_seconds": 17.0
+      },
+      {
+        "name": "pack.mp4",
+        "brief": "Hands opening or arranging small boxes.",
+        "minimum_seconds": 6.0
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "table.mp4",
+        "brief": "A shared table seen in a wide establishing view.",
+        "minimum_seconds": 7.0
+      },
+      {
+        "name": "reach.mp4",
+        "brief": "Chopsticks or a hand reaching across a table.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "chopsticks-to-bowl.mp4",
+        "brief": "One action from serving dish into a personal bowl, including its landing.",
+        "minimum_seconds": 7.0
+      },
+      {
+        "name": "seated.mp4",
+        "brief": "Two people remaining seated, both faces kept inside the frame.",
+        "minimum_seconds": 6.0
+      }
+    ],
+    "wav_sha256": "7a0666f9bb66b65680374f5d5cba782d689029831ea18941475e0b88e9283c69",
+    "lossless_score_sha256": "e432eb9848d8e4f9dc8b513421ef91f1580cb626bd35119e42d7d7f6061b4b99"
+  },
+  "06": {
+    "title": "给以后看到这一天的人",
+    "scene_id": "cut06e",
+    "scene_file": "scenes/06.tsx",
+    "score": "music/06.flac",
+    "wav": "06-letter-stem-handle.wav",
+    "inputs": [
+      {
+        "name": "generated-paper.png",
+        "brief": "Portrait paper texture, intentionally neutral."
+      },
+      {
+        "name": "zipper.mp4",
+        "brief": "Hands on a bag zipper. Exclude any phone or laptop screen.",
+        "minimum_seconds": 3.65
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 6.2
+      },
+      {
+        "name": "fronds.mp4",
+        "brief": "Palm fronds in last light with sky behind them.",
+        "minimum_seconds": 6.3
+      },
+      {
+        "name": "chopsticks-to-bowl.mp4",
+        "brief": "One action from serving dish into a personal bowl, including its landing.",
+        "minimum_seconds": 5.75
+      },
+      {
+        "name": "room-walk.mp4",
+        "brief": "A person walking from the far side of one room toward the lens.",
+        "minimum_seconds": 13.95
+      },
+      {
+        "name": "looking-in.mp4",
+        "brief": "A person reacting to the opened container.",
+        "minimum_seconds": 6.8
+      }
+    ],
+    "wav_sha256": "7ec7f848d2ef92ef602123d1eeb0a9dd5b0d61daf922f6a099223b3d56956fb0",
+    "lossless_score_sha256": "e386742de1f9153fcd6092bbdb49c66a4301b9c6c48783e0e87af0be9689802a"
+  },
+  "07": {
+    "title": "走到镜头前",
+    "scene_id": "cut07b",
+    "scene_file": "scenes/07.tsx",
+    "score": "music/07.flac",
+    "wav": "07-pickup.wav",
+    "inputs": [
+      {
+        "name": "generated-paper.png",
+        "brief": "Portrait paper texture, intentionally neutral."
+      },
+      {
+        "name": "room-before.jpg",
+        "brief": "A still of the room before the person enters. Match the beginning of the moving shot."
+      },
+      {
+        "name": "chair-leg.jpg",
+        "brief": "A detail from the same room, seen near floor level."
+      },
+      {
+        "name": "window-light.jpg",
+        "brief": "A still of the light in that same room."
+      },
+      {
+        "name": "room-walk.mp4",
+        "brief": "A person walking from the far side of one room toward the lens.",
+        "minimum_seconds": 14.35
+      },
+      {
+        "name": "room-face.jpg",
+        "brief": "Freeze the last clear glance in the unbroken approach."
+      },
+      {
+        "name": "near-portrait.jpg",
+        "brief": "A tight crop of that exact frame, with space above the head."
+      }
+    ],
+    "wav_sha256": "82509e588adfd57b14a9bbb093f370f5ee9d8711d0ab72b7e372577be1069c31",
+    "lossless_score_sha256": "0d970189f6f0a008d9b3bb6df4f9d0e964114f787b793092ce0cc6472ec70de0"
+  },
+  "08": {
+    "title": "往回看，盒盖还在手里",
+    "scene_id": "cut08e",
+    "scene_file": "scenes/08.tsx",
+    "score": "music/08.flac",
+    "wav": "08-pickup.wav",
+    "inputs": [
+      {
+        "name": "zipper.mp4",
+        "brief": "Hands on a bag zipper. Exclude any phone or laptop screen.",
+        "minimum_seconds": 3.2
+      },
+      {
+        "name": "lid-opens.mp4",
+        "brief": "The whole action of opening a lid, through its reveal.",
+        "minimum_seconds": 5.95
+      },
+      {
+        "name": "fronds.mp4",
+        "brief": "Palm fronds in last light with sky behind them.",
+        "minimum_seconds": 8.1
+      },
+      {
+        "name": "table.mp4",
+        "brief": "A shared table seen in a wide establishing view.",
+        "minimum_seconds": 6.0
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 5.4
+      },
+      {
+        "name": "looking-in.mp4",
+        "brief": "A person reacting to the opened container.",
+        "minimum_seconds": 7.2
+      }
+    ],
+    "wav_sha256": "3249c1d5157f0e01cc6cf6fbccca519e2461caac06f7df7ceffaadcf181ffff3",
+    "lossless_score_sha256": "78be755da813848865deb1ed278bd5e2b458d6473b2164728ed578849b340703"
+  },
+  "09": {
+    "title": "再添一碗",
+    "scene_id": "cut09d",
+    "scene_file": "scenes/09.tsx",
+    "score": "music/09.flac",
+    "wav": "09-second-helping.wav",
+    "inputs": [
+      {
+        "name": "second-helping.mp4",
+        "brief": "One continuous POV from empty bowl to the cooker, refill, and return to table.",
+        "minimum_seconds": 33.4
+      }
+    ],
+    "wav_sha256": "2d06eb5530c76593cfd3bdaa9dfd717030ef235d38cc68d0519aa312f6fd2694",
+    "lossless_score_sha256": "8c9b4e3f3abc107d5ab4d6f6f864f9f5cf4e2c77e4dcaeea484bcdf0d0136ada"
+  },
+  "10": {
+    "title": "近一点",
+    "scene_id": "cut10e",
+    "scene_file": "scenes/10.tsx",
+    "score": "music/10.flac",
+    "wav": "10-pickup.wav",
+    "inputs": [
+      {
+        "name": "dusk.mp4",
+        "brief": "A street seen in dusk light.",
+        "minimum_seconds": 5.5
+      },
+      {
+        "name": "hand-on-the-wheel.mp4",
+        "brief": "Frame only the steering wheel and the moving hand. The windshield is outside the crop.",
+        "minimum_seconds": 5.0
+      },
+      {
+        "name": "fronds.mp4",
+        "brief": "Palm fronds in last light with sky behind them.",
+        "minimum_seconds": 1.9
+      },
+      {
+        "name": "zipper.mp4",
+        "brief": "Hands on a bag zipper. Exclude any phone or laptop screen.",
+        "minimum_seconds": 1.7
+      },
+      {
+        "name": "leave.mp4",
+        "brief": "Someone walking away through a doorway.",
+        "minimum_seconds": 3.6
+      },
+      {
+        "name": "lid-opens.mp4",
+        "brief": "The whole action of opening a lid, through its reveal.",
+        "minimum_seconds": 4.8
+      },
+      {
+        "name": "table.mp4",
+        "brief": "A shared table seen in a wide establishing view.",
+        "minimum_seconds": 2.5
+      },
+      {
+        "name": "chopsticks-to-bowl.mp4",
+        "brief": "One action from serving dish into a personal bowl, including its landing.",
+        "minimum_seconds": 3.9
+      },
+      {
+        "name": "room-walk.mp4",
+        "brief": "A person walking from the far side of one room toward the lens.",
+        "minimum_seconds": 14.5
+      }
+    ],
+    "wav_sha256": "4999bfdf4a20d10d003d170eb23fb2644cb68f3ca34e801f3b47e2f3e45cdd6f",
+    "lossless_score_sha256": "d59fc01b01276cb2c45a7414cce1b1670ce031eeb7ed8f6d49dced3c0748bb6b"
+  }
+}
