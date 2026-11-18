@@ -13,6 +13,8 @@ type Dependencies = {
   microphone: () => Promise<{ granted: boolean; canAskAgain: boolean }>;
   notification: () => Promise<unknown>;
   audioMode: () => Promise<unknown>;
+  prepare?: () => Promise<void>;
+  recover?: () => Promise<unknown>;
   save: (url: string) => Promise<string>;
   permissionMessage: (canAskAgain: boolean) => string;
   savedMessage: string;
@@ -21,6 +23,7 @@ type Dependencies = {
 /** Owns one capture independently of React surfaces within the current JS runtime. */
 export class CaptureSession {
   readonly recorder: AudioRecorder;
+  readonly ready: Promise<void>;
   private snapshot: Snapshot = { phase: 'idle', message: '', saveVersion: 0 };
   private listeners = new Set<() => void>();
   private activeCapture = false;
@@ -37,6 +40,19 @@ export class CaptureSession {
     this.completionSubscription = this.recorder.addListener('recordingStatusUpdate', status => {
       void this.complete(status);
     });
+    this.ready = this.initialize();
+  }
+
+  private async initialize() {
+    if (!this.dependencies.recover) return;
+    this.setPhase('starting');
+    try {
+      await this.dependencies.recover();
+    } catch {
+      this.setMessage('Could not recover a recording. Reopen the app to retry.');
+    } finally {
+      this.setPhase('idle');
+    }
   }
 
   getSnapshot = () => this.snapshot;
@@ -75,7 +91,7 @@ export class CaptureSession {
       // native object is released by its hook and must never be called later.
       this.playbackBinding?.pause();
       await this.dependencies.audioMode();
-      await this.recorder.prepareToRecordAsync();
+      await (this.dependencies.prepare?.() ?? this.recorder.prepareToRecordAsync());
       this.activeCapture = true;
       this.recorder.record();
       this.setPhase('recording');

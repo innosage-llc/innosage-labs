@@ -5,6 +5,14 @@ or another app is in front. Recordings are AAC in an M4A container. Finished fil
 are stored in the app's documents directory and available for offline playback
 after reopening the app.
 
+## Finalized save recovery (Android)
+
+New Android captures use a stable identity in persistent storage. On cold launch,
+a finalized M4A interrupted after Stop is registered once in Library; incomplete
+pending output stays unlisted. Existing saved URIs and associated results are
+preserved. Active-capture recovery and historical cache migration are outside
+this change. See the [reproduction and physical-phone verification guide](docs/finalized-recovery/README.md).
+
 ## Product promise and release status
 
 **Promise:** AI Recorder is intended to make Android conversation capture and
