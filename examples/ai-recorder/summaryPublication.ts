@@ -43,10 +43,22 @@ export function summaryPublication(d: Dependencies) {
     try { return await operation(); } finally { busy.delete(d.pageId); }
   }
   async function post(path: string, body: object) {
-    const response = await d.request(api + path, { method:'POST', headers:{'Content-Type':'application/json'},
-      redirect:'error', credentials:'omit', body:JSON.stringify(body) });
-    if (!response.ok) throw new ShareResponseError(response.status);
-    return response.json();
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_,reject) => {
+      timer = setTimeout(() => {
+        reject(new Error('Draft sharing timed out. The last request was not confirmed.'));
+        controller.abort();
+      },30_000);
+    });
+    try {
+      return await Promise.race([deadline,(async () => {
+        const response = await d.request(api + path, { method:'POST', headers:{'Content-Type':'application/json'},
+          redirect:'error', credentials:'omit', body:JSON.stringify(body), signal:controller.signal });
+        if (!response.ok) throw new ShareResponseError(response.status);
+        return response.json();
+      })()]);
+    } finally { clearTimeout(timer); }
   }
   return {
     // Inspecting / reopening never authenticates, publishes, or contacts the service.

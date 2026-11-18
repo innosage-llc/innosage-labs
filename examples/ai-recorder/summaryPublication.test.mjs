@@ -88,3 +88,21 @@ test('a lost withdrawal reply suppresses the URL until the same owner confirms w
   await assert.rejects(summaryPublication(d).publish(edited),/Finish withdrawing/);
   await summaryPublication(d).unpublish(); assert.equal((await summaryPublication(d).status()).status,'unpublished');
 });
+
+for(const stall of ['headers','body']) test('a stalled '+stall+' releases the sharing lock without confirming a link',async t=>{
+  const {edited,d}=await setup();
+  t.mock.timers.enable({apis:['setTimeout']});
+  const original=d.request;
+  let entered, signal;
+  const ready=new Promise(resolve=>{entered=resolve;});
+  d.request=async(url,opts)=>{
+    signal=opts.signal;
+    const response=await original(url,opts); // server accepted the write before receipt was lost
+    const pending=()=>{entered();return new Promise(()=>{});};
+    return stall==='headers' ? pending() : {ok:true,json:pending};
+  };
+  const check=assert.rejects(summaryPublication(d).publish(edited),/timed out/);
+  await ready;t.mock.timers.tick(30_001);await check;assert.equal(signal.aborted,true);
+  assert.equal((await summaryPublication(d).status()).status,'unconfirmed');d.request=original;
+  await summaryPublication(d).unpublish();assert.equal((await summaryPublication(d).status()).status,'unpublished');
+});
