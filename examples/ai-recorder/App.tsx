@@ -57,6 +57,11 @@ function RecorderScreen() {
   const [files, setFiles] = useState(listRecordings);
   const session = getCaptureSession();
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  useEffect(() => {
+    let current = true;
+    void session.ready.then(() => { if (current) setFiles(listRecordings()); });
+    return () => { current = false; };
+  }, [session]);
   const { phase, message } = capture;
   const setCapturePhase = session.setPhase;
   const setMessage = session.setMessage;

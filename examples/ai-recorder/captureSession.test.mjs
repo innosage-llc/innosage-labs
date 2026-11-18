@@ -87,3 +87,26 @@ test('screen integration binds current playback in a layout lifetime and starts 
   assert.equal(layoutBindings[0].arguments[0].body.arguments[0].body.expression.getText(ast),'player.pause');
   assert.equal(layoutBindings[0].arguments[1].getText(ast),'[session, player]');assert.equal(starts.length,1);assert.equal(starts[0].arguments.length,0);
 });
+
+test('startup recovery locks capture until it settles and runs once per owner', async () => {
+  const gate=deferred();let recoveries=0,prepares=0;
+  const f=fixture({recover:()=>{recoveries++;return gate.promise;},prepare:async()=>{prepares++;}});
+  assert.equal(f.session.getSnapshot().phase,'starting');
+  await f.session.start();assert.equal(prepares,0);assert.equal(recoveries,1);
+  gate.resolve();await f.session.ready;assert.equal(f.session.getSnapshot().phase,'idle');
+  await f.session.start();assert.equal(prepares,1);assert.equal(recoveries,1);
+  assert(!f.calls.includes('prepare'));
+});
+test('recovery failure retains a retry message without fabricating Saved', async () => {
+  const f=fixture({recover:async()=>{throw Error('storage unavailable');}});
+  await f.session.ready;
+  assert.equal(f.session.getSnapshot().savedUri,undefined);
+  assert.equal(f.session.getSnapshot().saveVersion,0);
+  assert.match(f.session.getSnapshot().message,/Reopen the app to retry/);
+});
+test('persistent preparation failure cannot start or report a saved recording', async () => {
+  const f=fixture({prepare:async()=>{throw Error('storage unavailable');}});
+  await f.session.start();assert(!f.calls.includes('record'));
+  assert.equal(f.session.getSnapshot().savedUri,undefined);
+  assert.equal(f.session.getSnapshot().phase,'idle');
+});
