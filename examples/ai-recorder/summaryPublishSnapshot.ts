@@ -16,7 +16,7 @@ export function buildSummaryPublishSnapshot(
   createdAt: number,
 ) {
   if (latest.pageId !== reviewed.pageId || latest.revision !== reviewed.revision) throw new Error('Review the current saved summary before publishing.');
-  if (typeof publicDocumentId !== 'string' || !/^pub_[a-f0-9]{32}$/.test(publicDocumentId) ||
+  if (typeof publicDocumentId !== 'string' || !/^pub_(?:rec_)?[a-f0-9]{32}$/.test(publicDocumentId) ||
       !Number.isSafeInteger(createdAt) || createdAt <= 0) throw new Error('A separate public summary identity is required.');
   const projection = summaryPublicProjection(latest);
   const paragraphs: Paragraph[] = projection.text.split('\n').map(text => ({
