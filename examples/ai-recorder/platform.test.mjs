@@ -61,6 +61,20 @@ test('Android retains its Compose controls and bounded native uploader', () => {
   for (const file of files.keys()) assert.ok(!/\.ios\.tsx?$/.test(file), file);
 });
 
+test('Web uses the shared app/navigation with isolated browser adapters and no native UI imports', () => {
+  const files = graph('web');
+  for (const [file, source] of files) {
+    assert.doesNotMatch(source, /from ['"]@expo\/ui\/(?:jetpack-compose|swift-ui)/);
+    assert.doesNotMatch(source, /requireNativeModule/);
+    assert.ok(!/\.(?:android|ios)\.tsx?$/.test(file), file);
+  }
+  for (const name of ['App.tsx', 'captureOwner.web.ts', 'ui/RootShell.tsx', 'ui/AppChrome.web.tsx', 'ui/RecordControl.web.tsx', 'ProSettings.web.tsx', 'Transcript.web.tsx']) assert.ok(files.has(resolve(root, name)), name);
+  const app = files.get(resolve(root, 'App.tsx'));
+  assert.match(app, /Platform\.OS === 'web' \? undefined : new Directory/);
+  assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new AudioRecorderWeb/);
+  assert.doesNotMatch(files.get(resolve(root, 'captureOwner.web.ts')), /getUserMedia|requestRecordingPermissionsAsync/);
+});
+
 test('unsupported uploader fails explicitly without loading a native module or performing a request', async () => {
   assert.equal(supportsProUpload, false);
   await assert.rejects(uploadRecording('https://example.invalid', new Blob(['test']), {}), /InnoSage Pro uploads require Android/);
@@ -88,7 +102,7 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
 
 test('iOS config declares its identity and microphone purpose without broad file sharing', () => {
   const { expo } = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
-  assert.deepEqual(expo.platforms, ['android', 'ios']);
+  assert.deepEqual(expo.platforms, ['android', 'ios', 'web']);
   assert.equal(expo.ios.bundleIdentifier, expo.android.package);
   assert.ok(expo.ios.infoPlist.NSMicrophoneUsageDescription);
   assert.equal(expo.ios.infoPlist.UIFileSharingEnabled, undefined);

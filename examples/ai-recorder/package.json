@@ -17,7 +17,8 @@
     "ios:testflight:build": "npx eas-cli build --platform ios --profile testflight",
     "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight",
     "ios:device": "python3 scripts/ios_device.py",
-    "test:ios-device": "python3 -m unittest discover -s scripts -p test_ios_device.py"
+    "test:ios-device": "python3 -m unittest discover -s scripts -p test_ios_device.py",
+    "export:web": "expo export --platform web --output-dir dist-web"
   },
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",
@@ -30,11 +31,14 @@
     "expo-file-system": "~58.0.13",
     "expo-secure-store": "~58.0.2",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.1",
-    "react-native-safe-area-context": "5.11.1"
+    "react-native-safe-area-context": "5.11.1",
+    "react-native-web": "~0.21.4"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
+    "playwright": "1.64.1",
     "typescript": "6.0.3"
   }
 }
