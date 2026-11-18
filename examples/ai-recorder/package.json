@@ -15,7 +15,9 @@
     "test:platform": "node --test platform.test.mjs",
     "ios:check": "bash scripts/check-ios-development.sh",
     "ios:testflight:build": "npx eas-cli build --platform ios --profile testflight",
-    "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight"
+    "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight",
+    "ios:device": "python3 scripts/ios_device.py",
+    "test:ios-device": "python3 -m unittest discover -s scripts -p test_ios_device.py"
   },
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",
