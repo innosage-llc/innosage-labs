@@ -14,7 +14,7 @@ def main():
     root=Path(__file__).resolve().parents[1] / 'timeline'
     names=set(re.findall(r'src="([^"]+)"', ''.join(p.read_text() for p in (root/'scenes').glob('*.tsx'))))
     videos={name: args.clips/name for name in names if name.endswith('.mp4')}
-    audio={name: args.music/name.replace('-phrased','') for name in names if name.endswith('.wav')}
+    audio={name: args.music/name.replace('-phrased','').replace('-picture','') for name in names if name.endswith('.wav')}
     source={**videos,**audio,'generated-paper.png':args.clips/'generated-paper.png'}
     missing=[str(p) for p in source.values() if not p.is_file()]
     if missing: parser.error('Missing inputs:\n'+'\n'.join(missing))

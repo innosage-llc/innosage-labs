@@ -19,10 +19,12 @@ SPECS = [
  dict(id='10',name='cinematic',bpm=80,meter='4/4',duration=36,key='D minor → F major',programs=[48,60,47],chords=[[38,50,57,62,65],[34,50,58,62,65],[41,53,60,65,69],[36,52,55,60,64]])
 ]
 
-def compose(spec, out):
+def compose(spec, out, picture_cues=False):
     rng=random.Random(9400+int(spec['id'])); ev=[]; bpm=spec['bpm']; beat=60/bpm; D=spec['duration']
     def add(ch,n,t,d,v=65,*,cadence=False):
         if t<0 or (not cadence and t>D-3.0):return
+        if picture_cues and spec['id']=='03' and 16 <= t < 20 and ch in (0,1,9):return
+        if picture_cues and spec['id']=='02' and ch==1 and 16.8 <= t < 19.2:return
         v=max(1,min(116,round(v))); d=min(d,(D-.45 if cadence else D-2.65)-t)
         if d<=0:return
         ev.extend([(t,mido.Message('note_on',channel=ch,note=int(n),velocity=v)),(t+d,mido.Message('note_off',channel=ch,note=int(n),velocity=0))])
@@ -117,6 +119,12 @@ def compose(spec, out):
                 for j in range(8):note(0,c[1+j%3],b+j*.5,.36,53+j%2*10)
                 for off in [0,2]:note(2,root,b+off,.7,75)
             if .5<section<.84:chord(1,c[1:4],b,3,45)
+    if picture_cues and spec['id']=='02':
+        for t,n in [(19.2,43),(19.8,50),(22.8,67),(23.4,71),(24.0,69),(25.2,67)]:
+            add(1 if t<22 else 2,n,t,.45,69)
+    if picture_cues and spec['id']=='07':
+        for index,n in enumerate([60,64,67,72,76,79]):
+            add(2,n,27+index*1.2,.36,55+index*2,cadence=True)
     # Authored tonic cadence, stop active rhythms before end and let releases breathe.
     tonic=spec['chords'][0]
     if spec['id']=='08':tonic=[50,57,62,66]
@@ -132,12 +140,12 @@ def compose(spec, out):
     return len(ev)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('output',type=Path);ap.add_argument('--soundfont',type=Path,required=True);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('output',type=Path);ap.add_argument('--soundfont',type=Path,required=True);ap.add_argument('--picture-cues',action='store_true');a=ap.parse_args()
     a.output.mkdir(parents=True,exist_ok=True)
     for s in SPECS:
         stem=a.output/f"{s['id']}-{s['name']}";midi=stem.with_suffix('.mid');raw=stem.with_suffix('.raw.wav');wav=stem.with_suffix('.wav')
         if wav.exists():raise SystemExit(f'Refusing overwrite: {wav}')
-        count=compose(s,midi)
+        count=compose(s,midi,a.picture_cues)
         subprocess.run(['fluidsynth','-ni','-r','48000','-g','0.65','-R','1','-C','1','-F',str(raw),str(a.soundfont),str(midi)],check=True,capture_output=True)
         filt=f"atrim=duration={s['duration']},afade=t=in:d=0.025,afade=t=out:st={s['duration']-1.5}:d=1.5,loudnorm=I=-16:TP=-1.5:LRA=9"
         p=subprocess.run(['ffmpeg','-hide_banner','-nostdin','-i',str(raw),'-af',filt,'-ar','48000','-ac','2','-c:a','pcm_s24le',str(wav)],capture_output=True,text=True,check=True)

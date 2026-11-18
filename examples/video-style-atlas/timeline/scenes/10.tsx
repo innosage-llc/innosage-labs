@@ -1,4 +1,4 @@
-export default function Film(){return <scene id="film10" name="今天，不快进" active width={1080} height={1920} fill="#101817" workarea={[0,36.0]}>
+export default function Film(){return <scene id="film10" name="今天，不快进" active width={1080} height={1920} fill="#101817" workarea={[0,36.0]} playhead={12.77}>
 <sequence id="n10025" name="Picture">
 <video id="n10001" src="redlight.mp4" start={0} end={6} x={0} y={0} width={1080} height={1920} muted >
 </video>
@@ -46,6 +46,7 @@ export default function Film(){return <scene id="film10" name="今天，不快�
 </keyframeTrack>抵达<animation id="n10017" type="appearChar" duration={0.65}>
 </animation>
 </text>
+<rect id="ink10" x={56} y={1410} width={280} height={134} start={18} end={24} fill="#24312e"/>
 <text id="n10020" x={74} y={1410} width={930} height={180} fontFamily="PingFang SC" fontSize={92} color="#fff" start={18} end={24} fontWeight="bold">
 <keyframeTrack id="rise4" property="offsetY">
 <keyframe id="r4a" time={0} value={36} easing="cubicBezier(0,0.6,0.4,1)"/>

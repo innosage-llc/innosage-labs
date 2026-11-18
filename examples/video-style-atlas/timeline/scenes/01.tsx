@@ -10,13 +10,13 @@ export default function Film(){return <scene id="film01" name="红灯的时候" 
 </video>
 <video id="n1005" src="avenue.mp4" start={23} end={30} x={0} y={240} width={1080} height={1440} muted >
 </video>
-<video id="n1006" src="cup.mp4" start={30} end={36} x={0} y={240} width={1080} height={1440} muted >
+<video id="n1006" src="dusk.mp4" start={30} end={36} x={0} y={240} width={1080} height={1440} muted >
 </video>
 </sequence>
 <text id="n1008" x={80} y={95} width={920} height={180} fontFamily="PingFang SC" fontSize={55} color="#e9e5da" start={0} end={6} >红灯的时候<animation id="n1007" type="fade" duration={0.3}>
 </animation>
 </text>
-<text id="n1010" x={80} y={1740} width={920} height={180} fontFamily="PingFang SC" fontSize={45} color="#e9e5da" start={28} end={36} >等一等，也在向前。<animation id="n1009" type="fade" duration={0.3}>
+<text id="n1010" x={80} y={1740} width={920} height={180} fontFamily="PingFang SC" fontSize={45} color="#e9e5da" start={28} end={36} >灯变了。刚好，再看一眼。<animation id="n1009" type="fade" duration={0.3}>
 </animation>
 </text>
 <audio id="n1012" src="01-ambient-phrased.wav" start={0} end={36}>

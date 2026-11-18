@@ -44,12 +44,12 @@ export default function Film(){return <scene id="film03" name="赶路的间隙" 
 <text id="n3022" x={76} y={1420} width={920} height={180} fontFamily="PingFang SC" fontSize={76} color="#fff" start={0} end={2} >赶 路<animation id="n3021" type="fade" duration={0.3}>
 </animation>
 </text>
-<text id="n3024" x={76} y={1420} width={920} height={180} fontFamily="PingFang SC" fontSize={76} color="#fff" start={16} end={20} >停 一 停<animation id="n3023" type="fade" duration={0.3}>
+<text id="n3024" x={76} y={1420} width={920} height={180} fontFamily="PingFang SC" fontSize={76} color="#fff" start={16} end={20} >红灯。<animation id="n3023" type="fade" duration={0.3}>
 </animation>
 </text>
-<text id="n3026" x={76} y={1460} width={920} height={180} fontFamily="PingFang SC" fontSize={48} color="#fff" start={28} end={32.0} >日子就在间隙里<animation id="n3025" type="fade" duration={0.3}>
+<text id="n3026" x={76} y={1460} width={920} height={180} fontFamily="PingFang SC" fontSize={48} color="#fff" start={28} end={32.0} >等灯的几秒，也算今天。<animation id="n3025" type="fade" duration={0.3}>
 </animation>
 </text>
-<audio id="n3028" src="03-house-phrased.wav" start={0} end={32.0}>
+<audio id="n3028" src="03-house-picture.wav" start={0} end={32.0}>
 </audio>
 </scene>;}

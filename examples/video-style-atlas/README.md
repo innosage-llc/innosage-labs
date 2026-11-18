@@ -12,7 +12,7 @@ Start with the [Chinese field guide](book/TOC.md). Film 02 follows one day in or
 4. Run these commands from this directory using new output directories. Set CLIPS and SOUNDFONT to local paths. The scripts do not need API keys.
 
 ~~~bash
-uv run --with mido python scripts/compose_atlas.py ./scores --soundfont "$SOUNDFONT"
+uv run --with mido python scripts/compose_atlas.py ./scores --picture-cues --soundfont "$SOUNDFONT"
 python3 scripts/prepare.py "$CLIPS" ./scores ./my-atlas
 diffusion open -b ./my-atlas
 diffusion check film07
@@ -24,3 +24,16 @@ uv run --with pillow python scripts/review_export.py ./collage.mp4 ./review-coll
 Choose film01 through film10 to change scenes. Modify the JSX file for the corresponding scene. To isolate one decision, first change only the cut length or only the score. The generated contact sheets sample every 15 frames and include the final frame. Listen separately to the complete track and play through cuts and animation at normal speed.
 
 The private project uses family footage. Reproduce the timing and composition with clips you have permission to share.
+
+## Watch a public example
+
+[Play the 36-second illustrated paper journey](sample/paper-journey.mp4). Six original geometric illustrations stand in for travel photographs. Watch the last nine seconds for the relationship between each new card and the music. The public preview is 432 × 768. The editable master renders at 1080 × 1920.
+
+~~~bash
+uv run --with pillow python scripts/collage_sample.py ./scores/07-chamber.wav ./paper-study
+diffusion open -b ./paper-study
+diffusion check film07
+diffusion export film07 ./paper-journey.mp4
+~~~
+
+If the editor has just opened and the check reports a missing scene, allow the project to finish loading and run the check again.

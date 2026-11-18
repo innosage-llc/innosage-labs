@@ -10,7 +10,7 @@ export default function Film(){return <scene id="film09" name="一餐之间" act
 </video>
 <video id="n9005" src="bowl.mp4" start={28} end={32} x={0} y={0} width={1080} height={1920} muted >
 </video>
-<video id="n9006" src="serve.mp4" start={32} end={36} x={0} y={0} width={1080} height={1920} muted >
+<video id="n9006" src="serve.mp4" sourceIn={4.75} start={32} end={36} x={0} y={0} width={1080} height={1920} muted >
 </video>
 </sequence>
 <text id="n9008" x={70} y={1450} width={940} height={180} fontFamily="PingFang SC" fontSize={54} color="#fff" start={0} end={5} >一餐之间<animation id="n9007" type="fade" duration={0.3}>

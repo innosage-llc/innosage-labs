@@ -83,7 +83,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 <keyframe id="collection0r1" time={0.5} value={-4}/>
 </keyframeTrack>
 </image>
-<image id="collection1" src="leave-still.jpg" start={27.5} end={36} x={565} y={340} width={425} height={350} rotation={3}>
+<image id="collection1" src="leave-still.jpg" start={28.2} end={36} x={565} y={340} width={425} height={350} rotation={3}>
 <stroke id="collection1s" width={18} color="#fffaf0"/>
 <keyframeTrack id="collection1x" property="x">
 <keyframe id="collection1x0" time={0} value={685} easing="steps(4)"/>
@@ -94,7 +94,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 <keyframe id="collection1r1" time={0.5} value={3}/>
 </keyframeTrack>
 </image>
-<image id="collection2" src="table-still.jpg" start={28.0} end={36} x={85} y={750} width={425} height={350} rotation={2}>
+<image id="collection2" src="table-still.jpg" start={29.4} end={36} x={85} y={750} width={425} height={350} rotation={2}>
 <stroke id="collection2s" width={18} color="#fffaf0"/>
 <keyframeTrack id="collection2x" property="x">
 <keyframe id="collection2x0" time={0} value={205} easing="steps(4)"/>
@@ -105,7 +105,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 <keyframe id="collection2r1" time={0.5} value={2}/>
 </keyframeTrack>
 </image>
-<image id="collection3" src="serve-still.jpg" start={28.5} end={36} x={565} y={750} width={425} height={350} rotation={-2}>
+<image id="collection3" src="serve-still.jpg" start={30.6} end={36} x={565} y={750} width={425} height={350} rotation={-2}>
 <stroke id="collection3s" width={18} color="#fffaf0"/>
 <keyframeTrack id="collection3x" property="x">
 <keyframe id="collection3x0" time={0} value={685} easing="steps(4)"/>
@@ -116,7 +116,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 <keyframe id="collection3r1" time={0.5} value={-2}/>
 </keyframeTrack>
 </image>
-<image id="collection4" src="sunset-still.jpg" start={29.0} end={36} x={85} y={1160} width={425} height={350} rotation={-3}>
+<image id="collection4" src="sunset-still.jpg" start={31.8} end={36} x={85} y={1160} width={425} height={350} rotation={-3}>
 <stroke id="collection4s" width={18} color="#fffaf0"/>
 <keyframeTrack id="collection4x" property="x">
 <keyframe id="collection4x0" time={0} value={205} easing="steps(4)"/>
@@ -127,7 +127,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 <keyframe id="collection4r1" time={0.5} value={-3}/>
 </keyframeTrack>
 </image>
-<image id="collection5" src="redlight-still.jpg" start={29.5} end={36} x={565} y={1160} width={425} height={350} rotation={4}>
+<image id="collection5" src="redlight-still.jpg" start={33.0} end={36} x={565} y={1160} width={425} height={350} rotation={4}>
 <stroke id="collection5s" width={18} color="#fffaf0"/>
 <keyframeTrack id="collection5x" property="x">
 <keyframe id="collection5x0" time={0} value={685} easing="steps(4)"/>
@@ -139,7 +139,7 @@ export default function Film(){return <scene id="film07" name="把平常收藏" 
 </keyframeTrack>
 </image>
 <text id="title07" x={75} y={125} width={930} height={140} fontFamily="PingFang SC" fontSize={64} color="#71533c" start={0} end={36}>把平常收藏</text>
-<text id="end07" x={75} y={1650} width={930} height={180} fontFamily="PingFang SC" fontSize={45} color="#71533c" start={30} end={36}>日子不必特别，才值得记住。<animation id="endfade07" type="fade" duration={.5}/>
+<text id="end07" x={75} y={1650} width={930} height={180} fontFamily="PingFang SC" fontSize={45} color="#71533c" start={33} end={36}>日子不必特别，才值得记住。<animation id="endfade07" type="fade" duration={.5}/>
 </text>
-<audio id="music07" src="07-chamber-phrased.wav" start={0} end={36}/>
+<audio id="music07" src="07-chamber-picture.wav" start={0} end={36}/>
 </scene>;}

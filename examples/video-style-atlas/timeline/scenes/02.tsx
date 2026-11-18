@@ -27,9 +27,9 @@ export default function Film(){return <scene id="film02" name="把一天带出�
 <text id="n2014" x={75} y={1460} width={930} height={180} fontFamily="PingFang SC" fontSize={50} color="#fff" start={19.2} end={26.4} >同一张桌子<animation id="n2013" type="fade" duration={0.3}>
 </animation>
 </text>
-<text id="n2016" x={75} y={1460} width={930} height={180} fontFamily="PingFang SC" fontSize={50} color="#fff" start={26.4} end={36} >把脚步放慢<animation id="n2015" type="fade" duration={0.3}>
+<text id="n2016" x={75} y={1460} width={930} height={180} fontFamily="PingFang SC" fontSize={50} color="#fff" start={26.4} end={36} >天色替我们收了桌<animation id="n2015" type="fade" duration={0.3}>
 </animation>
 </text>
-<audio id="n2018" src="02-acoustic-phrased.wav" start={0} end={36.0}>
+<audio id="n2018" src="02-acoustic-picture.wav" start={0} end={36.0}>
 </audio>
 </scene>;}
