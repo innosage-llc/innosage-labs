@@ -26,7 +26,7 @@ test('review is separate and retrying a failed save does not repeat generation',
   const metadata={id:'candidate-1',recipe:'meeting',model:'gpt-test',source:'revision'};
   let paid=0, writes=0;
   const candidate=await generateSummaryCandidate({metadata,
-    readCurrent:async()=>({kind:'summary',revision:8}),
+    document:{pageId:'local-summary-A', recover:async()=>({pageId:'local-summary-A',kind:'summary',revision:8})},
     readInput:async()=>({text:'committed 陈宁',sourceRevision:7}),
     generate:async text=>{assert.equal(text,'committed 陈宁'); paid++; return {text:'Generated once'};},
   });
@@ -39,8 +39,8 @@ test('review is separate and retrying a failed save does not repeat generation',
     if(++writes===1) throw new Error('Local disk failed');
     return {revision:9};
   };
-  await assert.rejects(acceptSummaryCandidate(candidate,'fixture',replace), /Local disk/);
-  assert.equal((await acceptSummaryCandidate(candidate,'fixture',replace)).revision,9);
+  await assert.rejects(acceptSummaryCandidate(candidate,'fixture',{pageId:'local-summary-A',replaceSummary:replace}), /Local disk/);
+  assert.equal((await acceptSummaryCandidate(candidate,'fixture',{pageId:'local-summary-A',replaceSummary:replace})).revision,9);
   assert.equal(paid,1);
 });
 
@@ -66,10 +66,26 @@ test('a regenerated candidate cannot replace an intervening edit and can seed an
   let raw = null;
   const document = draftStore({pageId:'summary-test2',kind:'summary'}, {read:async()=>raw,write:async v=>{raw=v;}});
   const generation = {id:'one',recipe:'meet',model:'gpt-test',source:'revision',sourceRevision:4,text:'First candidate'};
-  assert.equal((await saveSummaryCandidate(document,{generation,basedOnRevision:0})).revision,1);
-  const candidate = {generation:{...generation,id:'two',text:'Second candidate'},basedOnRevision:1};
+  assert.equal((await saveSummaryCandidate(document,{pageId:document.pageId,generation,basedOnRevision:0})).revision,1);
+  const candidate = {pageId:document.pageId,generation:{...generation,id:'two',text:'Second candidate'},basedOnRevision:1};
   const blocks = prepareRecorderOpen(document.pageId,'Meeting Summary','Local edit').blocks;
   await document.commit(1,blocks);
   await assert.rejects(async () => saveSummaryCandidate(document,candidate),/revision changed/);
   assert.equal((await committedSummary(document)).text,'Local edit');
+});
+
+test('a candidate for one recording is never accepted into another recording with the same revision', async () => {
+  const create = (pageId) => {
+    let raw = null;
+    return draftStore({pageId,kind:'summary'},{read:async()=>raw,write:async value=>{raw=value;}});
+  };
+  const a = create('first-recording');
+  const b = create('second-recording');
+  const privateCandidate = await generateSummaryCandidate({
+    document:a, metadata:{id:'p1',recipe:'meet',model:'gpt-test',source:'original'},
+    readInput:async()=>({text:'Only recording A'}), generate:async()=>({text:'A summary'}),
+  });
+  await assert.rejects(async () => saveSummaryCandidate(b,privateCandidate),/another summary document/);
+  assert.equal(await b.recover(),undefined);
+  assert.equal((await saveSummaryCandidate(a,privateCandidate)).generation.text,'A summary');
 });

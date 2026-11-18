@@ -1,7 +1,7 @@
 import { draftText, readSummaryGeneration, type DraftSnapshot, type SummaryGeneration } from './draftDocumentModel';
 import { prepareRecorderOpen } from './recorderDraftProtocol';
 
-export type SummaryCandidate = { generation: SummaryGeneration; basedOnRevision: number };
+export type SummaryCandidate = Readonly<{ pageId: string; generation: SummaryGeneration; basedOnRevision: number }>;
 type SummarySource = SummaryGeneration['source'];
 
 /** Select committed text at call time, not from a render or an in-progress edit. */
@@ -22,15 +22,16 @@ export async function readSummaryInput(
  * take the exact same candidate back to review or acceptance without inference.
  */
 export async function generateSummaryCandidate({
-  metadata, readCurrent, readInput, generate,
+  metadata, document, readInput, generate,
 }: {
   metadata: Omit<SummaryGeneration,'text'|'citations'|'sourceRevision'>;
-  readCurrent: () => Promise<DraftSnapshot | undefined>;
+  document: Pick<NativeSummaryDocument,'pageId'|'recover'>;
   readInput: () => Promise<{text:string; sourceRevision?:number}>;
   generate: (text: string) => Promise<Pick<SummaryGeneration,'text'|'citations'>>;
 }): Promise<SummaryCandidate> {
-  const before = await readCurrent();
-  if (before && before.kind !== 'summary') throw new Error('A separate summary document is required.');
+  const {pageId} = document;
+  const before = await document.recover();
+  if (before && (before.kind !== 'summary' || before.pageId !== pageId)) throw new Error('A separate summary document is required.');
   const {text,sourceRevision} = await readInput();
   if (!text.trim()) throw new Error('The selected transcript is empty.');
   if (sourceRevision !== undefined && (metadata.source !== 'revision' ||
@@ -38,15 +39,16 @@ export async function generateSummaryCandidate({
   const result = await generate(text);
   const generation = readSummaryGeneration({...metadata,sourceRevision,text:result.text,citations:result.citations});
   if (!generation) throw new Error('The generated summary could not be saved.');
-  return { basedOnRevision: before?.revision ?? 0, generation };
+  return { pageId, basedOnRevision: before?.revision ?? 0, generation };
 }
 
 export function acceptSummaryCandidate(
   candidate: SummaryCandidate,
   blocks: unknown,
-  replace: (expected: number, blocks: unknown, generation: SummaryGeneration) => Promise<DraftSnapshot>,
+  document: Pick<NativeSummaryDocument,'pageId'|'replaceSummary'>,
 ) {
-  return replace(candidate.basedOnRevision, blocks, candidate.generation);
+  if (candidate.pageId !== document.pageId) throw new Error('This candidate belongs to another summary document.');
+  return document.replaceSummary(candidate.basedOnRevision, blocks, candidate.generation);
 }
 
 type NativeSummaryDocument = {
@@ -79,9 +81,10 @@ export async function loadSummaryDocument(
 }
 
 export function saveSummaryCandidate(document: NativeSummaryDocument, candidate: SummaryCandidate) {
+  if (candidate.pageId !== document.pageId) throw new Error('This candidate belongs to another summary document.');
   const seeded = prepareRecorderOpen(document.pageId, 'Meeting Summary', candidate.generation.text);
   if (!seeded) throw new Error('The generated summary is too large for Draft.');
-  return acceptSummaryCandidate(candidate, seeded.blocks, document.replaceSummary);
+  return acceptSummaryCandidate(candidate, seeded.blocks, document);
 }
 
 export async function committedSummary(draft: Pick<NativeSummaryDocument,'recover'>) {
