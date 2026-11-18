@@ -12,18 +12,20 @@ import { ActionButton } from './ui/ActionButton';
 import { readSummaryInput } from './summaryDraftLifecycle';
 
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
-type Props = {
+export type RecipeRequest = Pick<Summary, 'recipe'|'model'|'source'> & {effort:ThinkingEffort; webSearch:boolean; instructions?:string};
+export type SummaryProps = {
   original: File;
   hasRevision: boolean;
   readRevision: () => Promise<string | undefined>;
   output: File;
   save: (file: File, text: string) => Promise<void>;
   onLockChange: (locked: boolean) => void;
+  generateInDraft?: (request: RecipeRequest, signal: AbortSignal) => Promise<void>;
 };
 
-export function TranscriptSummary({ original, hasRevision, readRevision, output, save, onLockChange }: Props) {
+export function TranscriptSummary({ original, hasRevision, readRevision, output, save, onLockChange, generateInDraft }: SummaryProps) {
   const { palette, spacing } = useTheme();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!generateInDraft);
   const [recipe, setRecipe] = useState<string>();
   const [effort, setEffort] = useState<ThinkingEffort>('medium');
   const [instructions, setInstructions] = useState('');
@@ -82,7 +84,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
+      {!generateInDraft ? <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
         setOpen(!open);
         if (!open && !summary) void run(async () => {
           const file = savedFiles()[0] ?? output;
@@ -91,7 +93,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
           if (typeof saved.text !== 'string' || typeof saved.model !== 'string') throw new Error('Could not read the saved summary.');
           setSummary(saved);
         });
-      }} />
+      }} /> : null}
       {open ? <>
         <Text accessibilityRole="header" style={{ color: palette.text }}>Recipe library</Text>
         <ActionButton title={recipe === meetingEssentials.id ? '✓ Meeting Essentials' : 'Meeting Essentials'} disabled={busy || recipe === meetingEssentials.id} onPress={() => setRecipe(meetingEssentials.id)} />
@@ -150,9 +152,14 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
         <ActionButton title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'} variant="primary"
           disabled={busy || (!unsaved && (!recipe || !model || (recipe === 'custom' && !instructions.trim())))} onPress={() => void run(async signal => {
             if (unsaved) { await persist(unsaved); return; }
-            const transcript = await readSummaryInput(source, () => original.text(), readRevision);
             if (!recipe) return;
             const searchEnabled = recipe === 'custom' && webSearch;
+            if (generateInDraft) {
+              await generateInDraft({recipe,model,source,effort,webSearch:searchEnabled,
+                instructions:recipe === 'custom' ? instructions.trim() : undefined},signal);
+              return;
+            }
+            const transcript = await readSummaryInput(source, () => original.text(), readRevision);
             const result = await openAIAccess.summarize(model, transcript, {
               effort, instructions: recipe === 'custom' ? instructions.trim() : undefined, webSearch: searchEnabled,
             }, signal);

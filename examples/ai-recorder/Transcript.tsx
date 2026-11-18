@@ -1,3 +1,4 @@
+import { DraftSummary } from './DraftSummary';
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
@@ -456,8 +457,16 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
                 onPress={() => setEditingDraft(true)} /> : null}
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
-              <TranscriptSummary original={original} hasRevision={draftRevision > 0 || revision.exists}
-                readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
+              {hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
+                output={summaryFile} hasRevision={draftRevision > 0 || revision.exists} readRevision={readCommittedRevision}
+                readRevisionWithId={async () => {
+                  if (!draftDocument) throw new Error('The saved transcript is not ready.');
+                  const saved = await draftDocument.recover();
+                  return saved ? {text:draftText(saved), sourceRevision:saved.revision}
+                    : {text:revision.exists ? await revision.text() : ''};
+                }}
+                save={saveText} onLockChange={setSummaryLocked} /> : <TranscriptSummary original={original} hasRevision={draftRevision > 0 || revision.exists}
+                readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />}
             </>
           ) : isOpenAI ? (
             <>
