@@ -22,6 +22,11 @@ not qualify it as the offline Draft Recorder build.
    installable Recorder artifact and does not verify the app's UI, offline
    WebView, keyboard, or save/reopen journey.
 
+The WebView must use the paired Draft close protocol: a successful Back receipt
+explicitly confirms the editor was sealed after any IME commit and durable save.
+Older, unsealed receipts are not accepted. A timed-out Back cancels only its own
+flush and lets the same editor continue; it must never silently discard new input.
+
 Use synthetic data for Android evidence and route acceptance separately from
 publication. Do not commit screenshots or logs with recordings, account
 information, or other private paths.

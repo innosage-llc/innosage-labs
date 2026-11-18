@@ -14,7 +14,8 @@ export function parseRecorderEvent(raw: string, session: string, pageId: string)
     return {type:'error' as const};
   if (value.session !== session || value.pageId !== pageId) return;
   if (value.type === 'opened') return {type:'opened' as const};
-  if (value.type === 'flushed' && typeof value.ok === 'boolean' && revision(value.flushId) && value.flushId > 0)
+  if (value.type === 'flushed' && typeof value.ok === 'boolean' && (!value.ok || value.sealed === true) &&
+      revision(value.flushId) && value.flushId > 0)
     return {type:'flushed' as const, ok:value.ok, flushId:value.flushId};
   if (value.type === 'save' && revision(value.baseRevision) && revision(value.requestId) &&
       value.requestId > 0 && Array.isArray(value.blocks)) {

@@ -33,7 +33,7 @@ export function RecorderDraftHost({document, title, initial, onClose, onCommitte
   const state = useRef({
     active: false, ready: false, openIssued: false, opened: false, closed: false, backFailed: false,
     revision: 0, nextFlush: 0, awaitingBack: 0,
-    timer: undefined as ReturnType<typeof setTimeout> | undefined,
+    canceledBack: 0, timer: undefined as ReturnType<typeof setTimeout> | undefined,
   }).current;
 
   useEffect(() => {
@@ -60,7 +60,10 @@ export function RecorderDraftHost({document, title, initial, onClose, onCommitte
     if (!state.openIssued) { close(); return; }
     if (state.backFailed) {
       Alert.alert('Close without a confirmed save?', 'Your last saved revision will remain. Recent edits might be lost.', [
-        {text:'Keep editing', style:'cancel', onPress:() => { state.backFailed = false; }},
+        {text:'Keep editing', style:'cancel', onPress:() => {
+          if (state.canceledBack) post({type:'cancel-flush', flushId:state.canceledBack});
+          state.backFailed = false;
+        }},
         {text:'Close draft', style:'destructive', onPress:close},
       ]);
       return;
@@ -71,6 +74,8 @@ export function RecorderDraftHost({document, title, initial, onClose, onCommitte
     post({type:'flush', flushId});
     state.timer = setTimeout(() => {
       state.awaitingBack = 0;
+      state.canceledBack = flushId;
+      post({type:'cancel-flush', flushId});
       state.backFailed = true;
       setBackPending(false);
       setError('The editor has not confirmed the local save. Keep editing or choose whether to close when you go Back.');

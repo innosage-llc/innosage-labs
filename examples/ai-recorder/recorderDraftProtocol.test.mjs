@@ -6,10 +6,12 @@ const event = body => parseRecorderEvent(JSON.stringify({version:1, session:'ses
 test('only recognizes exact version, active document, valid ordinals and matching session', () => {
   assert.deepEqual(event({type:'opened'}), {type:'opened'});
   assert.deepEqual(event({type:'flushed', flushId:7, ok:false}), {type:'flushed', flushId:7, ok:false});
+  assert.deepEqual(event({type:'flushed', flushId:7, ok:true, sealed:true}), {type:'flushed', flushId:7, ok:true});
   assert.deepEqual(event({type:'save', requestId:1, baseRevision:0, blocks:[]}), {type:'save', requestId:1, baseRevision:0, blocks:[]});
   for (const invalid of [
     {type:'opened', session:'other'}, {type:'opened', pageId:'other'}, {type:'opened', version:2},
     {type:'save', requestId:-1, baseRevision:0, blocks:[]}, {type:'save', requestId:1, baseRevision:0.1, blocks:[]},
+    {type:'flushed', flushId:7, ok:true}, {type:'flushed', flushId:7, ok:true, sealed:false},
     {type:'flushed', ok:'true'}, {type:'flushed', ok:true}, {type:'upload', content:'anything'}
   ]) assert.equal(event(invalid), undefined);
 });
