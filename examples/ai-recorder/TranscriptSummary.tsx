@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Linking, Text, TextInput, View } from 'react-native';
-import { Host, Switch } from '@expo/ui/jetpack-compose';
-import { semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { RecorderSwitch } from './RecorderSwitch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
@@ -111,10 +110,10 @@ export function TranscriptSummary({ original, revision, output, save, onLockChan
             value={instructions} onChangeText={setInstructions} style={{ color: palette.text, borderWidth: 1, borderColor: palette.muted, padding: spacing.sm }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ color: palette.text }}>Search the web</Text>
-            <Host matchContents style={{ minWidth: 60 }}>
-              <Switch modifiers={[semantics({ contentDescription: 'Search the web' })]}
+            <View style={{ minWidth: 60 }}>
+              <RecorderSwitch label="Search the web"
                 enabled={!busy} value={webSearch} onCheckedChange={setWebSearch} />
-            </Host>
+            </View>
           </View>
           <ActionButton title="Save custom recipe" disabled={busy || !instructions.trim()}
             onPress={() => void run(async () => {

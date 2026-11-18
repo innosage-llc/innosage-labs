@@ -4,7 +4,8 @@
     "slug": "ai-recorder",
     "version": "0.1.9",
     "platforms": [
-      "android"
+      "android",
+      "ios"
     ],
     "android": {
       "package": "co.innosage.labs.airecorder",
@@ -20,6 +21,11 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "ios": {
+      "bundleIdentifier": "co.innosage.labs.airecorder",
+      "supportsTablet": false,
+      "buildNumber": "10"
+    }
   }
 }
