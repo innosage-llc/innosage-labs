@@ -21,3 +21,29 @@ export function parseRecorderEvent(raw: string, session: string, pageId: string)
     return {type:'save' as const, requestId:value.requestId, baseRevision:value.baseRevision, blocks:value.blocks};
   }
 }
+
+const OPEN_BLOCK_LIMIT = 3_990_000;
+
+export function recorderDraftTitle(title: string) {
+  return title.length <= 480 ? title : title.slice(0, 479) + '…';
+}
+
+type OpeningSnapshot = {revision:number; blocks:unknown[]};
+
+/** Mirror the local editor's serialized document budget before issuing an opening request. */
+export function prepareRecorderOpen(pageId: string, title: string, plainText: string, snapshot?: OpeningSnapshot) {
+  let blocks = snapshot?.blocks;
+  if (!blocks) {
+    if (plainText.length > OPEN_BLOCK_LIMIT) return;
+    let lines = 1;
+    for (const _ of plainText.matchAll(/\r\n?|\n/g)) if (++lines > 140_000) return;
+    blocks = [{id:pageId, type:'tiptap', content:JSON.stringify({
+      type:'doc',
+      content:plainText.split(/\r\n?|\n/).map(line => ({
+        type:'paragraph', ...(line ? {content:[{type:'text', text:line}]} : {}),
+      })),
+    })}];
+  }
+  if (JSON.stringify(blocks).length > OPEN_BLOCK_LIMIT) return;
+  return {type:'open', pageId, title:recorderDraftTitle(title), revision:snapshot?.revision ?? 0, blocks};
+}
