@@ -65,6 +65,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
   const seededRevision = useRef(false);
+  const [revisionReadFailed, setRevisionReadFailed] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const hasDraftEditor = useMemo(draftEditorIsBundled, []);
   const [draftDocument, setDraftDocument] = useState<Awaited<ReturnType<typeof createDraftDocument>>>();
@@ -93,8 +94,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     readOriginal: async () => original.exists ? original.text() : undefined,
     readSpeakers: async () => {
       if (!speakerFile.exists) return;
-      const raw = await speakerFile.text();
-      try { return parseSpeakerResult(JSON.parse(raw)); } catch { return; }
+      try { return parseSpeakerResult(JSON.parse(await speakerFile.text())); } catch { return; }
     },
     writeOriginal: (text: string) => saveText(original, text),
     writeSpeakers: async (speakers: SpeakerResult | undefined) => {
@@ -106,14 +106,24 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 
   async function showCompletion(committed: CompletedTranscript) {
     if (!seededRevision.current) {
-      const savedRevision = revision.exists ? await revision.text() : undefined;
-      // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
-      if (!seededRevision.current) {
-        seededRevision.current = true;
-        setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
-          ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
+      try {
+        const savedRevision = revision.exists ? await revision.text() : undefined;
+        // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
+        if (!seededRevision.current) {
+          seededRevision.current = true;
+          setRevisionReadFailed(false);
+          setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
+            ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
+        }
+      } catch {
+        if (!seededRevision.current) {
+          setRevisionReadFailed(true);
+          setMessage('The original is saved. Reopen this recording to recover its saved revision before editing.');
+        }
       }
     }
+    // Reaching a durable local completion is sufficient to release the in-memory OpenAI retry lock.
+    setUnsavedOpenAI(undefined);
     setJob(committed);
   }
 
@@ -217,11 +227,11 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 
   const complete = job?.state === 'COMPLETED';
   useEffect(() => {
-    if (complete && !busy && draftDocument && !autoOpened.current) {
+    if (complete && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
       setEditingDraft(true);
     }
-  }, [complete, busy, draftDocument]);
+  }, [complete, busy, draftDocument, revisionReadFailed]);
   async function readCommittedRevision() {
     const snapshot = await draftDocument?.recover();
     if (snapshot) return draftText(snapshot);
@@ -438,14 +448,14 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
                   : 'Speaker identification could not be completed. The transcript is available.'}
               </Text> : null}
               {showOriginal || !hasDraftEditor ? <TextInput
-                accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && canEditTranscript(showOriginal, busy)}
+                accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && !revisionReadFailed && canEditTranscript(showOriginal, busy)}
                 value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} /> : null}
               {!showOriginal && hasDraftEditor ? <ActionButton
-                title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument}
+                title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument || revisionReadFailed}
                 onPress={() => setEditingDraft(true)} /> : null}
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
-              {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy} onPress={save} /> : null}
+              {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               <TranscriptSummary original={original} hasRevision={draftRevision > 0 || revision.exists}
                 readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked} />
             </>
