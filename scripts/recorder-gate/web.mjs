@@ -4,6 +4,10 @@ import { resolve, extname, sep, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { artifact, observe, requireThat, writeJSON, sha } from './core.mjs';
 
+export function criticalHTTP(status, path, type) {
+  return status >= 400 && !(path === '/favicon.ico' && type === 'other');
+}
+
 export async function serveExport(directory) {
   const root = resolve(directory);
   // Freeze the already-hashed export in memory; a later disk edit cannot silently
@@ -28,7 +32,7 @@ export async function serveExport(directory) {
 
 export async function webObservation({ source, directory, output, fault, onFault = () => {} }) {
   const { chromium } = await import(pathToFileURL(join(source, 'examples/ai-recorder/node_modules/playwright/index.mjs')).href);
-  const server = await serveExport(directory); let browser; const diagnostics = []; let fatal = false;
+  const server = await serveExport(directory); let browser; const diagnostics = []; let fatal = false; let indexStatus;
   try {
     browser = await chromium.launch({ channel: 'chrome', headless: true });
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: [], serviceWorkers: 'block' });
@@ -44,14 +48,15 @@ export async function webObservation({ source, directory, output, fault, onFault
     page.on('crash', () => { fatal = true; diagnostics.push('page crashed'); });
     page.on('pageerror', error => { fatal = true; diagnostics.push(error.message); });
     page.on('requestfailed', request => { fatal = true; diagnostics.push(`resource failed: ${new URL(request.url()).pathname}`); });
-    page.on('response', response => { if (response.status() >= 400) { fatal = true; diagnostics.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); } });
+    page.on('response', response => { const path=new URL(response.url()).pathname; if (criticalHTTP(response.status(),path,response.request().resourceType())) { fatal = true; diagnostics.push(`HTTP ${response.status()}: ${path}`); } });
     await page.addInitScript(() => {
       window.__startupErrors = [];
       window.addEventListener('error', e => window.__startupErrors.push(String(e.message)));
       window.addEventListener('unhandledrejection', () => window.__startupErrors.push('unhandled rejection'));
     });
     const started = performance.now();
-    await page.goto(server.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const navigation=await page.goto(server.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    indexStatus=navigation?.status();requireThat(indexStatus===200,'production index did not return HTTP 200');
     requireThat(performance.now() - started < 30000, 'navigation readiness timeout');
     const originalOrigin = await page.evaluate(() => performance.timeOrigin);
     const control = page.getByRole('button', { name: 'Start recording', exact: true });
@@ -80,5 +85,5 @@ export async function webObservation({ source, directory, output, fault, onFault
     requireThat(!fatal, 'browser diagnostic failure');
     requireThat(artifact(directory).sha256 === server.artifact.sha256, 'export changed during observation');
     return { observation, diagnostics, runtime: `Chromium ${browser.version()}`, target: 'clean Chromium context; loopback production export', artifact: server.artifact, monitor_started_before_launch: true };
-  } finally { writeJSON(join(output, 'browser-diagnostics.json'), { fatal, diagnostics, runtime: browser?.version() ?? 'UNKNOWN' }); await browser?.close(); await server.close(); }
+  } finally { writeJSON(join(output, 'browser-diagnostics.json'), { fatal, index_http_status:indexStatus??null, diagnostics, runtime: browser?.version() ?? 'UNKNOWN' }); await browser?.close(); await server.close(); }
 }

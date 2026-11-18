@@ -8,6 +8,8 @@ import { main, mergeArguments, reviewGate } from '../auto-merge-ci.mjs';
 import { xmlControl } from './android.mjs';
 import { aggregate } from './aggregate.mjs';
 import { run, integrationRevision, sourceIdentity } from './host.mjs';
+import { criticalHTTP } from './web.mjs';
+import { platformGate } from './platform.mjs';
 
 const c = { repo: REPO, pr: 101, head: 'a'.repeat(40), base: 'b'.repeat(40), tested: 'c'.repeat(40), tree: 'd'.repeat(40) };
 const review = { candidate: c, decision: 'PASS', role: 'independent-reviewer', model: 'gpt-6.1-sol', effort: 'high', catalog_sha256: 'e'.repeat(64), report_sha256: 'f'.repeat(64) };
@@ -138,4 +140,22 @@ test('readiness budget includes time spent in the normal launcher before probes 
 });
 test('hung runtime probes are bounded and cannot create an incomplete green receipt',async()=>{
   await assert.rejects(observe({probe:()=>new Promise(()=>{}),responsive:async()=>true,maxGap:10}),/probe timeout/);
+});
+test('HTTP 200 index alone cannot mask a missing critical entry; only optional favicon is exempt',()=>{
+  assert.equal(criticalHTTP(200,'/','document'),false);
+  for(const type of ['script','stylesheet','image','font','fetch'])assert.equal(criticalHTTP(404,'/missing',type),true);
+  assert.equal(criticalHTTP(404,'/favicon.ico','other'),false);
+  assert.equal(criticalHTTP(404,'/favicon.ico','script'),true);
+});
+test('actual platform entry points fail closed for absent native targets and unavailable Web build tool',async()=>{
+  const {source,g}=repository();const app=join(source,'examples/ai-recorder');mkdirSync(app,{recursive:true});
+  for(const name of ['app.json','package.json','package-lock.json'])writeFileSync(join(app,name),'{}');
+  g('add','.');g('commit','-m','synthetic build inputs');const candidate={...c,tested:g('rev-parse','HEAD'),tree:g('rev-parse','HEAD^{tree}')};
+  for(const platform of ['android','ios','web']) {
+    const output=mkdtempSync(join(tmpdir(),'labs-platform-missing-'));
+    await assert.rejects(platformGate({platform,source,candidate,output,targets:{}}));
+    const result=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));
+    assert.equal(result.status,'FAIL');assert.equal(result.stage,platform==='web'?'build':'preflight');
+    if(platform!=='web')assert.deepEqual(result.commands,[]);
+  }
 });
