@@ -22,7 +22,7 @@ import { openAIMaxBytes } from './OpenAIClient';
 import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
-import { persistTranscriptCompletion, type SpeakerResult } from './transcriptCompletion';
+import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, type Gateway } from './GatewayConnection';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
@@ -32,6 +32,7 @@ const stateLabels: Record<string, string> = {
   FAILED: 'Transcription failed', CANCELLED: 'Cancelled', CLEANED: 'Expired', EXPIRED: 'Expired',
 };
 const pending = new Set(['UPLOADING', 'STAGED', 'QUEUED', 'PROCESSING']);
+const terminal = new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']);
 
 async function saveText(file: File, text: string) {
   const temporary = new File(file.parentDirectory, file.name + '.pending');
@@ -63,11 +64,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   const [summaryLocked, setSummaryLocked] = useState(false);
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
-  const dirtyRef = useRef(false);
-  function updateDirty(value: boolean) {
-    dirtyRef.current = value;
-    setDirty(value);
-  }
+  const seededRevision = useRef(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const hasDraftEditor = useMemo(draftEditorIsBundled, []);
   const [draftDocument, setDraftDocument] = useState<Awaited<ReturnType<typeof createDraftDocument>>>();
@@ -92,15 +89,39 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
   const speakerFile = new File(recording.parentDirectory, recording.name + '.speakers.json');
   const operationKey = 'transcription.' + recording.name;
+  const completionFiles = {
+    readOriginal: async () => original.exists ? original.text() : undefined,
+    readSpeakers: async () => {
+      if (!speakerFile.exists) return;
+      const raw = await speakerFile.text();
+      try { return parseSpeakerResult(JSON.parse(raw)); } catch { return; }
+    },
+    writeOriginal: (text: string) => saveText(original, text),
+    writeSpeakers: async (speakers: SpeakerResult | undefined) => {
+      if (speakers) await saveText(speakerFile, JSON.stringify(speakers));
+      else if (speakerFile.exists) speakerFile.delete();
+    },
+  };
+  const committedResult = () => readCommittedTranscript(original.uri, completionFiles);
+
+  async function showCompletion(committed: CompletedTranscript) {
+    if (!seededRevision.current) {
+      const savedRevision = revision.exists ? await revision.text() : undefined;
+      // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
+      if (!seededRevision.current) {
+        seededRevision.current = true;
+        setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
+          ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
+      }
+    }
+    setJob(committed);
+  }
 
   useEffect(() => {
     let active = true;
     async function restore() {
-      const [savedOperation, originalText, revisedText, speakerText] = await Promise.all([
-        SecureStore.getItemAsync(operationKey),
-        original.exists ? original.text() : undefined,
-        revision.exists ? revision.text() : undefined,
-        speakerFile.exists ? speakerFile.text() : undefined,
+      const [savedOperation, committed] = await Promise.all([
+        SecureStore.getItemAsync(operationKey), committedResult(),
       ]);
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation ? (savedOperation.startsWith('{') ? JSON.parse(savedOperation)
@@ -118,12 +139,9 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       setPaidOperation(paid);
       setProAvailable(!!profile);
       setUsePro(!!paid || (!savedOperation && !!profile));
-      const speakers: SpeakerResult | undefined = speakerText ? JSON.parse(speakerText) : undefined;
-      if (originalText !== undefined) {
-        setJob({ state: 'COMPLETED', transcript: originalText, speakerLabeling: speakers });
-        setDraft(revisedText !== undefined && revisedText !== speakers?.transcript
-          ? revisedText : readableSpeakerTranscript(originalText, speakers?.transcript));
-        if (paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
+      if (committed) {
+        await showCompletion(committed);
+        if (active && paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
         return;
       }
       if (restoredService === 'openai') {
@@ -140,7 +158,10 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         if (active && saved) setGateway(JSON.parse(saved));
       }
     }
-    void restore().catch(() => { if (active) setMessage('Could not connect. Retry when online.'); })
+    void restore().catch(error => {
+      if (active) setMessage(error instanceof Error && error.message === 'The original transcript needs recovery. It has not been changed.'
+        ? error.message : 'Could not connect. Retry when online.');
+    })
       .finally(() => { if (active) setConnecting(false); });
     return () => { active = false; submission.current?.abort(); };
   }, [operationKey]);
@@ -173,33 +194,25 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       if (!response.ok) throw new Error('Could not reach or complete the transcription. Check the connection and retry.');
       result = await response.json();
     }
-    await persistResult(result);
+    const local = await persistResult(result);
     if (paid && result.state === 'COMPLETED') {
       await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
     }
-    return result;
+    return local;
   }
 
-  async function persistResult(result: Job) {
-    if (result.state !== 'COMPLETED') {
-      setJob(current => current?.state === 'COMPLETED' ? current : result);
-      return;
+  async function persistResult(result: Job): Promise<Job> {
+    // When a previous screen finished saving and cleaning up the same operation,
+    // its local receipt takes precedence over a remote terminal status.
+    const committed = result.state === 'COMPLETED'
+      ? await persistTranscriptCompletion(original.uri, completionFiles, { state: 'COMPLETED', transcript: result.transcript, speakerLabeling: result.speakerLabeling })
+      : terminal.has(result.state) ? await committedResult() : undefined;
+    if (committed) {
+      await showCompletion(committed);
+      return committed;
     }
-    if (!result.transcript) throw new Error('The service completed without a transcript.');
-    const committed = await persistTranscriptCompletion(original.uri, {
-      readOriginal: async () => original.exists ? original.text() : undefined,
-      readSpeakers: async () => speakerFile.exists ? JSON.parse(await speakerFile.text()) : undefined,
-      writeOriginal: text => saveText(original, text),
-      writeSpeakers: async speakers => {
-        if (speakers) await saveText(speakerFile, JSON.stringify(speakers));
-        else if (speakerFile.exists) speakerFile.delete();
-      },
-    }, { ...result, state: 'COMPLETED', transcript: result.transcript });
-    const savedRevision = revision.exists ? await revision.text() : undefined;
-    // Repeated result callbacks must not overwrite an in-memory edit either.
-    if (!dirtyRef.current) setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
-      ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
-    setJob(committed);
+    setJob(current => current?.state === 'COMPLETED' ? current : result);
+    return result;
   }
 
   const complete = job?.state === 'COMPLETED';
@@ -290,6 +303,11 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     let openAIRequestStarted = false;
     let serviceRequestStarted = false;
     try {
+      const alreadySaved = await committedResult();
+      if (alreadySaved) {
+        await showCompletion(alreadySaved);
+        return;
+      }
       if (isOpenAI) {
         if (recording.size <= 0 || recording.size >= openAIMaxBytes) {
           throw new Error('Choose a non-empty M4A recording smaller than 25 MB.');
@@ -308,9 +326,9 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         setUnsavedOpenAI(undefined);
         return;
       }
-      const terminal = job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state);
-      let paid = terminal ? undefined : paidOperation;
-      if ((!operation || terminal) && usePro) {
+      const terminalJob = job && terminal.has(job.state);
+      let paid = terminalJob ? undefined : paidOperation;
+      if ((!operation || terminalJob) && usePro) {
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
         if (!profile) throw new Error('Configure your InnoSage Pro API key first.');
@@ -319,7 +337,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         paid = { lane: 'pro', id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`,
           identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size };
       }
-      const id = paid?.id ?? (terminal ? randomUUID() : operation ?? randomUUID());
+      const id = paid?.id ?? (terminalJob ? randomUUID() : operation ?? randomUUID());
       await SecureStore.setItemAsync(operationKey, JSON.stringify(paid ?? { id, identifySpeakers, lane: 'free', service: 'staging' }));
       setPaidOperation(paid);
       setOperation(id);
@@ -361,7 +379,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     setBusy(true);
     try {
       await saveText(revision, draft);
-      updateDirty(false);
+      setDirty(false);
       setMessage('Revision saved on this device.');
     } catch {
       setMessage('Could not save the revision.');
@@ -421,7 +439,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
               </Text> : null}
               {showOriginal || !hasDraftEditor ? <TextInput
                 accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && canEditTranscript(showOriginal, busy)}
-                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); updateDirty(true); }}
+                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }]} /> : null}
               {!showOriginal && hasDraftEditor ? <ActionButton
                 title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument}
