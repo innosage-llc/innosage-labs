@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 NATIVE = ROOT / "ios"
@@ -20,12 +21,29 @@ WORKSPACE = NATIVE / "AIRecorder.xcworkspace"
 CACHE = NATIVE / ".ai-recorder-device"
 APP = CACHE / "DerivedData/Build/Products/Release-iphoneos/AIRecorder.app"
 BUNDLE = "co.innosage.labs.airecorder"
+_termination_requested = False
 
 
 class DriverError(Exception):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
+
+
+class Terminated(Exception):
+    """A SIGTERM requested orderly cancellation of helper-owned work."""
+
+
+def request_termination(_signal, _frame):
+    # Setting a flag (rather than raising) avoids interrupting Popen before
+    # the newly created process group is available to the supervisor.
+    global _termination_requested
+    _termination_requested = True
+
+
+def check_termination():
+    if _termination_requested:
+        raise Terminated
 
 
 def select_wired_phone(devices):
@@ -62,17 +80,54 @@ def profile_matches(profile, bundle_id, udid, team=None, as_of=None):
             and udid.lower() in {d.lower() for d in profile.get("ProvisionedDevices", [])})
 
 
-def app_matches(apps, bundle_id, version=None, build=None):
-    return any(a.get("bundleIdentifier") == bundle_id
-               and (version is None or a.get("version") == version)
-               and (build is None or a.get("bundleVersion") == build)
-               for a in apps)
+def matching_app(apps, bundle_id, version=None, build=None):
+    matches = [a for a in apps if isinstance(a, dict) and a.get("bundleIdentifier") == bundle_id]
+    if len(matches) != 1:
+        return None
+    app = matches[0]
+    if (version is not None and app.get("version") != version
+            or build is not None and app.get("bundleVersion") != build):
+        return None
+    return app
 
 
-def running_app(processes, executable="AIRecorder"):
-    suffix = f"/{executable}.app/{executable}"
-    return any(str(p.get("executable", p.get("executablePath", ""))).endswith(suffix)
-               for p in processes)
+def device_path(value):
+    """Normalize CoreDevice file URLs and absolute paths without printing them."""
+    if not isinstance(value, str):
+        return None
+    if value.startswith("/"):
+        path = value
+    else:
+        try:
+            url = urlsplit(value)
+        except ValueError:
+            return None
+        if url.scheme != "file" or url.netloc not in ("", "localhost") or url.query or url.fragment:
+            return None
+        path = unquote(url.path)
+    if not path.startswith("/") or any(c in path for c in ("\0", "\r", "\n")):
+        return None
+    return ("/" + path.lstrip("/")).rstrip("/") or None
+
+
+def app_executable(app):
+    path = device_path(app.get("url"))
+    if not path or not path.endswith("/AIRecorder.app"):
+        raise DriverError("installed_app_path_unverified", "CoreDevice did not identify the installed AI Recorder bundle path.")
+    return path + "/AIRecorder"
+
+
+def process_matches(process, executable, pid=None):
+    if not isinstance(process, dict):
+        return False
+    observed_pid = process.get("processIdentifier")
+    return (type(observed_pid) is int and observed_pid > 0
+            and (pid is None or observed_pid == pid)
+            and device_path(process.get("executable", process.get("executablePath"))) == executable)
+
+
+def running_app(processes, executable, pid=None):
+    return isinstance(processes, list) and any(process_matches(p, executable, pid) for p in processes)
 
 
 def device_error(output):
@@ -97,10 +152,13 @@ PHONE_GUIDANCE = {
 
 
 def command(args, timeout=30, env=None):
+    check_termination()
     try:
-        return subprocess.run(args, cwd=ROOT, env=env, capture_output=True, timeout=timeout)
+        result = subprocess.run(args, cwd=ROOT, env=env, capture_output=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired):
-        return subprocess.CompletedProcess(args, 124, b"", b"command timeout or executable unavailable")
+        result = subprocess.CompletedProcess(args, 124, b"", b"command timeout or executable unavailable")
+    check_termination()
+    return result
 
 
 def output(result):
@@ -267,6 +325,7 @@ def show_doctor(issues):
 
 
 def stage(args, failure_code, hint, timeout, env=None, *, cwd=NATIVE, log_dir=CACHE):
+    check_termination()
     # Raw Xcode / CocoaPods output can contain account, signing or local-path details.
     log_dir.mkdir(mode=0o700, exist_ok=True)
     log = log_dir / f"{failure_code}.log"
@@ -278,30 +337,46 @@ def stage(args, failure_code, hint, timeout, env=None, *, cwd=NATIVE, log_dir=CA
         except OSError:
             raise DriverError(failure_code, hint)
         try:
-            rc = child.wait(timeout=timeout)
-        except (subprocess.TimeoutExpired, KeyboardInterrupt) as err:
+            rc = wait_stage(child, timeout)
+        except (subprocess.TimeoutExpired, KeyboardInterrupt, Terminated) as err:
             stop_stage(child)
-            if isinstance(err, KeyboardInterrupt):
+            if not isinstance(err, subprocess.TimeoutExpired):
                 raise
             raise DriverError(failure_code, hint + " The command timed out; check for an owner approval prompt.")
+    check_termination()
     if rc:
         raise DriverError(failure_code, hint)
+
+
+def wait_stage(child, timeout):
+    deadline = time.monotonic() + timeout
+    while True:
+        check_termination()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(child.args, timeout)
+        try:
+            return child.wait(timeout=min(remaining, 0.25))
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def stop_stage(child):
     # The process is the leader of the group created by stage(). Do not
     # terminate unrelated processes or Xcode sessions.
-    try:
-        os.killpg(child.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
+    def send_group(sig):
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            raise DriverError("cleanup_unverified", "The host denied cleanup of the owned build group. Check the original session before retrying; no later helper action was attempted.") from None
+
+    send_group(signal.SIGTERM)
     # Give the entire group a short grace period. Signal again before
     # reaping the leader: its exit does not imply descendants have exited.
     time.sleep(0.5)
-    try:
-        os.killpg(child.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    send_group(signal.SIGKILL)
     child.wait()
 
 
@@ -361,9 +436,9 @@ def installed(phone):
     return data["apps"]
 
 
-def process_verified(phone):
+def process_verified(phone, executable, pid=None):
     result = device((["device", "info", "processes"], [*target_options(phone), "--search", "AIRecorder"]))
-    return running_app(result.get("runningProcesses", result.get("processes", [])))
+    return running_app(result.get("runningProcesses", result.get("processes", [])), executable, pid)
 
 
 def run(args):
@@ -397,13 +472,18 @@ def run(args):
     # Installed version/build alone do not prove the identity of an older
     # artifact. Install in place even when those values already match.
     device((["device", "install", "app"], [*target, str(APP)]), mutation=True)
-    if not app_matches(installed(current), BUNDLE, version, build_no):
+    app = matching_app(installed(current), BUNDLE, version, build_no)
+    if app is None:
         raise DriverError("install_not_verified", "Installation was not verified on the iPhone; no launch was attempted.")
+    executable = app_executable(app)
     print("Verified installed bundle and version on the USB iPhone.")
-    device((["device", "process", "launch"], [*target, BUNDLE]), mutation=True)
+    launch = device((["device", "process", "launch"], [*target, BUNDLE]), mutation=True)
+    process = launch.get("process")
+    if not process_matches(process, executable):
+        raise DriverError("launch_not_verified", "CoreDevice did not identify the launched AI Recorder process.")
     time.sleep(3)
-    if not process_verified(current):
-        raise DriverError("launch_not_verified", "iOS accepted the launch, but the app was not running at the follow-up check.")
+    if not process_verified(current, executable, process["processIdentifier"]):
+        raise DriverError("launch_not_verified", "The launched AI Recorder process was not running at follow-up.")
     print("AI Recorder is running on the wired iPhone. Recording, playback and providers were not tested.")
     return 0
 
@@ -411,13 +491,11 @@ def run(args):
 def verify():
     phone = wired_phone()
     phone_details(phone)
-    apps = installed(phone)
-    matches = [a for a in apps if a.get("bundleIdentifier") == BUNDLE]
-    if len(matches) != 1:
-        raise DriverError("app_not_installed", "AI Recorder was not found on the wired iPhone.")
-    if not process_verified(phone):
-        raise DriverError("app_not_running", "AI Recorder is installed but not currently running.")
-    app = matches[0]
+    app = matching_app(installed(phone), BUNDLE)
+    if app is None:
+        raise DriverError("app_not_installed", "AI Recorder could not be uniquely identified on the wired iPhone.")
+    if not process_verified(phone, app_executable(app)):
+        raise DriverError("app_not_running", "The installed AI Recorder bundle has no matching running process.")
     version, build_no = str(app.get("version", "")), str(app.get("bundleVersion", ""))
     info = f" {version} ({build_no})" if all(re.fullmatch(r"[0-9.]+", x) for x in (version, build_no)) else ""
     print(f"AI Recorder{info} is installed and running on the wired iPhone (read-only check).")
@@ -435,20 +513,26 @@ def main():
     args = parser.parse_args()
     if not os.environ.get("DEVELOPER_DIR") and os.environ.get("XCODE_APP"):
         os.environ["DEVELOPER_DIR"] = str(Path(os.environ["XCODE_APP"]) / "Contents/Developer")
+    previous_term = signal.signal(signal.SIGTERM, request_termination)
     try:
         check_source()
         print(f"AI Recorder source: {source_revision()}", flush=True)
         if args.action == "doctor":
-            return doctor(args.host_only)
-        if args.action == "verify":
-            return verify()
-        return run(args)
+            rc = doctor(args.host_only)
+        elif args.action == "verify":
+            rc = verify()
+        else:
+            rc = run(args)
+        check_termination()
+        return rc
     except DriverError as err:
         print(f"[{err.code}] {err}", file=sys.stderr)
         return 2
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, Terminated) as err:
         print("[interrupted] Retry the same command when ready; cached build work is reused.", file=sys.stderr)
-        return 130
+        return 143 if isinstance(err, Terminated) else 130
+    finally:
+        signal.signal(signal.SIGTERM, previous_term)
 
 
 if __name__ == "__main__":

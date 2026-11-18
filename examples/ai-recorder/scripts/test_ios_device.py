@@ -2,6 +2,8 @@
 import copy
 import datetime as dt
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
@@ -9,7 +11,7 @@ from unittest.mock import Mock, call, patch
 import ios_device as driver
 
 from ios_device import (
-    DriverError, select_wired_phone, profile_matches, app_matches,
+    DriverError, select_wired_phone, profile_matches, matching_app,
     running_app, device_error,
 )
 
@@ -17,6 +19,11 @@ BUNDLE = "co.example.airecorder"
 TEAM = "FIXTURE123"
 UDID = "00000000-0000000000000001"
 NOW = dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc)
+APP_PATH = "/private/var/containers/Bundle/Application/fixture-local/AIRecorder.app"
+APP_URL = "file://" + APP_PATH + "/"
+APP_EXECUTABLE = APP_PATH + "/AIRecorder"
+APP_PID = 123
+LAUNCH = {"process": {"executable": "file:///" + APP_EXECUTABLE, "processIdentifier": APP_PID}}
 
 
 def phone(identifier="fixture-coredevice", transport="wired", kind="iPhone"):
@@ -141,7 +148,7 @@ class AppEvidenceTests(unittest.TestCase):
                     "version": "0.1.9", "bundleVersion": "10"}
 
     def test_exact_install_readback(self):
-        self.assertTrue(app_matches([self.app], BUNDLE, "0.1.9", "10"))
+        self.assertTrue(matching_app([self.app], BUNDLE, "0.1.9", "10"))
 
     def test_missing_wrong_or_stale_install_is_not_success(self):
         variants = [
@@ -152,25 +159,42 @@ class AppEvidenceTests(unittest.TestCase):
         ]
         for apps in variants:
             with self.subTest(apps=apps):
-                self.assertFalse(app_matches(apps, BUNDLE, "0.1.9", "10"))
+                self.assertFalse(matching_app(apps, BUNDLE, "0.1.9", "10"))
 
     def test_bundle_only_query_is_supported(self):
-        self.assertTrue(app_matches([self.app], BUNDLE))
+        self.assertTrue(matching_app([self.app], BUNDLE))
 
-    def test_running_executable_exact_suffix(self):
-        p = {"executable": "/private/var/containers/Bundle/Application/fixture/AIRecorder.app/AIRecorder",
-             "processIdentifier": 123}
-        self.assertTrue(running_app([p]))
+    def test_duplicate_bundle_is_not_a_unique_install(self):
+        self.assertIsNone(matching_app([self.app, self.app], BUNDLE))
+
+    def test_running_executable_matches_exact_bundle_file_url(self):
+        executable = driver.app_executable({**self.app, "url": APP_URL})
+        self.assertEqual(executable, APP_EXECUTABLE)
+        self.assertTrue(running_app([LAUNCH["process"]], executable))
+        self.assertTrue(running_app([{"executable": executable, "processIdentifier": APP_PID}], executable, APP_PID))
+
+    def test_app_url_must_identify_local_device_bundle(self):
+        for v in (None, "https://example.invalid/AIRecorder.app",
+                  "file://example.invalid/AIRecorder.app",
+                  "file:///unrelated/Other.app", "file:///AIRecorder.app?x=1"):
+            with self.subTest(v=v), self.assertRaises(DriverError):
+                driver.app_executable({**self.app, "url": v})
 
     def test_nonmatching_processes_are_not_running_evidence(self):
         for path in ("/fixture/AIRecorder.app/AIRecorderOther",
                      "/fixture/OtherAIRecorder.app/AIRecorder",
                      "/fixture/AIRecorder.app/AIRecorder/debug",
-                     "/fixture/AIRecorder.app/Helper"):
+                     "/fixture/AIRecorder.app/Helper",
+                     "/other-install/AIRecorder.app/AIRecorder"):
             with self.subTest(path=path):
-                self.assertFalse(running_app([{"executable": path, "processIdentifier": 123}]))
-        self.assertFalse(running_app([]))
-        self.assertFalse(running_app([{"name": "AIRecorder", "processIdentifier": 123}]))
+                self.assertFalse(running_app([{"executable": path, "processIdentifier": APP_PID}], APP_EXECUTABLE))
+        self.assertFalse(running_app([], APP_EXECUTABLE))
+        self.assertFalse(running_app([{"name": "AIRecorder", "processIdentifier": APP_PID}], APP_EXECUTABLE))
+        self.assertFalse(running_app([{"executable": APP_EXECUTABLE, "processIdentifier": True}], APP_EXECUTABLE))
+
+    def test_same_bundle_path_with_different_pid_does_not_confirm_launch(self):
+        self.assertFalse(running_app([LAUNCH["process"]], APP_EXECUTABLE, APP_PID + 1))
+        self.assertTrue(running_app([LAUNCH["process"]], APP_EXECUTABLE, APP_PID))
 
 
 class ErrorClassificationTests(unittest.TestCase):
@@ -244,8 +268,8 @@ class RunOrchestrationTests(unittest.TestCase):
         defaults = {
             "host_issues": [], "wired_phone": phone(), "phone_details": {},
             "prepare_native": None, "selected_team": TEAM, "identities": {"fixture-key"},
-            "build": (TEAM, p, "1.0", "7"), "device": {},
-            "installed": [{"bundleIdentifier": driver.BUNDLE, "version": "1.0", "bundleVersion": "7"}],
+            "build": (TEAM, p, "1.0", "7"), "device": LAUNCH,
+            "installed": [{"bundleIdentifier": driver.BUNDLE, "version": "1.0", "bundleVersion": "7", "url": APP_URL}],
             "process_verified": True,
         }
         for name, value in defaults.items():
@@ -266,7 +290,35 @@ class RunOrchestrationTests(unittest.TestCase):
             ["device", "install", "app"], ["device", "process", "launch"]])
         self.assertTrue(all(c.kwargs == {"mutation": True} for c in calls))
         self.mocks["installed"].assert_called_once()
-        self.mocks["process_verified"].assert_called_once()
+        self.mocks["process_verified"].assert_called_once_with(phone(), APP_EXECUTABLE, APP_PID)
+
+    def test_unknown_install_container_blocks_launch(self):
+        self.mocks["installed"].return_value[0].pop("url")
+        with self.assertRaises(DriverError) as caught:
+            driver.run(SimpleNamespace(build_only=False))
+        self.assertEqual(caught.exception.code, "installed_app_path_unverified")
+        self.assertEqual(self.mocks["device"].call_count, 1)
+        self.mocks["process_verified"].assert_not_called()
+
+    def test_wrong_launch_response_cannot_claim_running_app(self):
+        self.mocks["device"].return_value = {"process": {
+            "executable": "/other-install/AIRecorder.app/AIRecorder", "processIdentifier": APP_PID}}
+        with self.assertRaises(DriverError) as caught:
+            driver.run(SimpleNamespace(build_only=False))
+        self.assertEqual(caught.exception.code, "launch_not_verified")
+        self.mocks["process_verified"].assert_not_called()
+
+    def test_confirmed_launch_that_exits_fails_readback(self):
+        self.mocks["process_verified"].return_value = False
+        with self.assertRaises(DriverError) as caught:
+            driver.run(SimpleNamespace(build_only=False))
+        self.assertEqual(caught.exception.code, "launch_not_verified")
+        self.mocks["process_verified"].assert_called_once_with(phone(), APP_EXECUTABLE, APP_PID)
+
+    def test_verify_never_launches_and_is_bound_to_installed_container(self):
+        self.assertEqual(driver.verify(), 0)
+        self.mocks["process_verified"].assert_called_once_with(phone(), APP_EXECUTABLE)
+        self.mocks["device"].assert_not_called()
 
     def test_wrong_profile_blocks_install(self):
         team, p, version, build_no = self.mocks["build"].return_value
@@ -288,6 +340,56 @@ class RunOrchestrationTests(unittest.TestCase):
 
 
 class StageCleanupTests(unittest.TestCase):
+    def test_cli_sigterm_releases_active_build_group_and_stops_before_device_mutation(self):
+        child = Mock(pid=12345, args=["fixture-build"])
+
+        def wait(timeout=None):
+            if timeout is None:
+                return 0
+            driver.request_termination(driver.signal.SIGTERM, None)
+            raise driver.subprocess.TimeoutExpired(child.args, timeout)
+
+        child.wait.side_effect = wait
+        with TemporaryDirectory() as d, ExitStack() as stack:
+            for name, value in {"check_source": None, "source_revision": "synthetic", "host_issues": [],
+                                "wired_phone": phone(), "phone_details": {}, "selected_team": TEAM,
+                                "identities": {"fixture-key"}, "prepare_native": None}.items():
+                stack.enter_context(patch.object(driver, name, return_value=value))
+            stack.enter_context(patch.object(driver.sys, "argv", ["ios_device.py", "run"]))
+            stack.enter_context(patch.object(driver, "_termination_requested", False))
+            stack.enter_context(patch.object(driver, "command", side_effect=AssertionError("External command forbidden")))
+            device = stack.enter_context(patch.object(driver, "device", side_effect=AssertionError("Device forbidden")))
+            install = stack.enter_context(patch.object(driver, "installed", side_effect=AssertionError("Device forbidden")))
+            stack.enter_context(patch.object(driver.subprocess, "Popen", return_value=child))
+            send = stack.enter_context(patch.object(driver.os, "killpg"))
+            stack.enter_context(patch.object(driver.time, "sleep"))
+            stack.enter_context(patch.object(driver, "build", side_effect=lambda: driver.stage(
+                child.args, "build_failed", "synthetic", 30, cwd=Path(d), log_dir=Path(d))))
+            stack.enter_context(patch("builtins.print"))
+            self.assertEqual(driver.main(), 143)
+            self.assertEqual(send.call_args_list, [
+                call(child.pid, driver.signal.SIGTERM), call(child.pid, driver.signal.SIGKILL),
+            ])
+            self.assertEqual(child.wait.call_args, call())
+            self.assertEqual(child.wait.call_count, 2)
+            device.assert_not_called()
+            install.assert_not_called()
+
+    def test_canceled_command_never_spawns_process(self):
+        with patch.object(driver, "_termination_requested", True), patch.object(driver.subprocess, "run") as started:
+            with self.assertRaises(driver.Terminated):
+                driver.command(["synthetic"])
+            started.assert_not_called()
+
+    def test_denied_group_signal_does_not_claim_cleanup(self):
+        child = Mock(pid=12345)
+        with patch.object(driver.os, "killpg", side_effect=PermissionError) as send:
+            with self.assertRaises(DriverError) as caught:
+                driver.stop_stage(child)
+            self.assertEqual(caught.exception.code, "cleanup_unverified")
+            send.assert_called_once_with(child.pid, driver.signal.SIGTERM)
+            child.wait.assert_not_called()
+
     def test_signals_the_owned_group_before_reaping_the_leader(self):
         child = Mock(pid=12345)
         with patch.object(driver.os, "killpg") as send, patch.object(driver.time, "sleep"):

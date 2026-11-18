@@ -37,10 +37,13 @@ or a staging service.
    development signing to build a Release configuration with JavaScript embedded.
    It checks that the signed profile covers the phone, installs in place without
    uninstalling, reads back the installed version, launches the app, and checks
-   that the process is still running. A normal `run` installs the built app even
+   that the launched PID still executes the installed bundle. A normal `run` installs the built app even
    if that version is already present.
 4. After an interruption, retry the same command. Xcode reuses its incremental
-   cache, but the runner reinstalls in place before verifying the launch. An app
+   cache. On build cancellation, the runner signals only its own process group,
+   and reports unconfirmed cleanup if the host refuses it. Check the original
+   session before retrying in that case. The runner reinstalls in place before
+   verifying the launch. An app
    already on the phone with the same version/build is not necessarily the same
    artifact. `npm run ios:device -- run --build-only` does not touch the phone;
    `npm run ios:device -- verify` checks the existing install/process without
