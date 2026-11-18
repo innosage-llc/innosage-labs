@@ -4,7 +4,9 @@
     "slug": "ai-recorder",
     "version": "0.1.9",
     "platforms": [
-      "android"
+      "android",
+      "ios",
+      "web"
     ],
     "android": {
       "package": "co.innosage.labs.airecorder",
@@ -16,10 +18,20 @@
         "expo-audio",
         {
           "enableBackgroundRecording": true,
-          "enableBackgroundPlayback": false
+          "enableBackgroundPlayback": false,
+          "microphonePermission": "Record audio clips you choose to save on this device."
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "ios": {
+      "bundleIdentifier": "co.innosage.labs.airecorder",
+      "buildNumber": "10",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Record audio clips you choose to save on this device."
+      },
+      "icon": "./assets/ios-icon.png"
+    }
   }
 }

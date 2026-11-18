@@ -9,8 +9,17 @@
     "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs operationRecovery.test.mjs transcriptCompletion.test.mjs",
     "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs ui/libraryHandoff.test.mjs",
     "test:draft": "node --experimental-transform-types --test draftDocumentModel.test.mjs recorderDraftProtocol.test.mjs summaryDraftLifecycle.test.mjs summaryPublishSnapshot.test.mjs summaryPublication.test.mjs",
-    "test": "npm run test:transcript && npm run test:navigation && npm run test:capture && npm run test:draft",
-    "test:capture": "node --test captureSession.test.mjs"
+    "test": "npm run test:transcript && npm run test:navigation && npm run test:capture && npm run test:platform && npm run test:draft",
+    "test:capture": "node --test captureSession.test.mjs",
+    "ios": "expo run:ios --device",
+    "ios:prebuild": "expo prebuild --platform ios --no-install",
+    "test:platform": "node --test platform.test.mjs",
+    "ios:check": "bash scripts/check-ios-development.sh",
+    "ios:testflight:build": "npx eas-cli build --platform ios --profile testflight",
+    "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight",
+    "ios:device": "python3 scripts/ios_device.py",
+    "test:ios-device": "python3 -m unittest discover -s scripts -p test_ios_device.py",
+    "export:web": "expo export --platform web --output-dir dist-web"
   },
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",
@@ -23,11 +32,14 @@
     "expo-file-system": "~58.0.13",
     "expo-secure-store": "~58.0.2",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.1",
-    "react-native-safe-area-context": "5.11.1"
+    "react-native-safe-area-context": "5.11.1",
+    "react-native-web": "~0.21.4"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
+    "playwright": "1.64.1",
     "typescript": "6.0.3"
   }
 }
