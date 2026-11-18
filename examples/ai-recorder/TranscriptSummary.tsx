@@ -9,6 +9,7 @@ import { meetingEssentials, thinkingBudgets, type ThinkingEffort, type SummaryCi
 import { openAIAccess } from './OpenAIAccess';
 import { useTheme } from './ui/theme';
 import { ActionButton } from './ui/ActionButton';
+import { readSummaryInput } from './summaryDraftLifecycle';
 
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
 type Props = {
@@ -149,8 +150,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
         <ActionButton title={busy ? 'Working…' : unsaved ? 'Retry saving summary' : 'Generate summary'} variant="primary"
           disabled={busy || (!unsaved && (!recipe || !model || (recipe === 'custom' && !instructions.trim())))} onPress={() => void run(async signal => {
             if (unsaved) { await persist(unsaved); return; }
-            const transcript = ((await (source === 'revision' ? readRevision() : original.text())) ?? '').trim();
-            if (!transcript) throw new Error('The selected transcript is empty.');
+            const transcript = await readSummaryInput(source, () => original.text(), readRevision);
             if (!recipe) return;
             const searchEnabled = recipe === 'custom' && webSearch;
             const result = await openAIAccess.summarize(model, transcript, {

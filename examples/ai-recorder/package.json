@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "test:transcript": "node --experimental-transform-types --test OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs operationRecovery.test.mjs transcriptCompletion.test.mjs",
     "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs ui/libraryHandoff.test.mjs",
-    "test": "npm run test:transcript && npm run test:navigation && npm run test:capture",
+    "test:draft": "node --experimental-transform-types --test draftDocumentModel.test.mjs recorderDraftProtocol.test.mjs summaryDraftLifecycle.test.mjs summaryPublishSnapshot.test.mjs",
+    "test": "npm run test:transcript && npm run test:navigation && npm run test:capture && npm run test:draft",
     "test:capture": "node --test captureSession.test.mjs"
   },
   "dependencies": {

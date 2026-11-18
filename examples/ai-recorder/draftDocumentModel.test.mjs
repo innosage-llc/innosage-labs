@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { draftStore, draftText } from './draftDocumentModel.ts';
+import { draftStore, draftText, summaryPublicProjection } from './draftDocumentModel.ts';
 
 const key = {pageId: 'page', kind: 'transcript'};
 const content = value => [{id: 'page', type: 'tiptap', content: JSON.stringify({
@@ -49,3 +49,50 @@ test('fails on corrupt saved data instead of resetting from the original', async
   await assert.rejects(a.recover(), /recovery/);
   await assert.rejects(a.commit(0, content('replacing')), /recovery/);
 });
+
+test('summary regeneration and editor autosave use one atomic source-and-content receipt', async () => {
+  const summary = {id:'s1',recipe:'meeting',model:'gpt-test',source:'revision',text:'Generated answer'};
+  const generated = makeBlocks('summary-page', summary.text);
+  const disk = memoryStorage();
+  const store = draftStore({pageId:'summary-page',kind:'summary'}, disk);
+  const first = await store.replaceSummary(0, generated, summary);
+  assert.deepEqual(first.generation, summary);
+  const edited = makeBlocks('summary-page', 'Hand edit');
+  const second = await store.commit(first.revision, edited);
+  assert.equal(second.generation.id, 's1');
+  assert.equal(draftText(second), 'Hand edit');
+  const replacement = {...summary,id:'s2',text:'Replacement'};
+  await assert.rejects(store.replaceSummary(first.revision, makeBlocks('summary-page','Replacement'), replacement), /revision changed/);
+  assert.equal(draftText(await store.recover()), 'Hand edit');
+  const chosen = await store.replaceSummary(second.revision, makeBlocks('summary-page','Replacement'), replacement);
+  assert.equal(chosen.generation.id,'s2');
+  assert.equal(draftText(chosen),'Replacement');
+  assert.deepEqual(await store.replaceSummary(second.revision, makeBlocks('summary-page','Replacement'), replacement), chosen);
+});
+
+test('the public projection only contains current summary text and recoverable citation destinations', async () => {
+  const original = '🌱 Quoted source.';
+  const source = {id:'s1',recipe:'private instructions marker',model:'gpt-test',source:'revision',text:original,
+    citations:[
+      {start:2,end:15,url:'https://example.com/reference',title:'Source'},
+      {start:2,end:15,url:'https://user:pass@example.com/unsafe',title:'Reject auth'},
+    ]};
+  const store = draftStore({pageId:'summary-page',kind:'summary'},memoryStorage());
+  const snapshot = await store.replaceSummary(0,makeBlocks('summary-page','开头\n🌱 Quoted source.'),source);
+  const publicReceipt=summaryPublicProjection(snapshot);
+  assert.deepEqual(Object.keys(publicReceipt),['title','text','citations']);
+  assert.equal(publicReceipt.text,'开头\n🌱 Quoted source.');
+  assert.deepEqual(publicReceipt.citations,[{url:'https://example.com/reference',title:'Source',start:5,end:18}]);
+  assert.equal(JSON.stringify(publicReceipt).includes('private instructions marker'),false);
+  const ambiguous=await store.commit(snapshot.revision,makeBlocks('summary-page','Quoted source and Quoted source'));
+  assert.deepEqual(summaryPublicProjection(ambiguous).citations,[{url:'https://example.com/reference',title:'Source'}]);
+  assert.throws(()=>summaryPublicProjection({...snapshot,kind:'transcript'}),/summary/);
+});
+
+function makeBlocks(id,text) {
+  return [{id,type:'tiptap',content:JSON.stringify({type:'doc',content:text.split('\n').map(line=>({type:'paragraph',content:[{type:'text',text:line}]}))})}];
+}
+function memoryStorage() {
+  let raw=null;
+  return {read:async()=>raw,write:async value=>{raw=value;}};
+}
