@@ -21,7 +21,7 @@ export function getCaptureSession() {
     const options = { ...common, isMeteringEnabled: false,
       ...(Platform.OS === 'ios' ? ios : Platform.OS === 'web' ? web : android) };
     const recorder = new AudioModule.AudioRecorder(options);
-    const recovery = getFinalizedCapture(recorder, options);
+    const recovery = getFinalizedCapture(recorder, RecordingPresets.HIGH_QUALITY);
     session = new CaptureSession({
       recorder,
       recover: recovery?.recover,
