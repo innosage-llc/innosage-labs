@@ -48,7 +48,7 @@ export async function platformGate({ platform, source, candidate, output, target
       const abi = command('adb', ['-s', targets.android, 'shell', 'getprop', 'ro.product.cpu.abi'], { timeout: 10000 }).trim();
       requireThat(['arm64-v8a', 'x86_64'].includes(abi), 'unsupported emulator ABI');
       receipt.stage = 'build'; command('./node_modules/.bin/expo', ['prebuild', '--platform', 'android', '--no-install']);
-      command('./android/gradlew', ['-p', 'android', 'app:assembleRelease', '--offline', '--no-daemon', `-PreactNativeArchitectures=${abi}`]);
+      command('./android/gradlew', ['-p', 'android', 'app:assembleRelease', '--offline', '--no-daemon', `-PreactNativeArchitectures=${abi}`, '-Porg.gradle.java.installations.auto-download=false', ...(process.env.LABS85_JAVA_TOOLCHAINS ? [`-Porg.gradle.java.installations.paths=${process.env.LABS85_JAVA_TOOLCHAINS}`] : [])]);
       const apk = join(app, 'android/app/build/outputs/apk/release/app-release.apk');
       requireThat(/assets\/index.android.bundle/.test(command('unzip', ['-l', apk])), 'embedded Android JS missing');
       receipt.artifact = artifact(apk);

@@ -33,9 +33,11 @@ export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
+# If Gradle cannot discover the already installed JDK 17 required by its plugin:
+export LABS85_JAVA_TOOLCHAINS="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home,$JAVA_HOME"
 ```
 
-If system Ruby cannot load `xcodeproj`, use the Ruby/gem environment of the already installed CocoaPods. `LABS85_RUBY` chooses that existing Ruby executable; `GEM_HOME` remains its ordinary installed gem directory. Do not install gems or change permissions to silence a preflight failure. Record the actual versions. `LABS85_PYTHON` can select the existing test environment for Recorder server changes.
+If system Ruby cannot load `xcodeproj`, use the Ruby/gem environment of the already installed CocoaPods. `LABS85_RUBY` chooses that existing Ruby executable; `GEM_HOME` remains its ordinary installed gem directory. Do not install gems or change permissions to silence a preflight failure. Record the actual versions. Offline gate fixtures also exercise the generated XCTest project through this Ruby environment. `LABS85_PYTHON` can select the existing test environment for Recorder server changes.
 
 The merge entry point additionally requires the independently produced review receipt:
 

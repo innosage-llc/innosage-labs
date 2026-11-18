@@ -15,7 +15,7 @@ target.add_dependency(app)
 group = project.main_group.new_group('StartupGateUITests', 'StartupGateUITests')
 target.add_file_references(sources.map { |name| group.new_file(name) })
 target.build_configurations.each do |config|
-  config.build_settings.merge!('TEST_TARGET_NAME' => 'AIRecorder', 'PRODUCT_BUNDLE_IDENTIFIER' => 'co.innosage.labs.startupgate.tests', 'GENERATE_INFOPLIST_FILE' => 'YES', 'SWIFT_VERSION' => '5.0', 'CODE_SIGNING_ALLOWED' => 'NO')
+  config.build_settings.merge!('TEST_TARGET_NAME' => 'AIRecorder', 'PRODUCT_NAME' => '$(TARGET_NAME)', 'PRODUCT_BUNDLE_IDENTIFIER' => 'co.innosage.labs.startupgate.tests', 'GENERATE_INFOPLIST_FILE' => 'YES', 'SWIFT_VERSION' => '5.0', 'CODE_SIGNING_ALLOWED' => 'NO')
 end
 project.save
 scheme_path = File.join(project_path, 'xcshareddata', 'xcschemes', 'AIRecorder.xcscheme')
