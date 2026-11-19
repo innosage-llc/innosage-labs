@@ -1,0 +1,223 @@
+{
+  "scope": "synthetic only; three cases per session",
+  "evaluated_code_commit": "3116f193b2ea086eb40513ab5793110df3c72546",
+  "evaluated_helper_sha256": "ca267efbf8359c563c7be17ab6dff14e8a77e9b0949fd407c0eef1c0034766f2",
+  "later_fix": "f6ae8f2 preserves valid PARTIAL worker JSON; covered by added subprocess regression, not these model sessions",
+  "run_status": [
+    {
+      "model_requested": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "mode": "baseline",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "mode": "wrapper",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6.1-terra",
+      "reasoning": "medium",
+      "mode": "baseline",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6.1-terra",
+      "reasoning": "medium",
+      "mode": "wrapper",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning": "medium",
+      "mode": "baseline",
+      "exit_code": 0,
+      "final_exists": true
+    },
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning": "medium",
+      "mode": "wrapper",
+      "exit_code": 0,
+      "final_exists": true
+    }
+  ],
+  "results": [
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning_setting": "medium",
+      "mode": "baseline",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        }
+      ]
+    },
+    {
+      "model_requested": "gpt-6-luna",
+      "reasoning_setting": "medium",
+      "mode": "wrapper",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": 12288,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": 8392704,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": 0,
+          "occupied_bytes": 0,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        }
+      ]
+    },
+    {
+      "model_requested": "gpt-6.1-sol",
+      "reasoning_setting": "medium",
+      "mode": "baseline",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        }
+      ]
+    },
+    {
+      "model_requested": "gpt-6.1-sol",
+      "reasoning_setting": "medium",
+      "mode": "wrapper",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": 12288,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": 8392704,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": 0,
+          "occupied_bytes": 0,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        }
+      ]
+    },
+    {
+      "model_requested": "gpt-6.1-terra",
+      "reasoning_setting": "medium",
+      "mode": "baseline",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": null,
+          "occupied_bytes": null,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": 0
+        }
+      ]
+    },
+    {
+      "model_requested": "gpt-6.1-terra",
+      "reasoning_setting": "medium",
+      "mode": "wrapper",
+      "cases": [
+        {
+          "id": "normal",
+          "worktree_count": 1,
+          "occupied_bytes": 12288,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        },
+        {
+          "id": "large-worktree",
+          "worktree_count": 1,
+          "occupied_bytes": 8392704,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        },
+        {
+          "id": "partial-or-absent",
+          "worktree_count": 0,
+          "occupied_bytes": 0,
+          "model_reported_no_mutations": true,
+          "model_reported_actual_freed_bytes": null
+        }
+      ]
+    }
+  ],
+  "raw_logs_published": false,
+  "models_are_requested_cli_labels_not_universal_parity_claim": true,
+  "reporting_invariant_failure": "Repeat Luna wrapper reported 0 actual freed without measurement for all three cases; violates the UNKNOWN/null rule. These are model reports, not measured space. Historical result retained."
+}

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CaptureSession } from './captureSession.ts';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 const flush=()=>new Promise(r=>setImmediate(r));
 function fixture(overrides={}) {
@@ -86,4 +88,65 @@ test('screen integration binds current playback in a layout lifetime and starts 
   walk(ast);assert.equal(layoutBindings.length,1);assert.equal(layoutBindings[0].arguments[0].body.expression.getText(ast),'session.bindPlayback');
   assert.equal(layoutBindings[0].arguments[0].body.arguments[0].body.expression.getText(ast),'player.pause');
   assert.equal(layoutBindings[0].arguments[1].getText(ast),'[session, player]');assert.equal(starts.length,1);assert.equal(starts[0].arguments.length,0);
+});
+
+test('startup recovery locks capture until it settles and runs once per owner', async () => {
+  const gate=deferred();let recoveries=0,prepares=0;
+  const f=fixture({recover:()=>{recoveries++;return gate.promise;},prepare:async()=>{prepares++;}});
+  assert.equal(f.session.getSnapshot().phase,'starting');
+  await f.session.start();assert.equal(prepares,0);assert.equal(recoveries,1);
+  gate.resolve();await f.session.ready;assert.equal(f.session.getSnapshot().phase,'idle');
+  await f.session.start();assert.equal(prepares,1);assert.equal(recoveries,1);
+  assert(!f.calls.includes('prepare'));
+});
+test('recovery failure retains a retry message without fabricating Saved', async () => {
+  const f=fixture({recover:async()=>{throw Error('storage unavailable');}});
+  await f.session.ready;
+  assert.equal(f.session.getSnapshot().savedUri,undefined);
+  assert.equal(f.session.getSnapshot().saveVersion,0);
+  assert.match(f.session.getSnapshot().message,/Reopen the app to retry/);
+});
+test('persistent preparation failure cannot start or report a saved recording', async () => {
+  const f=fixture({prepare:async()=>{throw Error('storage unavailable');}});
+  await f.session.start();assert(!f.calls.includes('record'));
+  assert.equal(f.session.getSnapshot().savedUri,undefined);
+  assert.equal(f.session.getSnapshot().phase,'idle');
+});
+
+// Exercise the real owner/adapter through the installed SDK option normalizer:
+// prepare accepts nested public options, unlike the recorder's native constructor.
+test('persistent Android preparation retains the SDK AAC preset across normalization', async () => {
+  function load(path, modules = {}) {
+    const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+    const code = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2022}}).outputText;
+    const module = {exports:{}};
+    new Function('require', 'module', 'exports', code)(name => {
+      assert.ok(name in modules, `unexpected dependency ${name}`);return modules[name];
+    }, module, module.exports);
+    return module.exports;
+  }
+  const Platform = {OS:'android'};
+  const {RecordingPresets} = load('./node_modules/expo-audio/src/RecordingConstants.ts');
+  const {createRecordingOptions} = load('./node_modules/expo-audio/src/utils/options.ts', {expo:{Platform}});
+  let prepared;
+  class Recorder {
+    addListener(){return {remove(){}};}
+    async prepareToRecordAsync(options){prepared=createRecordingOptions(options);}
+    record(){}
+  }
+  const native = {recoverFinalizedRecordings:async()=>[],commitFinalizedRecording:async uri=>uri};
+  const adapter = load('./finalizedCapture.android.ts', {
+    expo:{requireNativeModule:()=>native},'expo-crypto':{randomUUID:()=> '12345678-1234-1234-1234-123456789abc'},
+  });
+  const owner = load('./captureOwner.ts', {
+    'react-native':{Platform},'./finalizedCapture':adapter,
+    'expo-audio':{AudioModule:{AudioRecorder:Recorder},RecordingPresets,
+      requestRecordingPermissionsAsync:async()=>({granted:true}),requestNotificationPermissionsAsync:async()=>{},setAudioModeAsync:async()=>{}},
+    'expo-file-system':{},'./captureSession':{CaptureSession},
+    './ui/recordFeedback':{microphonePermissionMessage:()=>'',recordingSavedMessage:'Saved'},
+  });
+  const session=owner.getCaptureSession();await session.ready;await session.start();
+  assert.equal(prepared.audioEncoder,'aac');assert.equal(prepared.outputFormat,'mpeg4');
+  assert.equal(prepared.sampleRate,RecordingPresets.HIGH_QUALITY.sampleRate);
+  assert.equal(prepared.directory,'document');assert.match(prepared.fileName,/^Recording-[0-9]+-12345678-/);
 });

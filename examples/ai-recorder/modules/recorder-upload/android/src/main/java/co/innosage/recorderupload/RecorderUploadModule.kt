@@ -34,6 +34,17 @@ class RecorderUploadModule : Module() {
       cancelled.clear()
     }
 
+    AsyncFunction("recoverFinalizedRecordings") Coroutine { ->
+      withContext(Dispatchers.IO) {
+        FinalizedRecordings(requireNotNull(appContext.reactContext).filesDir).recover()
+      }
+    }
+    AsyncFunction("commitFinalizedRecording") Coroutine { uri: String ->
+      withContext(Dispatchers.IO) {
+        FinalizedRecordings(requireNotNull(appContext.reactContext).filesDir).commit(uri)
+      }
+    }
+
     AsyncFunction("upload") Coroutine { id: String, address: String, uri: String,
                                         capability: String, hash: String, expectedBytes: Double ->
       withContext(Dispatchers.IO) {

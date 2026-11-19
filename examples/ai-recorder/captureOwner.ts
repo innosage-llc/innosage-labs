@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { getFinalizedCapture } from './finalizedCapture';
 import {
   AudioModule,
   RecordingPresets,
@@ -19,14 +20,19 @@ export function getCaptureSession() {
     const { android, ios, web, ...common } = RecordingPresets.HIGH_QUALITY;
     const options = { ...common, isMeteringEnabled: false,
       ...(Platform.OS === 'ios' ? ios : Platform.OS === 'web' ? web : android) };
+    const recorder = new AudioModule.AudioRecorder(options);
+    const recovery = getFinalizedCapture(recorder, RecordingPresets.HIGH_QUALITY);
     session = new CaptureSession({
-      recorder: new AudioModule.AudioRecorder(options),
+      recorder,
+      recover: recovery?.recover,
+      prepare: recovery?.prepare,
       microphone: requestRecordingPermissionsAsync,
-      notification: requestNotificationPermissionsAsync,
+      notification: () => Platform.OS === 'android' ? requestNotificationPermissionsAsync() : Promise.resolve(),
       audioMode: () => setAudioModeAsync({ allowsRecording: true, allowsBackgroundRecording: true, playsInSilentMode: true }),
-      permissionMessage: microphonePermissionMessage,
+      permissionMessage: canAskAgain => microphonePermissionMessage(canAskAgain, Platform.OS),
       savedMessage: recordingSavedMessage,
       save: async url => {
+        if (recovery) return recovery.save(url);
         const source = new File(url);
         if (!source.exists || !source.size) throw new Error('Recording file is empty.');
         const recordings = new Directory(Paths.document, 'recordings');
