@@ -2,7 +2,7 @@
 
 Physical acceptance is pending for [issue #68](https://github.com/innosage-llc/innosage-labs/issues/68). The historical APK below came from `2dd7d341eb66d7d76b1951ae2c1a6fbfc2f64050` (#67). The packet was reconciled against `7db439f6982ccbeccab188722d6e762aed4afa4a`. Before physical acceptance, select the intended source revision and record the SHA-256 and signing identity of its exact APK.
 
-Use a dedicated spare phone or test profile with verified ownership. Check the exact wired ADB serial and pin all device-specific commands to it. Before installing anything, verify the APK hash, confirm the package is absent on the selected target, and ensure the test can proceed with existing permissions. If the package already exists, leave it intact. Proceed with an installed build only if its provenance and permission readiness can be verified. Before Start, confirm microphone permission was previously granted and the notification permission on applicable Android versions is already in a known non-prompting state. If any permission prompt appears, leave it ungranted, stop and mark capture BLOCKED. Require a controlled synthetic speech source, a listener who can evaluate actual Library playback, and an authorized offline setup. Preserve recordings and device/network settings.
+Use a dedicated spare phone or test profile with verified ownership. Check the exact wired ADB serial and pin all device-specific commands to it. Before installing anything, verify the APK hash, confirm the package is absent on the selected target, and ensure the test can proceed with existing permissions. If the package already exists, leave it intact. Proceed with an installed build only if its provenance and permission readiness can be verified. Before Start, confirm microphone permission was previously granted and the notification permission on applicable Android versions is already in a known non-prompting state. If any permission prompt appears, leave it ungranted, stop and mark capture BLOCKED. Require a controlled synthetic speech source, a listener who can evaluate actual Library playback, and a pre-existing authorized offline setup. Establish and record the offline state immediately before and after the replay using a permitted read-only check such as Android connectivity status for the exact test serial. The evidence must show no active default or validated network path during the controlled replay interval. Keep only the offline verdict and its observation times. If the offline state cannot be established, mark that step BLOCKED. Preserve recordings and device/network settings.
 
 Use a dedicated profile with an empty Recorder Library verified before Start. During the test, create only the one scripted recording and perform no imports. This makes a single newly highlighted Library row and the sole row after reopen an unambiguous file binding. Record its displayed timestamp and the unique audible A–E sequence at both playbacks. The Library displays the capture timestamp, and the playback duration appears after Play loads the file. Record the raw filename or URI only if an already authorized app-scoped diagnostic can resolve this one recording. When a unique match cannot be established, mark exact-file acceptance BLOCKED and retain the available evidence.
 
@@ -12,17 +12,19 @@ Prepare the synthetic audio before clock start. Use only the scripted non-sensit
 
 | Time | Action / speech |
 | --- | --- |
-| 0:00 | Visible Record: Start once. Once recording, say “Acceptance 68 A before lock, one two three four five.” |
-| 0:20 | Lock; say “Acceptance 68 B locked, one two three four five.” |
-| 0:45 | Unlock, foreground Calculator; say “Acceptance 68 C another app, one two three four five.” |
-| 1:10 | Return; say “Acceptance 68 D returned, one two three four five.” |
-| 1:25 | Say “Acceptance 68 E ending.” Tap Stop & save once. |
-| 1:35 | Tap View in Library. Verify the single highlighted row says “Newly saved recording” and shows the expected capture timestamp. Confirm it is idle, then tap its Play control. Record the duration once playback loads. |
-| 1:40–3:05 | Listen from the beginning through completion. Verify A–E in order and intelligible, with no unexpected silence, duplication or truncation. |
-| 3:05–3:25 | After playback completes, remove only Recorder’s completed task from Android Recents using the normal gesture. Verify its task card has gone, then reopen from its launcher icon. Observe the initial Record screen before navigating to Library. A Home/Recents return to the existing playback screen is insufficient. |
-| 3:25–4:50 | In the authorized offline setup, select the sole Library entry and match its timestamp to the first playback. Tap Play from the beginning, confirm the matching duration after load, and listen through E to completion. |
+| 0:00 | Visible Record: Start once. Once recording, play “Acceptance 68 A before lock, one two three four five.” |
+| 0:15 | Lock, then play “Acceptance 68 B locked, one two three four five.” |
+| 0:30 | Unlock and foreground Calculator, then play “Acceptance 68 C another app, one two three four five.” |
+| 0:45 | Return to Recorder and play “Acceptance 68 D returned, one two three four five.” |
+| 0:55–1:05 | Play “Acceptance 68 E ending.” Tap Stop & save once and verify recording has ended. |
+| 1:05–1:20 | Tap View in Library. Verify the single highlighted row says “Newly saved recording” and shows the expected timestamp. Confirm it is idle. |
+| 1:20–2:35 | Have the listener ready before tapping Play. Listen from the first sound through the end. Note the loaded duration and verify A–E in order and intelligible, with no unexpected silence, duplication or truncation. |
+| 2:35–3:15 | After playback completes, remove only Recorder’s completed task from Android Recents using the normal gesture. Verify its task card has gone, then reopen from its launcher icon. Observe the initial Record screen before navigating to Library. |
+| 3:15–4:40 | Verify the existing offline state and select the sole Library entry matching the first playback. Have the listener ready before tapping Play from the beginning. Match the loaded duration and listen through E to completion. Recheck the offline state. |
 
-Do not force-stop the app, kill its process, rotate the device or try to reproduce a configuration change. Stop at the first actual failure and retain the evidence. At 5:00 record any unfinished step, elapsed time and last verified observation. Mark an unattempted step NOT_RUN or BLOCKED when a prerequisite is missing. Record an observed playback or persistence failure as FAILED.
+At an abort or the five-minute cutoff, immediately silence the synthetic source. If this run may still be recording, bring Recorder to the foreground, use its normal Stop & save control, and verify the recording indicator and timer have stopped and the app has returned to a non-recording state. If normal Stop fails or the end of capture cannot be verified, keep the source silent and the phone isolated from speech, alert the owner immediately for safe intervention, and mark the run FAILED. Any safety stop ends the run and carries no acceptance credit. Preserve the resulting evidence without starting another capture.
+
+Keep the existing network and permission state. Avoid force-stop, process kill, rotation and configuration-change reproduction. Log the first failure or any unfinished step at 5:00 with elapsed time and the last verified observation. Mark an unattempted step NOT_RUN or BLOCKED when a prerequisite is missing. Mark an observed playback or persistence failure FAILED.
 
 ## Evidence and verdict
 
