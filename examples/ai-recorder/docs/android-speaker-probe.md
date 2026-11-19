@@ -8,11 +8,73 @@ frequency bands per marker make the check tolerant of the app's AAC encoding,
 volume changes and leading silence. B passes only when all four B tones recur
 and the capture does not also match A.
 
-The calibration uses imported synthetic files. The normal recording input
-still needs a deterministic source on this Mac Studio. Leave #101 open and
-keep this diagnostic out of the local pre-merge gate. The existing
-[Android, iOS and Web startup gate](../../../scripts/recorder-gate/README.md)
-continues to cover startup.
+## Run the offline recording journey
+
+Use Node 24, the installed Android Emulator, and an empty task-owned
+`labs85-` Pixel 8 AVD with its default 1080×2400 portrait display and 420 dpi.
+The supported setup on the Mac Studio is emulator 37.2.13.0 (16740729) and the
+Android 16 API 36 Google APIs arm64 system image (revision 7). Use an ordinary
+Release APK built locally with the embedded JS bundle. The existing
+[local startup gate](../../../scripts/recorder-gate/README.md) describes that
+build. Use separate task-owned Android state, ADB, npm and Gradle caches.
+
+Start ADB restricted to the dedicated serial and boot the task AVD using
+unused loopback ports. In this example, use the environment variables of your
+task-owned directories and the installed SDK.
+
+```sh
+export ANDROID_ADB_SERVER_PORT=5101 ADB_SERVER_SOCKET=tcp:localhost:5101
+adb -L tcp:localhost:5101 --one-device emulator-5680 server nodaemon
+```
+
+In another shell with the same Android state and ADB endpoint:
+
+```sh
+env -u QEMU_AUDIO_DRV QEMU_AUDIO_IN_DRV=none   "$ANDROID_HOME/emulator/emulator" -avd labs85-101-audio -port 5680   -grpc 8611 -grpc-use-token -audio none -no-window -no-snapshot   -no-boot-anim -camera-back none -camera-front none -gpu swiftshader_indirect -no-metrics
+```
+
+Find `pid` in the emulator's printed discovery filename `pid_<pid>.ini`.
+Keep its contents private. Set airplane mode on and disable Wi-Fi and mobile
+data **on the dedicated emulator** before starting Recorder.
+
+```sh
+adb_task() { adb -H localhost -P 5101 -s emulator-5680 "$@"; }
+adb_task shell cmd connectivity airplane-mode enable
+adb_task shell svc wifi disable
+adb_task shell svc data disable
+
+node examples/ai-recorder/scripts/android-speaker-probe.mjs journey   5101 emulator-5680 labs85-101-audio "$pid" "$apk" "$task/new-journey"
+```
+
+The command installs the supplied APK and requires an empty Library. For a new
+trial use a fresh task AVD or reset only the previous trial's synthetic app
+data **before** invoking the command. Keep the saved data intact during the
+tested process restart. The script uses normal guest permission prompts,
+Start recording, Stop & save, Library and Play. While the native Recorder
+microphone operation is active, it sends eight seconds of deterministic
+48 kHz mono PCM via the emulator's authenticated virtual input. The
+`QEMU_AUDIO_IN_DRV=none` configuration excludes physical host microphone
+input. Each injection connection is closed before playback measurement.
+
+The test checks that each save added a distinct Library row. It records the
+old PID, force-stops it, confirms that the process is gone, cold-launches
+offline and checks both rows in the new process. It captures the guest's
+speaker stream independently and checks for B after tapping B. It uses the
+same B assertion to reject the idle speaker capture and the playback of A,
+which must independently identify as A. The run exits nonzero if required
+evidence is missing. `result.json` records the source revision, APK digest,
+guest build, launch process identity, timings and marker results. Keep the
+PCM and UI snapshots local. Each capture uses a new evidence directory.
+
+The Stop tap is tied to this Pixel 8 display profile because the live timer
+can keep UIAutomator from producing a fresh hierarchy. The test checks the
+display and active recording, and then requires Saved confirmation and a
+distinct new Library entry. Other controls use fresh UI hierarchy labels.
+
+This command is opt-in. The existing Android, iOS and Web cold-start checks
+retain their own scope. The audio journey needs an isolated audio-configured
+emulator and a fresh synthetic Library. Keep it out of pre-merge until
+repeatability and runtime justify adoption.
 
 ## Replay the speaker controls
 
@@ -94,6 +156,8 @@ took 2m 8s and produced APK SHA-256
 `0200c2076e9a4690eb0621deecad262cb4dac2db3e1943d362da867f86dbb905`.
 The tests used separate task caches and a serial-restricted ADB server.
 All speaker samples below were taken after the source stream had closed.
+These are initial feasibility results. See the journey setup above for the later
+configuration confirmed with the [#95 recovery evidence](https://github.com/innosage-llc/innosage-labs/pull/99).
 
 | Input experiment | Observed result |
 | --- | --- |
@@ -105,6 +169,7 @@ All speaker samples below were taken after the source stream had closed.
 | API 36, alternate virtual sound card (`-feature -VirtioSndCard`) | Record, Save and the RPC completed. The speaker stream supplied zero samples. |
 | API 36, default sound card, 44.1 kHz mono gRPC opened before Record | Emulator exited 139 during input setup. |
 | API 35, default sound card, explicit WAV driver, 44.1 kHz mono blocking gRPC after Record was active | RPC completed. Actual Library playback yielded 139,760 samples and neither marker matched. |
+| API 36, same image and emulator as #95, `QEMU_AUDIO_IN_DRV=none -audio none`, 48 kHz PCM sent after AppOps confirmed active Record | The 600, 1000 and 1600 Hz source tones were present in the independently captured Library PCM. This was a one-clip routing proof. |
 | API 36, known B imported for output calibration | Library playback yielded 121,760 samples. B matched with 8, 11, 15 and 15 qualifying windows across its four frequencies. |
 
 For an input diagnostic, use the installed
