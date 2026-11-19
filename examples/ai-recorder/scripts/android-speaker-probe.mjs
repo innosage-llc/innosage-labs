@@ -145,17 +145,25 @@ function score(pcm) {
   let peak = 0;
   for (let offset = 0; offset < pcm.length; offset += 2) peak = Math.max(peak, Math.abs(pcm.readInt16LE(offset)));
   const size = rate / 10;
-  const coefficients = frequencies.map(frequency => 2 * Math.cos(2 * Math.PI * frequency / rate));
+  // Emulator playback can shift a tone by a few Hz through clock correction
+  // and resampling. Search non-overlapping bands around the fixture tones.
+  const bands = frequencies.map(frequency => [-20, -15, -10, -5, 0, 5, 10, 15, 20]
+    .map(offset => 2 * Math.cos(2 * Math.PI * (frequency + offset) / rate)));
   const hits = Object.fromEntries(frequencies.map(frequency => [frequency, 0]));
   for (let offset = 0; offset + size * 2 <= pcm.length; offset += size * 2) {
     const samples = Array.from({ length: size }, (_, index) => pcm.readInt16LE(offset + 2 * index));
     const energy = samples.reduce((sum, value) => sum + value ** 2, 0);
-    for (const [index, coefficient] of coefficients.entries()) {
-      let s1 = 0;
-      let s2 = 0;
-      for (const sample of samples) [s1, s2] = [sample + coefficient * s1 - s2, s1];
-      const power = 4 * (s1 ** 2 + s2 ** 2 - coefficient * s1 * s2) / size ** 2;
-      if (power >= 120 ** 2 && power * size > energy) hits[frequencies[index]]++;
+    for (const [index, band] of bands.entries()) {
+      for (const coefficient of band) {
+        let s1 = 0;
+        let s2 = 0;
+        for (const sample of samples) [s1, s2] = [sample + coefficient * s1 - s2, s1];
+        const power = 4 * (s1 ** 2 + s2 ** 2 - coefficient * s1 * s2) / size ** 2;
+        if (power >= 120 ** 2 && power * size > energy) {
+          hits[frequencies[index]]++;
+          break;
+        }
+      }
     }
   }
   const matches = Object.entries(tones).filter(([, frequencies]) => frequencies.every(f => hits[f] >= 2));
@@ -290,8 +298,8 @@ async function observe([adbPort, serial, avd, pid, label, expected, output]) {
   }
 }
 
-async function* microphonePackets(marker) {
-  const pcm = makePcm(marker, 48_000, 8);
+async function* microphonePackets(marker, seconds) {
+  const pcm = makePcm(marker, 48_000, seconds);
   // AEMU AudioPacket field 1: 48 kHz mono signed 16-bit format.
   // Field 3: 1,920 bytes of audio, or exactly 20 ms.
   const header = Buffer.from([0x0a, 0x06, 0x08, 0x80, 0xf7, 0x02, 0x18, 0x01, 0x1a, 0x80, 0x0f]);
@@ -335,7 +343,7 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
   const out = outDir(output);
   const receipt = {
     head: git('rev-parse', 'HEAD'), avd, serial, emulator: device.emulator,
-    apk_sha256: sha(readFileSync(apk)), speaker_rate: rate, injection_rate: 48_000, status: 'FAIL', controls: {},
+    apk_sha256: sha(readFileSync(apk)), speaker_rate: rate, injection_rate: 48_000, primer_seconds: 2, status: 'FAIL', controls: {},
   };
   const began = performance.now();
   const forceStop = () => adb('shell', 'am', 'force-stop', BUNDLE);
@@ -353,7 +361,7 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
   }
   async function control(kind, label, xml) {
     const directory = outDir(join(out, kind));
-    const pcm = await listen(device, directory, label, xml, label ? 12_000 : 2500);
+    const pcm = await listen(device, directory, label, xml, label ? 15_000 : 2500);
     receipt.controls[kind] = pcm;
     return pcm;
   }
@@ -388,9 +396,14 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
       receipt.stage = `record-${marker}`;
       await assertOffline(adb);
       receipt[`recording_${marker}`] = await startRecording(adb);
+      const inject = (name, seconds) => onAudio(device, (session, token) =>
+        rpc(session, token, 'injectAudio', microphonePackets(name, seconds), (seconds + 8) * 1000, () => {}));
+      // Initialize the virtual input with silence while the same native
+      // recording is active. Close that stream before opening the marker feed.
+      receipt.stage = `prime-${marker}`;
+      await inject('silence', 2);
       receipt.stage = `inject-${marker}`;
-      await onAudio(device, (session, token) =>
-        rpc(session, token, 'injectAudio', microphonePackets(marker), 16_000, () => {}));
+      await inject(marker, 8);
       // The input RPC has completed and its connection is closed before save/playback.
       receipt.stage = `stop-${marker}`;
       // The timer can keep UIAutomator from reaching idle. This point is inside

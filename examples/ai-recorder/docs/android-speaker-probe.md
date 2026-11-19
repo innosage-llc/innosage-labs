@@ -52,7 +52,8 @@ data **before** invoking the command. Keep the saved data intact during the
 tested process restart. The script uses normal guest permission prompts,
 Start recording, Stop & save, Library and Play. While the native Recorder
 microphone operation is active, it sends eight seconds of deterministic
-48 kHz mono PCM via the emulator's authenticated virtual input. The
+48 kHz mono PCM via the emulator's authenticated virtual input after a
+two-second silent primer in the same recording. The
 `QEMU_AUDIO_IN_DRV=none` configuration excludes physical host microphone
 input. Each injection connection is closed before playback measurement.
 
