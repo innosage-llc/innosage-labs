@@ -5,6 +5,9 @@ or another app is in front. Recordings are AAC in an M4A container. Finished fil
 are stored in the app's documents directory and available for offline playback
 after reopening the app.
 
+For local Android playback diagnostics, see the
+[Library speaker probe](docs/android-speaker-probe.md).
+
 ## Finalized save recovery (Android)
 
 New Android captures use a stable identity in persistent storage. On cold launch,

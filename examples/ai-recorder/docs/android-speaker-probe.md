@@ -1,0 +1,120 @@
+# Android Library speaker probe
+
+Related to [Labs #101](https://github.com/innosage-llc/innosage-labs/issues/101).
+This diagnostic checks what the installed app emits when you tap a specific
+Library Play control. It connects to the emulator's speaker stream before the
+tap and retains PCM, the Library hierarchy and a JSON result. Four
+frequency bands per marker make the check tolerant of the app's AAC encoding,
+volume changes and leading silence. B passes only when all four B tones recur
+and the capture does not also match A.
+
+The calibration uses imported synthetic files. The normal recording input
+still needs a deterministic source on this Mac Studio. Leave #101 open and
+keep this diagnostic out of the local pre-merge gate. The existing
+[Android, iOS and Web startup gate](../../../scripts/recorder-gate/README.md)
+continues to cover startup.
+
+## Replay the speaker controls
+
+Use Node 24, an installed Android Emulator and a **task-owned** `labs85-` AVD
+with the built-in microphone and speaker configured. The verified setup used
+macOS 26.6.2 arm64, emulator 37.2.13.0 (16740729), Pixel 8, Android 16 / API
+36 Google APIs arm64, and the existing local Release APK with embedded JS.
+Use a separate ADB server restricted to the dedicated serial. Pick unused
+loopback ports and set task-owned Android, npm and Gradle state before launch.
+
+```sh
+# Run on the task's own AVD. Use unused ports if these are occupied.
+export ANDROID_ADB_SERVER_PORT=5101 ADB_SERVER_SOCKET=tcp:localhost:5101
+adb -L tcp:localhost:5101 --one-device emulator-5680 server nodaemon
+```
+
+In a second shell with the same environment, choose absolute paths for
+`task` (private evidence and AVD state) and `ANDROID_HOME` (installed SDK).
+Generate a silent input fixture and boot the audio backend. The WAV driver
+uses only the designated files, and microphone passthrough stays off.
+
+```sh
+probe=examples/ai-recorder/scripts/android-speaker-probe.mjs
+node "$probe" fixture silence "$task/backend-input.wav"
+QEMU_AUDIO_DRV=wav QEMU_WAV_FREQUENCY=16000 \
+  QEMU_WAV_IN_PATH="$task/backend-input.wav" QEMU_WAV_PATH="$task/backend-output.wav" \
+  "$ANDROID_HOME/emulator/emulator" -avd labs85-101-audio -port 5680 \
+  -grpc 8611 -grpc-use-token -no-snapshot -no-window -no-boot-anim \
+  -camera-back none -camera-front none
+```
+
+Install the ordinary offline-built Release APK via the dedicated serial. Set
+airplane mode on and disable guest Wi-Fi and mobile data before starting
+Recorder. The probe checks airplane mode and no active default network before
+and after playback, and verifies host microphone passthrough is off.
+
+```sh
+adb_task() { adb -H localhost -P 5101 -s emulator-5680 "$@"; }
+adb_task shell cmd connectivity airplane-mode enable
+adb_task shell svc wifi disable
+adb_task shell svc data disable
+for clip in A B silence; do
+  node "$probe" fixture "$clip" "$task/Labs101-$clip.wav"
+  ffmpeg -hide_banner -loglevel error -i "$task/Labs101-$clip.wav" \
+    -c:a aac "$task/Labs101-$clip.m4a"
+  adb_task push "$task/Labs101-$clip.m4a" /sdcard/Download/
+done
+```
+
+FFmpeg is only needed to make the imported calibration files. In Library,
+use **Import audio** to choose the three fixtures from Downloads. Find
+`pid` in the emulator's printed discovery filename `pid_<pid>.ini`.
+Keep its contents private. From the Labs root, run these commands with a fresh
+directory for each capture. Wait for each command to exit before starting the
+next one.
+
+```sh
+node "$probe" observe 5101 emulator-5680 labs85-101-audio "$pid" \
+  'Play Labs101-B.m4a' B "$task/positive-B"
+node "$probe" observe 5101 emulator-5680 labs85-101-audio "$pid" \
+  'Play Labs101-A.m4a' B "$task/stale-A"
+node "$probe" observe 5101 emulator-5680 labs85-101-audio "$pid" \
+  'Play Labs101-silence.m4a' B "$task/silence"
+```
+
+Expect exit 0 for B and exit 1 for A and silence. Inspect `result.json` to
+confirm the intended failures. Stale A must report marker A and silence must
+supply PCM with no recognized marker. A transport or setup failure also exits
+nonzero and does not count as a negative control. To rerun the exact content
+assertion from a previously captured stream, use
+`node "$probe" score B "$task/stale-A/speaker.pcm"`. The score reads raw
+16 kHz mono little-endian signed 16-bit PCM from the speaker stream.
+
+## Recording-input investigation
+
+The offline Release build from Labs
+[`0d2a86d`](https://github.com/innosage-llc/innosage-labs/commit/0d2a86dfaf1db0f9551d986aa1409a69aad7526e)
+took 2m 8s and produced APK SHA-256
+`0200c2076e9a4690eb0621deecad262cb4dac2db3e1943d362da867f86dbb905`.
+The tests used separate task caches and a serial-restricted ADB server.
+All speaker samples below were taken after the source stream had closed.
+
+| Input experiment | Observed result |
+| --- | --- |
+| Default CoreAudio backend, 16 kHz mono gRPC while permission dialog was open | Emulator exited 139. The crash report for the same process put SIGSEGV in `audio_forwarder_enable`. That attempt used an earlier feasibility APK. |
+| Emulator `-audio wav` switch, 16 kHz realtime after Record was active | CoreAudio still handled input and could not create `virtio-snd-mic0`. The forwarder crashed again. |
+| Explicit `QEMU_AUDIO_DRV=wav` with host input off, file backend only | Record and Save worked. Real Library playback yielded 137,859 samples at 16 kHz and neither marker matched. |
+| API 36, explicit WAV driver, 16 kHz realtime gRPC after Record was active | Injection RPC completed. Library playback yielded 137,077 samples and neither marker matched. |
+| API 36, explicit WAV driver, 48 kHz mono blocking gRPC after Record was active | Android reported an active, unsilenced built-in microphone track. The RPC completed, but Library playback yielded 136,903 samples and neither marker matched. |
+| API 36, alternate virtual sound card (`-feature -VirtioSndCard`) | Record, Save and the RPC completed. The speaker stream supplied zero samples. |
+| API 36, default sound card, 44.1 kHz mono gRPC opened before Record | Emulator exited 139 during input setup. |
+| API 35, default sound card, explicit WAV driver, 44.1 kHz mono blocking gRPC after Record was active | RPC completed. Actual Library playback yielded 139,760 samples and neither marker matched. |
+| API 36, known B imported for output calibration | Library playback yielded 121,760 samples. B matched with 8, 11, 15 and 15 qualifying windows across its four frequencies. |
+
+For an input diagnostic, use the installed
+`emulator/lib/emulator_controller.proto` with the
+[Android Emulator gRPC client](https://android.googlesource.com/platform/external/qemu/+/emu-master-dev/android/android-grpc/python/aemu-grpc).
+Open Record and accept only the normal guest microphone prompt. After **Stop
+& save** appears, submit 6 seconds of synthetic marker A, 20 ms per
+`injectAudio` packet, via the same loopback endpoint. Set the format on the
+first packet, send signed 16-bit mono PCM, and close the input RPC before
+stopping the recording. Identify the new row in Library and apply the same
+speaker assertion with expected marker A. Keep RPC status, the cue's sample
+rate and delivery mode, device and build identity, guest AudioFlinger state,
+and the PCM receipt. RPC success cannot substitute for audible content.
