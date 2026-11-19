@@ -2,7 +2,9 @@
 
 Physical acceptance is pending for [issue #68](https://github.com/innosage-llc/innosage-labs/issues/68). The historical APK below came from `2dd7d341eb66d7d76b1951ae2c1a6fbfc2f64050` (#67). The packet was reconciled against `7db439f6982ccbeccab188722d6e762aed4afa4a`. Before physical acceptance, select the intended source revision and record the SHA-256 and signing identity of its exact APK.
 
-Use a dedicated spare phone or test profile with verified ownership. Check the exact wired ADB serial and pin all device-specific commands to it. Before installing anything, verify the APK hash, confirm the package is absent on the selected target, and ensure the test can proceed with existing permissions. If the package already exists, leave it intact. Proceed with an installed build only if its provenance and prior permission grant are independently verified. If setup requires a new microphone permission, leave capture unrun. Require a controlled synthetic speech source, a listener who can evaluate the actual Library playback, and an authorized offline setup. Keep existing recordings, device settings and network settings intact.
+Use a dedicated spare phone or test profile with verified ownership. Check the exact wired ADB serial and pin all device-specific commands to it. Before installing anything, verify the APK hash, confirm the package is absent on the selected target, and ensure the test can proceed with existing permissions. If the package already exists, leave it intact. Proceed with an installed build only if its provenance and permission readiness can be verified. Before Start, confirm microphone permission was previously granted and the notification permission on applicable Android versions is already in a known non-prompting state. If any permission prompt appears, leave it ungranted, stop and mark capture BLOCKED. Require a controlled synthetic speech source, a listener who can evaluate actual Library playback, and an authorized offline setup. Preserve recordings and device/network settings.
+
+Use a dedicated profile with an empty Recorder Library verified before Start. During the test, create only the one scripted recording and perform no imports. This makes a single newly highlighted Library row and the sole row after reopen an unambiguous file binding. Record its displayed timestamp and the unique audible A–E sequence at both playbacks. The Library displays the capture timestamp, and the playback duration appears after Play loads the file. Record the raw filename or URI only if an already authorized app-scoped diagnostic can resolve this one recording. When a unique match cannot be established, mark exact-file acceptance BLOCKED and retain the available evidence.
 
 ## Five-minute script
 
@@ -15,15 +17,16 @@ Prepare the synthetic audio before clock start. Use only the scripted non-sensit
 | 0:45 | Unlock, foreground Calculator; say “Acceptance 68 C another app, one two three four five.” |
 | 1:10 | Return; say “Acceptance 68 D returned, one two three four five.” |
 | 1:25 | Say “Acceptance 68 E ending.” Tap Stop & save once. |
-| 1:35 | View in Library; note exact file ID/name, timestamp and duration. Navigation must not autoplay. Explicitly Play. |
-| 1:40–3:05 | Listen fully: A–E ordered and intelligible, no unexpected silence, duplication or truncation. |
-| 3:05–4:40 | After playback, leave/reopen normally; use already offline setup. Select same entry, explicitly Play and listen through E. Allow extra seconds for navigation. |
+| 1:35 | Tap View in Library. Verify the single highlighted row says “Newly saved recording” and shows the expected capture timestamp. Confirm it is idle, then tap its Play control. Record the duration once playback loads. |
+| 1:40–3:05 | Listen from the beginning through completion. Verify A–E in order and intelligible, with no unexpected silence, duplication or truncation. |
+| 3:05–3:25 | After playback completes, remove only Recorder’s completed task from Android Recents using the normal gesture. Verify its task card has gone, then reopen from its launcher icon. Observe the initial Record screen before navigating to Library. A Home/Recents return to the existing playback screen is insufficient. |
+| 3:25–4:50 | In the authorized offline setup, select the sole Library entry and match its timestamp to the first playback. Tap Play from the beginning, confirm the matching duration after load, and listen through E to completion. |
 
-No force-stop, process kill, rotation or configuration reproduction. Stop at first actual failure; preserve evidence without retries.
+Do not force-stop the app, kill its process, rotate the device or try to reproduce a configuration change. Stop at the first actual failure and retain the evidence. At 5:00 record any unfinished step, elapsed time and last verified observation. Mark an unattempted step NOT_RUN or BLOCKED when a prerequisite is missing. Record an observed playback or persistence failure as FAILED.
 
 ## Evidence and verdict
 
-Record UTC time, tester and listener, model/OS/API, source revision and APK SHA-256, app version/code, permission readiness, offline setup, transition times, exact saved file identity, elapsed capture versus saved duration (explain a discrepancy over five seconds), marker order and audible defect timestamps. Keep raw synthetic audio local. Do not enumerate/export existing personal recordings. Optional file hash/container metadata supplements listening only.
+Record UTC time, tester and listener, model/OS/API, source revision, candidate APK SHA-256 and signer certificate SHA-256, installed package version/code and verification tying it to that APK, permission readiness, offline setup, transition times, exact saved file identity, elapsed capture versus saved duration (explain a discrepancy over five seconds), marker order and audible defect timestamps. For an already installed package, use preexisting trusted install provenance or a permitted read-only hash of the installed APK on the verified serial. If the installed package cannot be tied to the intended APK, leave the acceptance run blocked. Keep raw synthetic audio local and leave existing personal recordings untouched. Optional file hash/container metadata supplements listening only.
 
 Mark PASS only when the expected result is observed. Mark FAILED if an attempt contradicts it, BLOCKED if a prerequisite is missing, or NOT_RUN if the step was unattempted. Audible physical success requires listening to the actual recording through Library playback.
 
@@ -34,7 +37,7 @@ Mark PASS only when the expected result is observed. Mark FAILED if an attempt c
 | Physical Start/lock/other app/return | NOT_RUN | Transition observations + audible A–E |
 | Save/file continuity | NOT_RUN | Exact ID, duration and full listening |
 | Library handoff/explicit playback | NOT_RUN | Same entry and explicit playback |
-| Normal relaunch persistence | NOT_RUN | Same ID and duration after reopen |
+| Normal relaunch persistence | NOT_RUN | Completed task removed, fresh launcher entry, same unique Library row and duration |
 | Offline full replay | NOT_RUN | Authorized offline setup and full listening through E |
 | Owner final acceptance | PENDING | Review complete ledger and decide |
 
@@ -54,7 +57,7 @@ Build observed on 2026-11-15 at `2dd7d341eb66d7d76b1951ae2c1a6fbfc2f64050` with 
 - package-lock.json SHA-256: `826413237b938cd42880ac873c7c4580e960bd59153eeedc0f4bf5f2e09a9004`.
 - Node 24.22.2; Homebrew OpenJDK 17.0.21.0.3; Gradle 9.4.1. Generated release uses debug test signing, not production signing.
 
-Historical commands from `examples/ai-recorder` with Node 24 first on PATH:
+Historical commands from `examples/ai-recorder`. The first `npm ci` ran under Node 26. Typecheck, successful tests, prebuild and assembly ran with Node 24 first on PATH.
 
 ```sh
 npm ci
