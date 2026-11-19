@@ -12,9 +12,9 @@ async function moduleURL(file, names) {
   return 'data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(code)).toString('base64');
 }
 const snapshotUrl = await moduleURL('./summaryPublishSnapshot.ts',{'./draftDocumentModel':modelUrl});
-const {summaryPublication} = await import(await moduleURL('./summaryPublication.ts',{'./summaryPublishSnapshot':snapshotUrl}));
+const {resolveSummaryShareEnvironment,summaryPublication,summaryPublicationSlot} = await import(await moduleURL('./summaryPublication.ts',{'./summaryPublishSnapshot':snapshotUrl}));
 const pageId = 'local-recording-summary';
-async function setup() {
+async function setup(environment='staging') {
   let raw=null, owned=null;
   const actions=[], remote=new Map();
   const doc=draftStore({pageId,kind:'summary'}, {read:async()=>raw,write:async x=>{raw=x;}});
@@ -23,9 +23,10 @@ async function setup() {
     id:'recipe-secret',recipe:'private-prompt',source:'revision',model:'private-model',text:'Generated meeting',
     citations:[{url:'https://example.org/agenda',title:'Agenda',start:0,end:9}]});
   const edited=await doc.commit(original.revision,blocks('Edited action item.'));
-  const d={pageId,randomUUID,sha256Hex:async s=>createHash('sha256').update(s).digest('hex'),recover:doc.recover,read:async()=>owned,write:async x=>{owned=x;},
+  const d={pageId,environment,randomUUID,sha256Hex:async s=>createHash('sha256').update(s).digest('hex'),recover:doc.recover,read:async()=>owned,write:async x=>{owned=x;},
     request:async (url,opts)=>{
-      assert.ok(url.startsWith('https://api-staging.draft.innosage.co/api/publish'));
+      const api=environment === 'production' ? 'https://api.draft.innosage.co' : 'https://api-staging.draft.innosage.co';
+      assert.ok([api+'/api/publish',api+'/api/publish/unpublish'].includes(url));
       const req=JSON.parse(opts.body); actions.push(req); const id=req.pageId;
       if(url.endsWith('/unpublish')){
         assert.equal(remote.get(id).key,req.browserPublisherKey); remote.delete(id);
@@ -37,7 +38,7 @@ async function setup() {
       remote.set(id,{snapshot:req.snapshot,key:req.browserPublisherKey});
       return Response.json({success:true,status:'active',ownerType:'browser',ownerManaged:true,publicPageId:id,url:'https://ignored.invalid'});
     }};
-  return {doc,blocks,edited,d,actions,remote};
+  return {doc,blocks,edited,d,actions,remote,stored:()=>owned};
 }
 test('explicit publish, local-only edit, update and cold-owner unpublish share only the reviewed summary',async()=>{
   const {doc,blocks,edited,d,actions,remote}=await setup();
@@ -105,4 +106,44 @@ for(const stall of ['headers','body']) test('a stalled '+stall+' releases the sh
   await ready;t.mock.timers.tick(30_001);await check;assert.equal(signal.aborted,true);
   assert.equal((await summaryPublication(d).status()).status,'unconfirmed');d.request=original;
   await summaryPublication(d).unpublish();assert.equal((await summaryPublication(d).status()).status,'unpublished');
+});
+
+test('a production build allows only the fixed production target; invalid build values fail closed',async()=>{
+  assert.equal(resolveSummaryShareEnvironment(undefined),'staging');
+  assert.equal(resolveSummaryShareEnvironment('staging'),'staging');
+  assert.equal(resolveSummaryShareEnvironment('production'),'production');
+  for(const value of ['','prod','https://draft.innosage.co','Production','__proto__']) {
+    assert.equal(resolveSummaryShareEnvironment(value),undefined);
+  }
+  const {d,edited,actions,remote,stored}=await setup('production');
+  assert.throws(()=>summaryPublication({...d,environment:'__proto__'}),/Invalid summary sharing target/);
+  const url=await summaryPublication(d).publish(edited);
+  const id=url.split('/').at(-1);
+  assert.equal(url,'https://draft.innosage.co/preview/'+id);
+  assert.equal(JSON.parse(stored()).environment,'production');
+  const rebooted=summaryPublication(d);
+  assert.equal((await rebooted.status()).url,url);
+  await rebooted.unpublish();
+  assert.equal(remote.has(id),false);
+  assert.equal(actions[0].browserPublisherKey,actions[1].browserPublisherKey);
+});
+
+test('production and staging owner slots are separate; legacy staging is recoverable without cross-routing',async()=>{
+  const stage=await setup(), prod=await setup('production');
+  const stageUrl=await summaryPublication(stage.d).publish(stage.edited);
+  const old=JSON.parse(stage.stored()); delete old.environment;
+  await stage.d.write(JSON.stringify(old));
+  assert.equal(summaryPublicationSlot('staging',pageId),'recorder.summary.staging.'+pageId);
+  assert.equal(summaryPublicationSlot('production',pageId),'recorder.summary.production.'+pageId);
+  assert.equal((await summaryPublication(stage.d).status()).url,stageUrl);
+  assert.equal(await summaryPublication(prod.d).status(),undefined);
+  await prod.d.write(stage.stored()); // corrupt/misrouted storage is not a valid production owner
+  await assert.rejects(summaryPublication(prod.d).unpublish(),/needs recovery/);
+  assert.equal(prod.actions.length,0);
+  await prod.d.write(null);
+  const prodUrl=await summaryPublication(prod.d).publish(prod.edited);
+  await summaryPublication(stage.d).unpublish(); // explicit legacy recovery
+  assert.equal(stage.remote.size,0);
+  assert.equal((await summaryPublication(prod.d).status()).url,prodUrl);
+  assert.equal(prod.actions.length,1);
 });

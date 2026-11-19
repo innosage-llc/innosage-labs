@@ -6,7 +6,7 @@ import { draftText, editedSummaryCitations, type DraftSnapshot } from './draftDo
 import { createDraftDocument } from './draftDocumentStore';
 import { openAIAccess } from './OpenAIAccess';
 import { RecorderDraftHost } from './RecorderDraftHost';
-import { recorderSummaryPublication } from './recorderSummaryPublication';
+import { recorderSummaryPublication, recorderSummaryShareEnvironment } from './recorderSummaryPublication';
 import { generateSummaryCandidate, loadSummaryDocument, saveSummaryCandidate, type SummaryCandidate } from './summaryDraftLifecycle';
 import { TranscriptSummary, type RecipeRequest, type SummaryProps } from './TranscriptSummary';
 import { ActionButton } from './ui/ActionButton';
@@ -29,6 +29,8 @@ export function DraftSummary(props:Props) {
   const [sharing,setSharing] = useState(false);
   const [owner,setOwner] = useState<ShareStatus>();
   const [ownerKnown,setOwnerKnown] = useState(false);
+  const [otherOwner,setOtherOwner] = useState<ShareStatus>();
+  const [otherError,setOtherError] = useState(false);
   const [retry,setRetry] = useState(0);
   const [loading,setLoading] = useState(true);
   const [formBusy,setFormBusy] = useState(false);
@@ -37,7 +39,10 @@ export function DraftSummary(props:Props) {
   const [message,setMessage] = useState('');
   const outputUri = props.output.uri;
   const { recordingUri, onLockChange } = props;
-  const publication = useMemo(() => document && recorderSummaryPublication(document),[document]);
+  const target = recorderSummaryShareEnvironment;
+  const otherTarget = target === 'production' ? 'staging' : 'production';
+  const publication = useMemo(() => document && target ? recorderSummaryPublication(document,target) : undefined,[document,target]);
+  const otherPublication = useMemo(() => document && target ? recorderSummaryPublication(document,otherTarget) : undefined,[document,target,otherTarget]);
   useEffect(() => { onLockChange(busy || formBusy || !!candidate || editing); },[busy,formBusy,candidate,editing,onLockChange]);
   useEffect(() => {
     let alive = true;
@@ -87,9 +92,16 @@ export function DraftSummary(props:Props) {
     }
   }
   async function refreshOwner() {
-    setOwnerKnown(false);
-    const status = await publication!.status();
-    setOwner(status); setOwnerKnown(true);
+    setOwnerKnown(false); setOwner(undefined);
+    setOtherOwner(undefined); setOtherError(false);
+    if (!publication) return;
+    try { setOwner(await publication.status()); setOwnerKnown(true); }
+    finally {
+      // Only read the other slot locally. Another target must never be selected
+      // automatically for a new publication, even during a version rollback.
+      try { setOtherOwner(await otherPublication?.status()); }
+      catch { setOtherError(true); }
+    }
   }
   const text = useMemo(() => snapshot ? draftText(snapshot) : '',[snapshot]);
   const characters = useMemo(() => sharing ? Array.from(text) : [],[sharing,text]);
@@ -118,7 +130,7 @@ export function DraftSummary(props:Props) {
       <ActionButton title={snapshot ? 'Replace saved summary' : 'Save and open in Draft'} disabled={locked} onPress={()=>void run(()=>accept(candidate))} />
       <ActionButton title={snapshot ? 'Keep my saved summary' : 'Discard unsaved result'} variant="outlined" disabled={locked} onPress={()=>{setCandidate(undefined);setMessage('');}} />
     </> : null}
-    {sharing && snapshot && publication ? <>
+    {sharing && snapshot ? <>
       <ActionButton title="Back to summary" variant="text" disabled={locked} onPress={()=>{setSharing(false);setMessage('');}} />
       <Text accessibilityRole="header" style={{color:palette.text}}>Summary to share</Text>
       <Text selectable style={{color:palette.text}}>{text}</Text>
@@ -127,18 +139,27 @@ export function DraftSummary(props:Props) {
         return <Text key={i} accessibilityRole="link" onPress={()=>void run(()=>Linking.openURL(citation.url).then(()=>{}))}
           style={{color:palette.accent}}>{quote ? quote + ' · ' : 'Source · '}{citation.title || citation.url}</Text>;
       })}
-      <Text style={secondary}>Only this saved summary and its sources will be public on Draft staging. Local edits do not update the link automatically.</Text>
-      {!ownerKnown ? <ActionButton title="Check saved link state" disabled={locked} onPress={()=>void run(refreshOwner)} /> : <>
-        {owner?.url ? <>
-          <Text selectable style={{color:palette.text}}>{owner.url}</Text>
-          <ActionButton title="Share public link" disabled={locked} onPress={()=>void run(async()=>{if(owner.url) await Share.share({message:owner.url});})} />
+      {!publication ? <Text style={secondary}>Public sharing is unavailable: this build has an invalid sharing target.</Text> : <>
+        <Text style={secondary}>Only this saved summary and its sources will be public on Draft {target}. Local edits do not update the link automatically.</Text>
+        {!ownerKnown ? <ActionButton title="Check saved link state" disabled={locked} onPress={()=>void run(refreshOwner)} /> : <>
+          {owner?.url ? <>
+            <Text selectable style={{color:palette.text}}>{owner.url}</Text>
+            <ActionButton title="Share public link" disabled={locked} onPress={()=>void run(async()=>{if(owner.url) await Share.share({message:owner.url});})} />
+          </> : null}
+          {owner?.status !== 'unconfirmed' && owner?.status !== 'withdrawing' ?
+            <ActionButton title={owner?.status === 'active' ? 'Update public summary' : 'Publish summary to ' + target} disabled={locked || !text.trim()}
+              onPress={()=>void run(async()=>{try { await publication.publish(snapshot); } finally { await refreshOwner(); }})} /> :
+            <Text style={secondary}>The last request was not confirmed. Withdraw this link before publishing again.</Text>}
+          {owner && owner.status !== 'unpublished' ? <ActionButton title="Unpublish summary" disabled={locked} variant="outlined"
+            onPress={()=>void run(async()=>{try { await publication.unpublish(); } finally { await refreshOwner(); }})} /> : null}
+        </>}
+        {otherError ? <Text style={secondary}>Could not read the existing {otherTarget} link state.</Text> : null}
+        {otherPublication && otherOwner && otherOwner.status !== 'unpublished' ? <>
+          <Text style={secondary}>An earlier Draft {otherTarget} link remains managed separately.</Text>
+          {otherOwner.url ? <Text selectable style={{color:palette.text}}>{otherOwner.url}</Text> : null}
+          <ActionButton title={'Withdraw existing ' + otherTarget + ' summary'} disabled={locked} variant="outlined"
+            onPress={()=>void run(async()=>{try { await otherPublication.unpublish(); } finally { await refreshOwner(); }})} />
         </> : null}
-        {owner?.status !== 'unconfirmed' && owner?.status !== 'withdrawing' ?
-          <ActionButton title={owner?.status === 'active' ? 'Update public summary' : 'Publish summary to staging'} disabled={locked || !text.trim()}
-            onPress={()=>void run(async()=>{try { await publication.publish(snapshot); } finally { await refreshOwner(); }})} /> :
-          <Text style={secondary}>The last request was not confirmed. Withdraw this link before publishing again.</Text>}
-        {owner && owner.status !== 'unpublished' ? <ActionButton title="Unpublish summary" disabled={locked} variant="outlined"
-          onPress={()=>void run(async()=>{try { await publication.unpublish(); } finally { await refreshOwner(); }})} /> : null}
       </>}
     </> : null}
     {editing && snapshot && document ? <RecorderDraftHost document={document} title="Meeting Summary"

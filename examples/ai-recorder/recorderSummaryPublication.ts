@@ -1,12 +1,20 @@
 import { CryptoDigestAlgorithm, digestStringAsync, randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { fetch as expoFetch } from 'expo/fetch';
 import type { createDraftDocument } from './draftDocumentStore';
-import { summaryPublication } from './summaryPublication';
+import { resolveSummaryShareEnvironment, summaryPublication, summaryPublicationSlot, type SummaryShareEnvironment } from './summaryPublication';
 
-export function recorderSummaryPublication(document: Awaited<ReturnType<typeof createDraftDocument>>) {
-  const slot = 'recorder.summary.staging.' + document.pageId;
+export const recorderSummaryShareEnvironment = resolveSummaryShareEnvironment(
+  process.env.EXPO_PUBLIC_RECORDER_DRAFT_SHARE_ENV
+);
+
+export function recorderSummaryPublication(
+  document: Awaited<ReturnType<typeof createDraftDocument>>,
+  environment: SummaryShareEnvironment,
+) {
+  const slot = summaryPublicationSlot(environment,document.pageId);
   return summaryPublication({
-    pageId:document.pageId, recover:document.recover, randomUUID, request:fetch,
+    environment,pageId:document.pageId, recover:document.recover, randomUUID, request:expoFetch,
     sha256Hex: value => digestStringAsync(CryptoDigestAlgorithm.SHA256,value),
     read:() => SecureStore.getItemAsync(slot), write:value => SecureStore.setItemAsync(slot,value),
   });
