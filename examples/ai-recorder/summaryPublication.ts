@@ -1,9 +1,22 @@
 import type { DraftSnapshot } from './draftDocumentModel';
 import { buildSummaryPublishSnapshot } from './summaryPublishSnapshot';
 
-// Sharing is independent of the transcription provider. This milestone is staging only.
-export const summaryShareSite = 'https://draft-staging.innosage.co';
-const api = 'https://api-staging.draft.innosage.co';
+// Sharing is independent of the transcription provider. A build selects one
+// reviewed target; arbitrary origins and misspelled targets are not accepted.
+export type SummaryShareEnvironment = 'staging' | 'production';
+const targets = {
+  staging: { site:'https://draft-staging.innosage.co', api:'https://api-staging.draft.innosage.co' },
+  production: { site:'https://draft.innosage.co', api:'https://api.draft.innosage.co' },
+} as const;
+
+export function resolveSummaryShareEnvironment(value: string | undefined): SummaryShareEnvironment | undefined {
+  if (value === undefined) return 'staging';
+  return value === 'staging' || value === 'production' ? value : undefined;
+}
+
+export function summaryPublicationSlot(environment: SummaryShareEnvironment, pageId: string) {
+  return 'recorder.summary.' + environment + '.' + pageId;
+}
 const publicId = /^pub_rec_[a-f0-9]{32}$/;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 class ShareResponseError extends Error {
@@ -11,8 +24,9 @@ class ShareResponseError extends Error {
   constructor(status: number) { super('Draft sharing request failed (HTTP ' + status + ').'); this.status = status; }
 }
 type Status = 'unconfirmed' | 'active' | 'withdrawing' | 'unpublished';
-type Owner = { key: string; id: string; status: Status; created: number; revision: number };
+type Owner = { environment?: SummaryShareEnvironment; key: string; id: string; status: Status; created: number; revision: number };
 type Dependencies = {
+  environment: SummaryShareEnvironment;
   pageId: string;
   read(): Promise<string | null>;
   write(value: string): Promise<void>;
@@ -24,23 +38,30 @@ type Dependencies = {
 const busy = new Set<string>();
 
 export function summaryPublication(d: Dependencies) {
-  const url = (id: string) => summaryShareSite + '/preview/' + id;
+  const { environment } = d;
+  const target = environment === 'staging' ? targets.staging :
+    environment === 'production' ? targets.production : undefined;
+  if (!target) throw new Error('Invalid summary sharing target.');
+  const {site,api} = target;
+  const lockKey = environment + ':' + d.pageId;
+  const url = (id: string) => site + '/preview/' + id;
   async function load(): Promise<Owner | undefined> {
     const raw = await d.read();
     if (raw === null) return;
     const state = JSON.parse(raw) as Owner | null;
-    if (!state || !uuid.test(state.key) || !publicId.test(state.id) ||
+    if (!state || (state.environment === undefined ? environment !== 'staging' : state.environment !== environment) ||
+        !uuid.test(state.key) || !publicId.test(state.id) ||
         !['active','unpublished','unconfirmed','withdrawing'].includes(state.status) ||
         !Number.isSafeInteger(state.created) || state.created <= 0 ||
         !Number.isSafeInteger(state.revision) || state.revision < 1)
       throw new Error('The saved publication needs recovery.');
     return state;
   }
-  const store = (s: Owner) => d.write(JSON.stringify(s));
+  const store = (s: Owner) => d.write(JSON.stringify({...s,environment}));
   async function once<T>(operation: () => Promise<T>) {
-    if (busy.has(d.pageId)) throw new Error('A sharing action is already in progress.');
-    busy.add(d.pageId);
-    try { return await operation(); } finally { busy.delete(d.pageId); }
+    if (busy.has(lockKey)) throw new Error('A sharing action is already in progress.');
+    busy.add(lockKey);
+    try { return await operation(); } finally { busy.delete(lockKey); }
   }
   async function post(path: string, body: object) {
     const controller = new AbortController();

@@ -22,6 +22,22 @@ not qualify it as the offline Draft Recorder build.
    installable Recorder artifact and does not verify the app's UI, offline
    WebView, keyboard, or save/reopen journey.
 
+### Public summary target
+
+Set `EXPO_PUBLIC_RECORDER_DRAFT_SHARE_ENV=production` on the exact private Android
+Release build that is intended for the production service. The app displays that
+destination before publishing. The default (or explicit `staging`) remains for
+QA and never publishes to production. An invalid value disables public sharing.
+This build setting is separate from the transcription provider in Settings.
+
+Owner state belongs to the link's original environment. A different build
+target never migrates or automatically withdraws a link. Sources and sharing
+can explicitly withdraw a previously saved link on its original target; this
+also preserves withdrawal when switching between either of these target-aware
+builds. Before reverting to an older staging-only app version, withdraw any
+active production smoke link using the target-aware build. Keep the owning
+installation and do not clear its data.
+
 The WebView must use the paired Draft close protocol: a successful Back receipt
 explicitly confirms the editor was sealed after any IME commit and durable save.
 Older, unsealed receipts are not accepted. A timed-out Back cancels only its own
