@@ -286,9 +286,12 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 
   async function submit() {
     if ((!supportsProUpload && (usePro || service === 'production')) || connecting || !serviceReady || submission.current || busy) return;
+    const terminalJob = !!job && terminal.has(job.state);
     if (isOpenAI ? !openAIConfigured && !unsavedOpenAI
-      : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminal.has(job?.state ?? ''))) return;
+      : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminalJob)) return;
+    const startingPro = !isOpenAI && usePro && (!operation || terminalJob);
     setBusy(true);
+    if (startingPro) setProDenied(false);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
@@ -320,10 +323,9 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         setUnsavedOpenAI(undefined);
         return;
       }
-      const terminalJob = job && terminal.has(job.state);
       let paid = terminalJob ? undefined : paidOperation;
       let free: FreeOperation | undefined;
-      if ((!operation || terminalJob) && usePro) {
+      if (startingPro) {
         if (!supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
@@ -365,22 +367,26 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       const failure = error instanceof Error ? error.message : undefined;
       const openAIDefinitiveFailure = !!failure && /^(OpenAI rejected this API key\.|Check that your OpenAI project key|Check your OpenAI project quota|OpenAI rejected the recording size\.|Choose a non-empty M4A recording|Enter an OpenAI Platform API key\.)/.test(failure);
       const knownServiceFailure = error instanceof KnownServiceFailure || error instanceof ProServiceError || !!failure && /^(This recording exceeds the supported file size\.|This recording or speaker identification is unavailable\.|This source exceeds 512 MiB or has changed\.|This source exceeds the service limit\.)/.test(failure);
+      const proAuthorizationDenied = usePro && error instanceof ProServiceError && error.code === 'authorization';
+      const mayOfferFreeAfterDenial = proAuthorizationDenied && startingPro && !paidTransferStarted;
       if (isOpenAI) {
         setStatusUnknown(false);
         setMessage(openAIRequestStarted && !openAIDefinitiveFailure
           ? 'OpenAI transcription may have completed, but its status cannot be checked here. Confirm before retrying to avoid duplicate submission; the original audio remains on this device.'
           : failure ?? 'Could not save the transcript.');
       } else {
-        const uncertainOperation = serviceRequestStarted && !knownServiceFailure;
-        if (uncertainOperation) setStatusUnknown(true);
-        else setStatusUnknown(false);
-        setMessage(uncertainOperation
-          ? 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.'
-          : failure ?? 'Could not submit the recording.');
+        const mustRecoverPaid = proAuthorizationDenied && !mayOfferFreeAfterDenial;
+        const uncertainOperation = serviceRequestStarted && (!knownServiceFailure || mustRecoverPaid);
+        setStatusUnknown(uncertainOperation);
+        if (uncertainOperation) {
+          setMessage(mustRecoverPaid
+            ? 'Pro authorization is unavailable or expired. Restore access and check the same operation before retrying.'
+            : 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.');
+        } else setMessage(failure ?? 'Could not submit the recording.');
       }
       if (speakerUnavailable(error)) setJob({ state: 'FAILED' });
-      if (usePro && error instanceof ProServiceError && error.code === 'authorization') {
-        if (freshPaid && !paidTransferStarted) {
+      if (mayOfferFreeAfterDenial) {
+        if (freshPaid) {
           try {
             const denied: StoredProOperation = { ...freshPaid, authorizationDeniedBeforeUpload: true };
             await SecureStore.setItemAsync(operationKey, JSON.stringify(denied));
@@ -389,7 +395,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
           } catch {
             setMessage('Could not save the authorization result. Retry this operation when access is available.');
           }
-        } else if (!operation) setProDenied(true);
+        } else setProDenied(true);
       }
     } finally {
       if (submission.current === controller) submission.current = null;

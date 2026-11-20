@@ -155,3 +155,70 @@ test('Free submission checks known limits and binds access before upload', async
     assert.deepEqual(retry.events, ['restore', ['save', retry.prior], ['upload', retry.prior]]);
   }
 });
+
+test('Pro denial offers Free only before transfer on a fresh attempt', async () => {
+  const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
+  const body = stripTypeScriptTypes(component.slice(component.indexOf('async function submit() {'), component.indexOf('\n  async function save() {')));
+  const denied = new ProServiceError('Pro authorization is unavailable.', 'authorization');
+  const cases = [
+    { stage: 'identity' },
+    { stage: 'identity', previous: 'FAILED' },
+    { stage: 'before-transfer' },
+    { stage: 'after-transfer' },
+    { stage: 'before-transfer', previous: 'RESERVED' },
+  ];
+  for (const { stage, previous } of cases) {
+    const saved = [];
+    let proDenied = false;
+    let statusUnknown;
+    let job = previous ? { state: previous } : undefined;
+    let message;
+    const prior = previous ? { lane: 'pro', id: 'original-operation' } : undefined;
+    const dependencies = {
+      connecting: false, supportsProUpload: true, usePro: true, serviceReady: true,
+      submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
+      operation: prior?.id, paidOperation: prior, job, identifySpeakers: false,
+      committedResult: async () => undefined, recording: { size: 1234 },
+      terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
+      proClient: {
+        workerURL: 'https://worker.test', profile: async () => ({ key: 'synthetic' }),
+        identity: async () => { if (stage === 'identity') throw denied; return 'a'.repeat(64); },
+      },
+      randomUUID: () => 'new-operation', operationKey: 'synthetic-operation-key',
+      SecureStore: { setItemAsync: async (_key, value) => { saved.push(JSON.parse(value)); } },
+      request: async (_free, upload, _signal, paid, onTransfer) => {
+        assert.equal(upload, true);
+        assert.equal(paid.id, saved.at(-1).id);
+        if (stage === 'after-transfer') onTransfer();
+        throw denied;
+      },
+      setBusy() {}, setOperation() {}, setFreeOperation() {}, setPaidOperation() {},
+      setJob: value => { job = value; },
+      setProDenied: value => { proDenied = value; },
+      setStatusUnknown: value => { statusUnknown = value; },
+      setMessage: value => { message = value; },
+      KnownServiceFailure, ProServiceError, speakerUnavailable: () => false,
+    };
+    const submit = new Function(...Object.keys(dependencies), 'return (' + body + ')')(...Object.values(dependencies));
+    await submit();
+    if (stage === 'identity') {
+      assert.equal(proDenied, true);
+      assert.equal(statusUnknown, false);
+      assert.equal(saved.length, 0);
+      assert.equal(job?.state, previous);
+    } else if (!previous && stage === 'before-transfer') {
+      assert.equal(proDenied, true);
+      assert.equal(statusUnknown, false);
+      assert.equal(saved.length, 2);
+      assert.deepEqual(saved[1], { ...saved[0], authorizationDeniedBeforeUpload: true });
+      assert.equal(job?.state, 'FAILED');
+    } else {
+      assert.equal(proDenied, false);
+      assert.equal(statusUnknown, true);
+      assert.equal(saved.length, 1);
+      assert.equal(saved[0].authorizationDeniedBeforeUpload, undefined);
+      if (previous) assert.equal(saved[0].id, prior.id);
+      assert.match(message, /check the same operation before retrying/);
+    }
+  }
+});
