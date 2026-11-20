@@ -64,9 +64,9 @@ export function InnoSageTranscriptAction({
     : jobState ?? (serviceReady ? 'Checking saved transcription…' : 'Saved transcription');
 
   let uploadTitle = 'Transcribe';
-  if (operationEnded) uploadTitle = 'Start new transcription';
-  else if (canResumeUpload) uploadTitle = 'Resume upload';
+  if (canResumeUpload) uploadTitle = 'Resume upload';
   else if (proDenied) uploadTitle = 'Retry Pro';
+  else if (operationEnded) uploadTitle = 'Start new transcription';
 
   return (
     <View style={{ gap: spacing.md }}>
@@ -85,7 +85,7 @@ export function InnoSageTranscriptAction({
       {!serviceReady ? (
         <Text accessibilityLiveRegion="polite" selectable style={body}>Could not read transcription settings.</Text>
       ) : null}
-      {checkOnly ? (
+      {serviceReady && checkOnly ? (
         <Text style={muted}>
           {statusUnknown ? 'Check the same operation to recover its status.' : 'Check the same operation for an update.'}
         </Text>
@@ -126,7 +126,9 @@ export function InnoSageTranscriptAction({
         </View>
       ) : null}
 
-      {busy ? (
+      {!serviceReady ? (
+        <ActionButton title="Retry" variant="primary" onPress={onRetryService} />
+      ) : busy ? (
         <View style={row}>
           <ActivityIndicator color={palette.accent} />
           <Text accessibilityLiveRegion="polite" style={[muted, rowText]}>
@@ -135,8 +137,6 @@ export function InnoSageTranscriptAction({
         </View>
       ) : checkOnly ? (
         <ActionButton title="Check status" variant="primary" onPress={onCheckStatus} />
-      ) : !serviceReady ? (
-        <ActionButton title="Retry" variant="primary" onPress={onRetryService} />
       ) : canUpload ? (
         <ActionButton title={uploadTitle} variant="primary" onPress={onTranscribe} />
       ) : null}
