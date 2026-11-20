@@ -171,13 +171,14 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
   const cases = [
     { stage: 'identity' },
     { stage: 'identity', previous: 'FAILED' },
+    { stage: 'missing-profile', previous: 'FAILED' },
     { stage: 'before-transfer' },
     { stage: 'after-transfer' },
     { stage: 'before-transfer', previous: 'RESERVED' },
   ];
   for (const { stage, previous } of cases) {
     const saved = [];
-    let proDenied = false;
+    let proDenied = stage === 'missing-profile';
     let statusUnknown;
     let job = previous ? { state: previous } : undefined;
     let message;
@@ -189,7 +190,8 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
       committedResult: async () => undefined, recording: { size: 1234 },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
       proClient: {
-        workerURL: 'https://worker.test', profile: async () => ({ key: 'synthetic' }),
+        workerURL: 'https://worker.test',
+        profile: async () => stage === 'missing-profile' ? undefined : { key: 'synthetic' },
         identity: async () => { if (stage === 'identity') throw denied; return 'a'.repeat(64); },
       },
       randomUUID: () => 'new-operation', operationKey: 'synthetic-operation-key',
@@ -214,6 +216,12 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
       assert.equal(statusUnknown, false);
       assert.equal(saved.length, 0);
       assert.equal(job?.state, previous);
+    } else if (stage === 'missing-profile') {
+      assert.equal(proDenied, true);
+      assert.equal(statusUnknown, false);
+      assert.equal(saved.length, 0);
+      assert.equal(job?.state, 'FAILED');
+      assert.match(message, /Configure your InnoSage Pro API key/);
     } else if (!previous && stage === 'before-transfer') {
       assert.equal(proDenied, true);
       assert.equal(statusUnknown, false);

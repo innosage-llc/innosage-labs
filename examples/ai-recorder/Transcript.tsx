@@ -291,7 +291,6 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminalJob)) return;
     const startingPro = !isOpenAI && usePro && (!operation || terminalJob);
     setBusy(true);
-    if (startingPro) setProDenied(false);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
@@ -354,6 +353,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       setFreeOperation(free);
       setOperation(next.id);
       setJob({ state: 'RESERVED' });
+      if (startingPro) setProDenied(false);
       controller.signal.throwIfAborted();
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
       try {
