@@ -49,51 +49,65 @@ test('a completed same-operation read returns its result without cancelling its 
   assert.equal(owner.signal.aborted, false);
 });
 
-test('manual status checks and automatic polling retain revoked-key guidance', async () => {
+test('status reads retain authorization guidance and treat speaker denial as terminal', async () => {
   // Exercise the real component handlers without mounting native React views.
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
   const manual = component.slice(component.indexOf('async function checkOperationStatus() {'), component.indexOf('\n  async function submit() {'));
   const poll = component.slice(component.indexOf('async function poll() {'), component.indexOf('\n    void poll();'));
-  const denied = new ProServiceError('Pro authorization is unavailable or expired. Check your API key.', 'authorization');
-  const state = { busy: false, message: '', unknown: false };
-  const dependencies = {
-    freeOperation: undefined, paidOperation: { id: 'synthetic-operation' },
-    busy: false, submission: { current: null },
-    request: async () => { throw denied; }, pending: new Set(),
-    setBusy: value => { state.busy = value; },
-    setMessage: value => { state.message = value; },
-    setStatusUnknown: value => { state.unknown = value; },
-    readOperationWithDeadline, statusRecoveryMessage,
-    speakerUnavailable: () => false,
-    controller: new AbortController(),
-  };
-  const bind = source => new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(source) + ')')(...Object.values(dependencies));
-  await bind(manual)();
-  assert.equal(state.busy, false);
-  assert.equal(state.message, denied.message);
-  await bind(poll)();
-  assert.equal(state.message, denied.message);
-  assert.equal(state.unknown, true);
+  const cases = [
+    new ProServiceError('Pro authorization is unavailable or expired. Check your API key.', 'authorization'),
+    new ProServiceError('Speaker identification is unavailable.', 'speaker_unavailable'),
+  ];
+  for (const denied of cases) {
+    const state = { busy: false, message: '', unknown: false, job: undefined };
+    const dependencies = {
+      freeOperation: undefined, paidOperation: { id: 'synthetic-operation' },
+      busy: false, submission: { current: null },
+      request: async () => { throw denied; }, pending: new Set(),
+      setBusy: value => { state.busy = value; },
+      setMessage: value => { state.message = value; },
+      setStatusUnknown: value => { state.unknown = value; },
+      setJob: value => { state.job = value; },
+      readOperationWithDeadline, statusRecoveryMessage,
+      speakerUnavailable: error => error.code === 'speaker_unavailable',
+      controller: new AbortController(),
+    };
+    const bind = source => new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(source) + ')')(...Object.values(dependencies));
+    await bind(manual)();
+    assert.equal(state.busy, false);
+    assert.equal(state.message, denied.message);
+    await bind(poll)();
+    assert.equal(state.message, denied.message);
+    assert.equal(state.unknown, denied.code === 'authorization');
+    assert.deepEqual(state.job, denied.code === 'speaker_unavailable' ? { state: 'FAILED' } : undefined);
+  }
 });
 
 test('opening Transcript reads local state and does not activate a guest', async () => {
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
   const body = component.slice(component.indexOf('async function restore() {'), component.indexOf('\n    void restore().catch'));
   const legacyId = '113e4567-e89b-42d3-a456-426614174000';
-  for (const saved of [null, legacyId]) {
+  const denied = { lane: 'pro', id: 'synthetic-pro-operation', workerURL: 'https://worker.test', authorizationDeniedBeforeUpload: true };
+  for (const saved of [null, legacyId, JSON.stringify(denied)]) {
     const services = [];
+    const restored = {};
     const dependencies = {
       active: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
       SecureStore: { getItemAsync: async () => saved }, readFreeOperation,
       selectedService: async () => 'production',
+      serviceForWorker: url => { assert.equal(url, denied.workerURL); return 'staging'; },
       clientForService: () => ({ profile: async () => undefined }), supportsProUpload: true,
       setService: service => services.push(service),
       setIdentifySpeakers() {}, setOperation() {}, setPaidOperation() {}, setFreeOperation() {},
       setUsePro() {}, setProAvailable() {}, setServiceReady() {},
+      setJob: job => { restored.job = job; },
+      setProDenied: value => { restored.proDenied = value; },
+      setMessage() {},
     };
     const restore = new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(body) + ')')(...Object.values(dependencies));
     await restore();
     assert.deepEqual(services, [saved ? 'staging' : 'production']);
+    assert.deepEqual(restored, saved?.startsWith('{') ? { job: { state: 'FAILED' }, proDenied: true } : {});
   }
 });
 
