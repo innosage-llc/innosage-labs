@@ -2,12 +2,16 @@
 
 Refs https://github.com/innosage-llc/innosage-labs/issues/104
 
-Lead-owned checkpoint for local M4A sharing. The service stages a byte-for-byte
-copy under the app cache, then invokes the native share sheet. It holds recent
-copies for receiving apps and confines cleanup to its own stale cache entries.
-Recorder has one in-flight share at a time. The Web entry uses its own adapter.
+The V6 worker added one accessible Share audio action beside Transcript in
+each native Library row. The lead-owned service presents a single M4A copy
+through the operating system. The device's receiving app controls its copy.
 
-The Library action component retains the existing Transcript action at this
-checkpoint. The Share audio UI is the next V6-scoped change. Local typechecking
-and platform/filename tests passed. Exact-candidate native receiving-app
-verification and review are pending.
+The service reuses a complete cache copy when the same unchanged recording is
+shared again. A cancelled chooser therefore does not require space for a second
+copy. The service discards incomplete writes and keeps recent complete copies
+available for recipients to read after the chooser returns. Sharing leaves the
+source recording and transcript associations in place.
+
+The regression suite exercises constrained-space retry, partial-copy recovery,
+distinct recording URIs and a missing source. Exact-candidate runtime and
+recipient verification are tracked on the draft PR.
