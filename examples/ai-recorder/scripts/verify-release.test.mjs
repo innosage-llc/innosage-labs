@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { artifact, BUNDLE, REPO, sha } from '../../../scripts/recorder-gate/core.mjs';
-import { verifyRelease } from './verify-release.mjs';
+import { humanListening, verifyRelease } from './verify-release.mjs';
 
 const sourceRevision = 'a'.repeat(40);
 const serial = 'FIXTURE-FONE';
@@ -21,7 +22,7 @@ function fixture(t) {
   const artifactManifest = artifact(apk);
   const apkSha256 = artifactManifest.files[0].sha256;
   const sample = { identity: 'fixture', ready: true, alive: true, foreground: true };
-  const startup = { candidate: { repo: REPO, tested: sourceRevision, head: 'b'.repeat(40),
+  const startup = { candidate: { repo: REPO, pr: 999, tested: sourceRevision, head: 'b'.repeat(40),
     base: 'c'.repeat(40), tree: 'd'.repeat(40) }, platform: 'android', status: 'PASS',
     artifact: artifactManifest, monitor_started_before_launch: true, screenshots: [{ bytes: 9, sha256: sha('fixture') }],
     target: {}, runtime: {}, commands: [{}],
@@ -77,6 +78,7 @@ test('fixture only: same staging installation and a different PID require live i
   const f = fixture(t);
   const ready = await f.call({ serial });
   assert.equal(ready.status, 'PENDING_MANUAL');
+  assert.deepEqual((await f.call()).before, ready.before);
   f.state.pid = '765';
   const confirmation = { serial, confirm: ready.candidateId };
   assert.equal((await f.call(confirmation)).exitCode, 2);
@@ -121,6 +123,10 @@ test('missing/tampered APK, missing/tampered receipt and stale metadata fail clo
   f.writeSpec();
   assert.match((await f.call()).reason, /different source revision/);
   f.spec.sourceRevision = sourceRevision;
+  delete f.startup.candidate.pr;
+  f.writeStartup();
+  assert.match((await f.call()).reason, /repository and PR required/);
+  f.startup.candidate.pr = 999;
   f.startup.artifact.files[0].sha256 = 'f'.repeat(64);
   f.writeStartup();
   assert.match((await f.call()).reason, /startup receipt artifact/);
@@ -190,4 +196,15 @@ test('a differently built distribution artifact is recorded and remains unverifi
   assert.equal(result.candidate.distribution.identity, 'SEPARATE_UNVERIFIED');
   writeFileSync(path, 'changed distribution fixture');
   assert.match((await f.call()).reason, /Distribution artifact SHA-256 mismatch/);
+});
+
+test('unattended or closed interactive input supplies no listening attestation', async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  assert.equal(humanListening(input, output), undefined);
+  input.isTTY = true;
+  output.isTTY = true;
+  const answer = humanListening(input, output);
+  input.end();
+  assert.equal(await answer, undefined);
 });

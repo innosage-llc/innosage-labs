@@ -9,7 +9,7 @@ waveform alone is insufficient. The Founder owns the release decision.
 
 Use Node, Android SDK Platform Tools (`adb`) and SDK Build Tools (`aapt2`).
 Put them on your PATH or set `ADB` and `AAPT2` to the installed executables.
-Reuse the embedded-JS Release APK and its `android/result.json` from the
+Reuse the embedded-JS Release APK and its `android/result.json` from the canonical
 [local Android startup gate](../../../../scripts/recorder-gate/README.md).
 Take `sourceRevision` from that receipt's `candidate.tested`, and the recorded
 APK SHA-256 from `artifact.files[0].sha256`. The top-level `artifact.sha256`
@@ -58,7 +58,7 @@ throughout the session.
 
    Expect `PENDING_MANUAL` (exit 2) and a `before` checkpoint. Keep the printed
    `candidateId`. You can also run without `--serial` to check only local build
-   evidence; that mode leaves `before` empty and cannot be confirmed.
+   evidence. Prepare with the phone before you can confirm.
 3. In Recorder, make and save short, distinct clips using normal recording.
    For example, say “alpha one” repeatedly in the first and “bravo two” in
    the second. Make both long enough to hear clearly, and identify the second

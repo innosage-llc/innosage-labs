@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { closeSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { createInterface } from 'node:readline/promises';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { artifact, BUNDLE, commit, REPO, requireThat, sha, validatePlatform } from '../../../scripts/recorder-gate/core.mjs';
+import { artifact, BUNDLE, commit, requireThat, sha, validateCandidate, validatePlatform } from '../../../scripts/recorder-gate/core.mjs';
 
 const exitCodes = { PASS: 0, FAIL: 1, PENDING_MANUAL: 2 };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -30,10 +30,9 @@ function readCandidate(path, run) {
   requireThat(hash(spec.androidReceiptSha256) && sha(receiptBytes) === spec.androidReceiptSha256,
     'Android startup receipt SHA-256 mismatch');
   const startup = JSON.parse(receiptBytes);
-  requireThat(startup?.candidate?.repo === REPO && startup.candidate.tested === sourceRevision,
-    'Android startup receipt is for a different source revision');
-  for (const key of ['head', 'base', 'tree']) commit(startup.candidate[key]);
-  validatePlatform(startup, startup.candidate, 'android');
+  const buildCandidate = validateCandidate(startup?.candidate);
+  requireThat(buildCandidate.tested === sourceRevision, 'Android startup receipt is for a different source revision');
+  validatePlatform(startup, buildCandidate, 'android');
   requireThat(startup.artifact.sha256 === apkArtifact.sha256 && same(startup.artifact.files, [apkFile]),
     'Staging APK differs from the Android startup receipt artifact');
 
@@ -92,17 +91,20 @@ function runLocal(binary, args) {
   }
 }
 
-async function humanListening() {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return undefined;
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return (await terminal.question(
+export function humanListening(input = process.stdin, output = process.stdout) {
+  if (!input.isTTY || !output.isTTY) return undefined;
+  const terminal = createInterface({ input, output });
+  return new Promise(resolveAnswer => {
+    terminal.once('close', () => resolveAnswer(undefined));
+    terminal.question(
       'Did you supervise saving both distinct clips, force-stop and cold-open Recorder offline, then hear only the second clip from Library?\n' +
-      'Type HEARD SECOND CLIP or FAILED. Leave blank to defer: '
-    )).trim() || undefined;
-  } finally {
-    terminal.close();
-  }
+      'Type HEARD SECOND CLIP or FAILED. Leave blank to defer: ',
+      answer => {
+        resolveAnswer(answer.trim() || undefined);
+        terminal.close();
+      }
+    );
+  });
 }
 
 export async function verifyRelease({ candidatePath, serial, confirm }, {
@@ -167,9 +169,11 @@ export async function verifyRelease({ candidatePath, serial, confirm }, {
       }
     } else {
       if (serial !== undefined) before = installed(serial, candidate, run);
+      else if (prior?.status === 'PENDING_MANUAL') before = prior.before;
       status = 'PENDING_MANUAL';
-      reason = before ? 'Device verified. Complete the offline listening steps, then confirm with the candidate ID.'
-        : 'A physical staging install and supervised listening are still required';
+      reason = serial !== undefined ? 'Device verified. Complete the offline listening steps, then confirm with the candidate ID.'
+        : before ? 'A device checkpoint already exists. Confirm on the original device.'
+          : 'A physical staging install and supervised listening are still required';
     }
   } catch (error) {
     reason = error.message;
