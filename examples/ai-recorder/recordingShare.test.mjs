@@ -12,6 +12,7 @@ let copies;
 let failCopy;
 let failMarker;
 const shown = [];
+const Platform = { OS: 'android' };
 let whileChooserOpen;
 
 class Entry {
@@ -63,6 +64,7 @@ class File extends Entry {
 globalThis.recorderShareTestModules = {
   Directory,
   File,
+  Platform,
   Paths: { cache: new Directory('file:///cache'), get availableDiskSpace() { return freeSpace; } },
   CryptoDigestAlgorithm: { SHA256: 'sha256' },
   digestStringAsync: async (algorithm, value) => createHash(algorithm).update(value).digest('hex'),
@@ -76,6 +78,7 @@ const exportsByPackage = {
   'expo-file-system': 'Directory, File, Paths',
   'expo-crypto': 'CryptoDigestAlgorithm, digestStringAsync',
   'expo-sharing': 'isAvailableAsync, shareAsync',
+  'react-native': 'Platform',
 };
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -101,6 +104,7 @@ beforeEach(() => {
   failCopy = false;
   failMarker = false;
   whileChooserOpen = undefined;
+  Platform.OS = 'android';
 });
 
 test('retry after chooser dismissal reuses the complete copy even if there is room for only one', async () => {
@@ -171,4 +175,27 @@ test('cleanup preserves a recently dismissed share and removes abandoned stale s
   assert.equal(await shareRecording(second, 'Second.m4a'), 'dismissed');
   assert.equal(stale.exists, false);
   assert.equal(files.get(shown[0].uri), 'marker first');
+});
+
+test('keeps Android MIME explicit and lets iOS infer audio from the original M4A extension', async () => {
+  const recording = new File('file:///recordings/platform-test.m4a');
+  files.set(recording.uri, 'marker sample');
+  assert.equal(await shareRecording(recording, 'Platform.m4a'), 'dismissed');
+  assert.deepEqual(shown[0].options, { mimeType: 'audio/mp4' });
+  Platform.OS = 'ios';
+  assert.equal(await shareRecording(recording, 'Platform.m4a'), 'dismissed');
+  assert.equal(shown[1].options, undefined);
+  assert.match(shown[1].uri, /\.m4a$/);
+});
+
+test('recovers the staged copy after the same immutable recording moves to a new app container', async () => {
+  const first = new File('file:///before/recordings/unique.m4a');
+  const after = new File('file:///after/recordings/unique.m4a');
+  files.set(first.uri, 'marker first');
+  assert.equal(await shareRecording(first, 'Unique.m4a'), 'dismissed');
+  files.delete(first.uri);
+  files.set(after.uri, 'marker first');
+  assert.equal(await shareRecording(after, 'Unique.m4a'), 'dismissed');
+  assert.equal(shown[0].uri, shown[1].uri);
+  assert.equal(copies, 1);
 });

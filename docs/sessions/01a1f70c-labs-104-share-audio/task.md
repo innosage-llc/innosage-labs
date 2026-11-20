@@ -13,6 +13,9 @@ available for recipients to read after the chooser returns. The expiry is
 refreshed at dismissal to cover a chooser left open for an extended time. Sharing leaves the
 source recording and transcript associations in place.
 
-The regression suite exercises constrained-space retry, partial-copy recovery,
+Android sets an explicit audio MIME type. iOS passes the .m4a URL itself so
+the system infers audio without adding a second extension.
+
+The regression suite exercises platform file typing, container relocation, constrained-space retry, partial-copy recovery,
 distinct recording URIs, a full-volume cache marker failure and a missing source. Exact-candidate runtime and
 recipient verification are tracked on the draft PR.

@@ -1,6 +1,7 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import { Directory, File, Paths } from 'expo-file-system';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
+import { Platform } from 'react-native';
 
 import { audioShareFilename } from './audioShareFilename';
 
@@ -58,7 +59,7 @@ export async function shareRecording(recording: File, label: string): Promise<Au
 
     const filename = audioShareFilename(label);
     const key = await digestStringAsync(CryptoDigestAlgorithm.SHA256,
-      JSON.stringify([recording.uri, sourceSize, recording.lastModified, filename]));
+      JSON.stringify([recording.name, sourceSize, recording.lastModified, filename]));
     const root = new Directory(Paths.cache, 'recording-shares');
     root.create({ idempotent: true });
     discardExpired(root, key);
@@ -84,7 +85,9 @@ export async function shareRecording(recording: File, label: string): Promise<Au
     incomplete = undefined;
     await retainShare(directory, key);
     try {
-      await shareAsync(copy.uri, { mimeType: 'audio/mp4', UTI: 'public.mpeg-4-audio' });
+      // iOS infers audio from the .m4a URL. A declared type can make Expo
+      // append .mp4 on iOS and cause Files to save it as video.
+      await shareAsync(copy.uri, Platform.OS === 'android' ? { mimeType: 'audio/mp4' } : undefined);
     } finally {
       // Measure the grace period from settlement, including a long-open chooser.
       // Android recipients may still read from the URI after this point.
