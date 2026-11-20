@@ -9,6 +9,7 @@ const directories = new Set();
 let freeSpace;
 let copies;
 let failCopy;
+let failMarker;
 const shown = [];
 
 class Entry {
@@ -44,7 +45,10 @@ class File extends Entry {
     files.set(destination.uri, files.get(this.uri));
     files.delete(this.uri);
   }
-  async write(value) { files.set(this.uri, value); }
+  async write(value) {
+    if (failMarker) throw new Error('no space for cache metadata');
+    files.set(this.uri, value);
+  }
 }
 
 // The native modules cannot load under Node. Exercise the production service
@@ -84,6 +88,7 @@ beforeEach(() => {
   freeSpace = 13;
   copies = 0;
   failCopy = false;
+  failMarker = false;
 });
 
 test('retry after chooser dismissal reuses the complete copy even if there is room for only one', async () => {
@@ -122,4 +127,15 @@ test('a missing source has no chooser action even if its shared copy survives', 
   files.delete(recording.uri);
   assert.equal(await shareRecording(recording, 'Second.m4a'), 'missing');
   assert.equal(shown.length, 1);
+});
+
+test('the chooser still gets a complete copy when its cache marker cannot be written', async () => {
+  const recording = new File('file:///recordings/marker.m4a');
+  files.set(recording.uri, 'marker fresh');
+  failMarker = true;
+  assert.equal(await shareRecording(recording, 'Marker.m4a'), 'dismissed');
+  assert.equal(await shareRecording(recording, 'Marker.m4a'), 'dismissed');
+  assert.equal(copies, 1);
+  assert.equal(shown.length, 2);
+  assert.equal(shown[1].audio, 'marker fresh');
 });

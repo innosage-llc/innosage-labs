@@ -13,5 +13,5 @@ available for recipients to read after the chooser returns. Sharing leaves the
 source recording and transcript associations in place.
 
 The regression suite exercises constrained-space retry, partial-copy recovery,
-distinct recording URIs and a missing source. Exact-candidate runtime and
+distinct recording URIs, a full-volume cache marker failure and a missing source. Exact-candidate runtime and
 recipient verification are tracked on the draft PR.

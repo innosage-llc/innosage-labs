@@ -8,6 +8,7 @@ export type AudioShareOutcome = 'dismissed' | 'missing' | 'unavailable' | 'no-sp
 
 const retentionMs = 24 * 60 * 60 * 1000;
 const leaseName = '.last-share';
+const recentSharesWithoutMarker = new Map<string, number>();
 
 function discard(directory: Directory) {
   try {
@@ -19,10 +20,14 @@ function discard(directory: Directory) {
 
 function discardExpired(root: Directory, currentKey: string) {
   const cutoff = Date.now() - retentionMs;
+  for (const [key, lastUsed] of recentSharesWithoutMarker) {
+    if (lastUsed < cutoff) recentSharesWithoutMarker.delete(key);
+  }
   try {
     for (const entry of root.list()) {
       if (!(entry instanceof Directory) || entry.name === currentKey || !/^[a-f0-9]{64}$/.test(entry.name)) continue;
-      const lastUsed = new File(entry, leaseName).lastModified || entry.info().modificationTime;
+      const lastUsed = recentSharesWithoutMarker.get(entry.name)
+        ?? (new File(entry, leaseName).lastModified || entry.info().modificationTime);
       if (lastUsed && lastUsed < cutoff) discard(entry);
     }
   } catch {
@@ -65,8 +70,16 @@ export async function shareRecording(recording: File, label: string): Promise<Au
       await pending.move(copy);
     }
 
-    await new File(directory, leaseName).write(String(Date.now()));
     incomplete = undefined;
+    const now = Date.now();
+    try {
+      await new File(directory, leaseName).write(String(now));
+      recentSharesWithoutMarker.delete(key);
+    } catch {
+      // Sharing a complete copy must still work if the volume cannot write
+      // its timestamp. Retain it in this process even if the older marker expires.
+      recentSharesWithoutMarker.set(key, now);
+    }
     // Recipients may open the URI after the chooser returns on Android.
     await shareAsync(copy.uri, { mimeType: 'audio/mp4', UTI: 'public.mpeg-4-audio' });
     return 'dismissed';
