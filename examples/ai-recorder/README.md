@@ -8,6 +8,14 @@ after reopening the app.
 For local Android playback diagnostics, see the
 [Library speaker probe](docs/android-speaker-probe.md).
 
+## Share a saved recording
+
+In the Android or iOS Library, find a saved or imported recording and tap
+**Share audio**. Choose a compatible receiving app, or save a local copy when
+the system offers a Files destination. Sharing uses the original M4A bytes
+and works offline without a transcript or account. The receiving app controls
+what it saves. The original remains in Recorder.
+
 ## Finalized save recovery (Android)
 
 New Android captures use a stable identity in persistent storage. On cold launch,
