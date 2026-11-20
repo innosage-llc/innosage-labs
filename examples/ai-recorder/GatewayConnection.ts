@@ -1,7 +1,8 @@
 import { fetch } from 'expo/fetch';
+import { Platform } from 'react-native';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import { createGatewayGuests, type FreeOperation, type GatewayGuest } from './GatewayGuest';
+import { createGatewayGuests, provisionedGuestToken, type FreeOperation, type GatewayGuest } from './GatewayGuest';
 import type { File } from 'expo-file-system';
 import { KnownServiceFailure } from './operationRecovery';
 import type { SpeakerResult } from './transcriptCompletion';
@@ -9,8 +10,12 @@ import type { InnoSageServiceId } from './ServiceConfig';
 import allowedTargets from './recorder-free-targets.json';
 
 const stagingInput = process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL?.replace(/\/$/, '');
-const targets: Partial<Record<InnoSageServiceId, string>> = stagingInput === allowedTargets.staging
-  ? { staging: allowedTargets.staging } : {};
+const productionInput = process.env.EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL?.replace(/\/$/, '');
+const targets: Partial<Record<InnoSageServiceId, string>> = {
+  staging: stagingInput === allowedTargets.staging ? allowedTargets.staging : undefined,
+  production: Platform.OS === 'android' && productionInput === allowedTargets.production
+    ? allowedTargets.production : undefined,
+};
 
 export const gatewayAvailable = (service: InnoSageServiceId) => !!targets[service];
 
@@ -23,7 +28,8 @@ const guests = createGatewayGuests({
       const response = await fetch(`${url}/v1/guests`, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
       });
-      if (response.ok) return (await response.json()).token;
+      const expected = url === allowedTargets.production ? 'production' : 'staging';
+      if (response.ok) return provisionedGuestToken(await response.json(), expected);
     } catch { /* Keep transport details private. */ }
     throw new KnownServiceFailure('Could not activate Free access. Check your connection and retry.');
   },

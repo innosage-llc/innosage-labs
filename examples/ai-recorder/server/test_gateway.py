@@ -20,6 +20,7 @@ class GatewayTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.env = patch.dict(os.environ, {
             "RECORDER_DB": str(Path(self.temp.name) / "state.sqlite3"),
+            "RECORDER_ENVIRONMENT": "staging",
             "RECORDER_PILOT_TOKEN": "synthetic-pilot-token-" + "x" * 32,
             "RECORDER_ROUTER_TOKEN": "synthetic-service-token",
         })
@@ -79,6 +80,57 @@ class GatewayTest(unittest.TestCase):
         ))
         self.router.start()
         self.addCleanup(self.router.stop)
+
+    def production_config(self):
+        return {
+            "RECORDER_ENVIRONMENT": "production",
+            "RECORDER_DB": str(Path(self.temp.name) / "production.sqlite3"),
+            "RECORDER_ROUTER_URL": gateway.PRODUCTION_ROUTER,
+            "RECORDER_PILOT_TOKEN": "",
+        }
+
+    def test_production_uses_separate_state_and_rejects_staging_credentials(self):
+        identity = self.client.head("/internal/recorder/environment")
+        self.assertEqual(identity.status_code, 204)
+        self.assertEqual(identity.headers["X-Recorder-Environment"], "staging")
+        stage_guest = self.client.post("/v1/guests").json()["token"]
+        stage_digest = gateway.guest_digest(stage_guest)
+        operation = "/v1/jobs/" + str(uuid4())
+        with patch.dict(os.environ, self.production_config()), TestClient(gateway.app) as production:
+            identity = production.head("/internal/recorder/environment")
+            self.assertEqual(identity.status_code, 204)
+            self.assertEqual(identity.headers["X-Recorder-Environment"], "production")
+            self.assertNotEqual(gateway.guest_digest(stage_guest), stage_digest)
+            self.assertEqual(production.get(operation, headers=gateway.bearer(stage_guest)).status_code, 401)
+            self.assertEqual(production.get(operation, headers=self.headers).status_code, 401)
+            provisioned = production.post("/v1/guests").json()
+            self.assertEqual(provisioned["environment"], "production")
+            production_guest = provisioned["token"]
+            production_headers = {**gateway.bearer(production_guest), "Content-Type": "audio/mp4"}
+            self.assertEqual(production.get(operation, headers=production_headers).json()["state"], "RESERVED")
+            self.assertEqual(production.put(operation, headers=production_headers, content=b"synthetic-audio").status_code, 200)
+            self.state = "COMPLETED"
+            self.assertEqual(production.get(operation, headers=production_headers).json()["transcript"], "Synthetic original transcript")
+            self.assertEqual(self.uploads, 1)
+        self.assertEqual(self.client.get(operation, headers=gateway.bearer(production_guest)).status_code, 401)
+        self.assertEqual(self.client.get(operation, headers=gateway.bearer(stage_guest)).json()["state"], "RESERVED")
+
+    def test_production_startup_rejects_wrong_router_pilot_and_staging_database(self):
+        staging_db = os.environ["RECORDER_DB"]
+        self.client.post("/v1/guests").raise_for_status()
+        legacy_db = str(Path(self.temp.name) / "legacy.sqlite3")
+        with sqlite3.connect(legacy_db) as db:
+            db.execute("CREATE TABLE guests (digest TEXT PRIMARY KEY)")
+        for invalid in (
+            {"RECORDER_ROUTER_URL": "https://rd.innosage.co:8443"},
+            {"RECORDER_ROUTER_TOKEN": ""},
+            {"RECORDER_PILOT_TOKEN": "x" * 40},
+            {"RECORDER_DB": staging_db},
+            {"RECORDER_DB": legacy_db},
+        ):
+            with self.subTest(invalid=tuple(invalid)), patch.dict(os.environ, {**self.production_config(), **invalid}):
+                with self.assertRaises(RuntimeError), TestClient(gateway.app):
+                    self.fail("Production started with a conflicting configuration")
 
     def test_speaker_choice_survives_status_reads_and_conflicting_retries_reject(self):
         path = "/v1/jobs/" + str(uuid4())

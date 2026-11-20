@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Modal, ScrollView, Text, View } from "react-nativ
 import { TextInput, useNativeState } from "@expo/ui";
 import { Host } from "@expo/ui";
 import { ServiceChoice } from "./ServiceChoice";
+import { gatewayAvailable } from "./GatewayConnection";
 import { supportsProUpload } from "./NativeUpload";
 import { clientForService, selectedService, selectService } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
@@ -21,6 +22,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   const [service, setService] = useState<ServiceId>("staging");
   const access = accessFor(service);
   const isOpenAI = service === "openai";
+  const environment = service === "production" ? "Production" : "Staging";
   const canConfigureKey = isOpenAI || supportsProUpload;
   const [hasKey, setHasKey] = useState(false);
   const [configured, setConfigured] = useState(false);
@@ -102,7 +104,9 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               : !supportsProUpload ? service === 'production'
                 ? 'Production Pro is unavailable on iOS. Select Staging Free access or OpenAI direct.'
                 : 'Use Free access for staging transcriptions. Pro uploads are unavailable on iOS.'
-              : service === 'production' ? 'Requires a production Pro key. Free transcription is currently available only on staging.' : 'Use a staging Pro key, or transcribe with Free access.'}
+              : gatewayAvailable(service)
+                ? `Free guest access is available. Add and verify an optional ${environment} Pro key.`
+                : `${environment} Free access is unavailable in this build. A ${environment} Pro key is required.`}
             {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
           </Text>
           <Text style={{ color: palette.text }}>

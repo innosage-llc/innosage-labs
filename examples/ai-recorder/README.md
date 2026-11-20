@@ -143,7 +143,9 @@ Open a saved M4A in Library, choose **Transcript**, check the displayed service,
 and tap **Transcribe** to authorize upload. Opening Transcript keeps a new recording
 local. The first Free submission provisions a device guest credential for the
 selected environment and saves it in Expo SecureStore. Recovery uses the original
-service, operation and guest identity. This build supports Staging Free access.
+service, operation and guest identity. Staging Free remains available in the
+Staging build. A private Android parity candidate can pair both environments
+after the Production service is qualified.
 
 For an installable Staging Android release, set the approved input before Expo
 prebuild and keep both values set through the existing offline Gradle release recipe.
@@ -155,6 +157,13 @@ export EXPO_PUBLIC_RECORDER_GATEWAY_URL="$(node -p "require('./recorder-free-tar
 ```
 
 The app config rejects a missing or different build input for that release.
+The separate `RECORDER_PARITY_ANDROID_RELEASE=1` marker requires both exact
+allowlisted inputs before prebuild. Use the same Staging input and set
+`EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL` to `production` from
+`recorder-free-targets.json`. The Staging-only marker excludes the Production
+input. Production Free is Android-only and requires a Guest response that
+identifies the Production environment. Verify both live environments before
+publishing a parity build.
 Without an approved input, a development build marks Free transcription
 unavailable. Older jobs recover with their original credential when it belongs
 to the approved Staging route. Recovery for a different historical origin
@@ -167,17 +176,25 @@ format. Preserve local recordings and completed transcripts throughout.
 The single-worker FastAPI Gateway uses SQLite and the Speech Router's
 Recorder-specific Free Guest profile. Configure these server-only variables:
 
-- `RECORDER_DB`, a private SQLite database path.
+- `RECORDER_ENVIRONMENT`, `staging` by default or explicit `production`.
+- `RECORDER_DB`, a private SQLite database path owned by that instance.
 - `RECORDER_ROUTER_URL`, the Router HTTPS origin or loopback forward.
 - `RECORDER_ROUTER_TOKEN`, the Router service credential.
-- Optional `RECORDER_PILOT_TOKEN`, a random credential for manual pilot setup.
+- Optional `RECORDER_PILOT_TOKEN` for legacy Staging recovery. Production must leave it unset.
 
 Install `server/requirements.txt` in a virtual environment, then run
 `uvicorn gateway:app --app-dir server --host 127.0.0.1 --port 8785 --workers 1 --no-access-log`
 behind HTTPS. For this bounded staging milestone, the existing staging Router
 can forward its explicitly enabled `/recorder` paths to the private Gateway.
-Guest registration is capped at 1,000 identities per deployment. Production
-onboarding, account recovery and public distribution need a later milestone.
+Guest registration is capped at 1,000 identities per deployment. A Production
+instance requires a separate private process and state, the fixed Production
+Router HTTPS origin, and its existing environment-specific service authority.
+Production startup rejects an existing unmarked or Staging-marked database.
+The private environment probe lets the Router check the expected Gateway
+before forwarding audio or credentials on the same TLS connection. Its Guest
+response names its environment and its account digest is distinct
+from Staging. Preserve the existing Staging database and pilot recovery on
+upgrade. The inactive candidate grants no service rollout.
 
 Each guest can retrieve only its own operations. The Gateway buffers an upload
 up to the existing Free limit before forwarding it. The Router owns decoded
@@ -196,7 +213,7 @@ provide server-side editing or cross-device synchronization in this milestone.
 Before a new transcription, optionally turn on **Identify speakers**. The default
 is off. The selection belongs to the saved operation and stays fixed during
 retry/recovery. Existing recordings and plain-mode operations remain readable.
-The staging Router must already support speaker attribution; unavailable
+The configured Router must already support speaker attribution; unavailable
 admission offers an explicit new transcription with the switch off.
 
 Attributed editable text uses Speaker 1 / Speaker 2 and Unknown speaker labels.

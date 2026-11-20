@@ -11,3 +11,15 @@ The product controller provisions Free access only after the upload action. Read
 Preliminary independent review identified a retry race, a terminal speaker denial that could become an unknown status, ambiguous Pro authorization recovery, and an unverified legacy Gateway alias. The controller now waits for a confirmed reserved state before a same-operation retry, preserves terminal denials, offers explicit Free selection only after a definitive pre-upload Pro denial, and restores legacy credentials only for the approved Staging origin.
 
 Exact controller review of `89b0d2e` found two Pro denial cases. A definitive identity denial during a new attempt can offer Free even after a prior operation ended. Once a paid transfer may have started, an authorization denial keeps the same paid operation in recovery and blocks another upload until its status is checked. Regression tests exercise both cases and the pre-transfer persisted denial.
+
+## Production parity follow-up
+
+The tested Staging milestone remains at `87e4db2` in PR #110. This follow-up
+prepares an explicit Android parity build and a separately bound, default-off
+Production Guest path. Verify the existing Production Router and the exact
+release set before activating it. Both environments retain the shared Free
+limits, recovery rules and environment-specific Pro profiles.
+
+Independent review found that valid client identity could still reach a miswired
+upstream bridge. The candidate adds the private Gateway environment probe for
+the Router to check before forwarding any credential or audio.
