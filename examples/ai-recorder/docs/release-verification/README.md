@@ -1,5 +1,41 @@
 # Android staging release verification
 
+## Run the automated staging trust-buster
+
+From `examples/ai-recorder` on the qualified Apple silicon macOS emulator setup, run:
+
+```sh
+ANDROID_HOME=/path/to/android-sdk npm run verify:release:staging -- \
+  --candidate /path/to/candidate.json --out /private/path/to/new-run
+```
+
+Use a clean harness checkout, Node 24, an installed compatible JDK, and the Android SDK's command-line
+tools, emulator, Platform Tools, Build Tools 36.0.0 and Android 16 Google APIs
+ARM64 image. The `--out` directory must be new and outside the repository with
+an existing parent. Use the clean checkout that produced the Android receipt
+or a clean checkout of the same Git tree. Pass `--source /path/to/checkout`
+to select it when the runner lives in a separate checkout. The [candidate
+manifest](#prepare-the-candidate) binds the installed APK to the artifact file
+in the local Android startup receipt. The runner creates a fresh Pixel 8 AVD
+and dedicated ADB server. It sets the guest offline before installing and
+exercising Recorder. Leave loopback ports 5117, 5558, 5559 and 8657 free.
+Run one at a time. No physical phone, human
+listening, account, or hosted CI is needed for this staging test.
+
+The app records synthetic A and B through its normal mic, saves distinct
+Library entries, and reopens in a new offline process. The test independently
+captures the emulator speaker and requires B. The same assertion rejects
+silence and stale A, which must itself be audible as A. There are no retries.
+Success exits 0 and writes `result.json`. Failure exits nonzero and retains
+the run receipt, logs, and any audio or Library evidence obtained. Keep
+evidence private. The runner shuts down only its own emulator and ADB server.
+
+This is an opt-in executable product check. [Earlier qualification](https://github.com/innosage-llc/innosage-labs/issues/103)
+found intermittent stale-A evidence. The existing pre-merge gates and the
+physical staging release receipt below retain their respective requirements.
+
+## Supervised physical phone release check
+
 Use this local check for one release promise. After you save two distinct
 recordings offline, force-stop Recorder, and reopen offline, the second saved
 Library item must actually play the second recording. A row, timer, or
