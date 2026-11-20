@@ -51,6 +51,14 @@ type Dependencies = {
   provision(url: string): Promise<unknown>;
 };
 
+export function provisionedGuestToken(payload: unknown, expected: InnoSageServiceId) {
+  if (!payload || typeof payload !== 'object') return;
+  const { token, environment } = payload as Record<string, unknown>;
+  // Older Staging Gateway deployments predate the response environment field.
+  if (environment !== expected && !(expected === 'staging' && environment === undefined)) return;
+  return token;
+}
+
 export function createGatewayGuests({ targets, store, fingerprint, provision }: Dependencies) {
   const pending = new Map<InnoSageServiceId, Promise<GatewayGuest>>();
   const key = (service: InnoSageServiceId) => `${legacyKey}.${service}`;

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { createGatewayGuests, freeRecordingLimit, readFreeOperation } from './GatewayGuest.ts';
+import { createGatewayGuests, provisionedGuestToken, freeRecordingLimit, readFreeOperation } from './GatewayGuest.ts';
 
 const require = createRequire(import.meta.url);
 const configureApp = require('./app.config.js');
@@ -85,23 +85,35 @@ test('unconfigured services fail closed and a staging release rejects invalid bu
   await assert.rejects(restore(readFreeOperation(id)), /unavailable/);
   assert.deepEqual(calls, []);
 
-  const flag = 'RECORDER_STAGING_ANDROID_RELEASE';
-  const input = 'EXPO_PUBLIC_RECORDER_GATEWAY_URL';
-  const prior = [process.env[flag], process.env[input]];
+  const stagingFlag = 'RECORDER_STAGING_ANDROID_RELEASE';
+  const parityFlag = 'RECORDER_PARITY_ANDROID_RELEASE';
+  const stagingInput = 'EXPO_PUBLIC_RECORDER_GATEWAY_URL';
+  const productionInput = 'EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL';
+  const variables = [stagingFlag, parityFlag, stagingInput, productionInput];
+  const prior = variables.map(variable => process.env[variable]);
   const config = { name: 'Recorder' };
   try {
-    delete process.env[input];
-    delete process.env[flag];
+    for (const variable of variables) delete process.env[variable];
     assert.equal(configureApp({ config }), config);
-    process.env[flag] = '1';
-    assert.throws(() => configureApp({ config }), /approved Free gateway/);
-    process.env[input] = production;
-    assert.throws(() => configureApp({ config }), /approved Free gateway/);
-    process.env[input] = approved.staging;
+    process.env[stagingFlag] = '1';
+    assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
+    process.env[stagingInput] = production;
+    assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
+    process.env[stagingInput] = approved.staging;
     assert.equal(configureApp({ config }), config);
-    assert.deepEqual(Object.keys(approved), ['staging']);
+    process.env[productionInput] = approved.production;
+    assert.throws(() => configureApp({ config }), /must exclude the Production Free gateway/);
+    delete process.env[stagingFlag];
+    process.env[parityFlag] = '1';
+    assert.equal(configureApp({ config }), config);
+    delete process.env[productionInput];
+    assert.throws(() => configureApp({ config }), /approved Production Free gateway/);
+    process.env[productionInput] = approved.staging;
+    assert.throws(() => configureApp({ config }), /approved Production Free gateway/);
+    process.env[stagingInput] = approved.production;
+    assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
   } finally {
-    for (const [index, variable] of [flag, input].entries()) {
+    for (const [index, variable] of variables.entries()) {
       if (prior[index] === undefined) delete process.env[variable];
       else process.env[variable] = prior[index];
     }
@@ -114,4 +126,14 @@ test('the same Free limits apply with exact inclusive decimal byte and duration 
   assert.match(freeRecordingLimit(50_000_000, 900_001), /15 minutes/);
   assert.match(freeRecordingLimit(0), /empty/);
   assert.equal(freeRecordingLimit(1), undefined);
+});
+
+
+test('Production provisioning requires an explicit matching environment', () => {
+  const token = 'x'.repeat(43);
+  assert.equal(provisionedGuestToken({ token }, 'staging'), token);
+  assert.equal(provisionedGuestToken({ token }, 'production'), undefined);
+  assert.equal(provisionedGuestToken({ token, environment: 'staging' }, 'production'), undefined);
+  assert.equal(provisionedGuestToken({ token, environment: 'production' }, 'staging'), undefined);
+  assert.equal(provisionedGuestToken({ token, environment: 'production' }, 'production'), token);
 });

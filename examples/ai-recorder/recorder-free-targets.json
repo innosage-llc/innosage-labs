@@ -1,3 +1,4 @@
 {
-  "staging": "https://rd.innosage.co:8443/recorder"
+  "staging": "https://rd.innosage.co:8443/recorder",
+  "production": "https://speech-router.innosage.co:8443/recorder"
 }
