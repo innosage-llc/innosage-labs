@@ -9,7 +9,8 @@ through the operating system. The device's receiving app controls its copy.
 The service reuses a complete cache copy when the same unchanged recording is
 shared again. A cancelled chooser therefore does not require space for a second
 copy. The service discards incomplete writes and keeps recent complete copies
-available for recipients to read after the chooser returns. Sharing leaves the
+available for recipients to read after the chooser returns. The expiry is
+refreshed at dismissal to cover a chooser left open for an extended time. Sharing leaves the
 source recording and transcript associations in place.
 
 The regression suite exercises constrained-space retry, partial-copy recovery,

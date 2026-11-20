@@ -35,6 +35,17 @@ function discardExpired(root: Directory, currentKey: string) {
   }
 }
 
+async function retainShare(directory: Directory, key: string) {
+  const now = Date.now();
+  try {
+    await new File(directory, leaseName).write(String(now));
+    recentSharesWithoutMarker.delete(key);
+  } catch {
+    // A complete copy is shareable even if the volume cannot write its timestamp.
+    recentSharesWithoutMarker.set(key, now);
+  }
+}
+
 export async function shareRecording(recording: File, label: string): Promise<AudioShareOutcome> {
   let incomplete: Directory | undefined;
   try {
@@ -71,17 +82,14 @@ export async function shareRecording(recording: File, label: string): Promise<Au
     }
 
     incomplete = undefined;
-    const now = Date.now();
+    await retainShare(directory, key);
     try {
-      await new File(directory, leaseName).write(String(now));
-      recentSharesWithoutMarker.delete(key);
-    } catch {
-      // Sharing a complete copy must still work if the volume cannot write
-      // its timestamp. Retain it in this process even if the older marker expires.
-      recentSharesWithoutMarker.set(key, now);
+      await shareAsync(copy.uri, { mimeType: 'audio/mp4', UTI: 'public.mpeg-4-audio' });
+    } finally {
+      // Measure the grace period from settlement, including a long-open chooser.
+      // Android recipients may still read from the URI after this point.
+      await retainShare(directory, key);
     }
-    // Recipients may open the URI after the chooser returns on Android.
-    await shareAsync(copy.uri, { mimeType: 'audio/mp4', UTI: 'public.mpeg-4-audio' });
     return 'dismissed';
   } catch {
     return 'failed';
