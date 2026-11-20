@@ -75,6 +75,17 @@ test('Web uses the shared app/navigation with isolated browser adapters and no n
   assert.doesNotMatch(files.get(resolve(root, 'captureOwner.web.ts')), /getUserMedia|requestRecordingPermissionsAsync/);
 });
 
+test('only the native entry graphs can load the local audio sharing service', () => {
+  for (const platform of ['android', 'ios']) {
+    const native = graph(platform).get(resolve(root, 'recordingShare.ts'));
+    assert.match(native, /from ['"]expo-sharing/);
+  }
+  const web = graph('web');
+  assert.ok(web.has(resolve(root, 'recordingShare.web.ts')));
+  assert.ok(!web.has(resolve(root, 'recordingShare.ts')));
+  for (const source of web.values()) assert.doesNotMatch(source, /from ['"]expo-sharing/);
+});
+
 test('unsupported uploader fails explicitly without loading a native module or performing a request', async () => {
   assert.equal(supportsProUpload, false);
   await assert.rejects(uploadRecording('https://example.invalid', new Blob(['test']), {}), /InnoSage Pro uploads require Android/);

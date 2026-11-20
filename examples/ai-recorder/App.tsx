@@ -12,6 +12,8 @@ import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
 import { ActionButton } from './ui/ActionButton';
 import { RecordControl } from './ui/RecordControl';
+import { RecordingActions } from './ui/recording-actions';
+import { shareRecording } from './recordingShare';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
 import { hasSavedFeedback } from './ui/recordFeedback';
 import { canSwitchDestination, type RootDestination } from './ui/navigation';
@@ -66,6 +68,8 @@ function RecorderScreen() {
   const setCapturePhase = session.setPhase;
   const setMessage = session.setMessage;
   const playRequest = useRef(0);
+  const sharing = useRef(false);
+  const [sharePending, setSharePending] = useState(false);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
   const library = useRef<FlatList<File>>(null);
   const [libraryReady, setLibraryReady] = useState(false);
@@ -183,6 +187,23 @@ function RecorderScreen() {
         // A cache cleanup failure must not leave the import controls disabled.
       }
       setCapturePhase('idle');
+    }
+  }
+
+  async function shareAudio(file: File, label: string) {
+    if (!recordings || sharing.current || session.getSnapshot().phase !== 'idle') return;
+    sharing.current = true;
+    setSharePending(true);
+    setMessage('');
+    try {
+      const result = await shareRecording(file, label);
+      if (result === 'missing') setMessage('This recording is unavailable on this device.');
+      if (result === 'unavailable') setMessage('Audio sharing is unavailable on this device.');
+      if (result === 'no-space') setMessage('Free up storage to share a copy of this recording.');
+      if (result === 'failed') setMessage('Could not share the audio. Check available storage and try again.');
+    } finally {
+      sharing.current = false;
+      setSharePending(false);
     }
   }
 
@@ -307,7 +328,7 @@ function RecorderScreen() {
           <Text style={styles.cardTitle}>Your recordings live here</Text>
           <Text style={styles.support}>Make a recording or import an M4A file. Playback and transcript choices stay on this device.</Text>
         </View>}
-        extraData={{ playback, handoff }}
+        extraData={{ playback, handoff, sharePending }}
         renderItem={({ item }) => {
           const selected = playingFile === item.uri;
           const action = selected && playback.playing ? 'Pause' : 'Play';
@@ -348,8 +369,9 @@ function RecorderScreen() {
                   </View>
                 </>
               ) : null}
-              <ActionButton title="Transcript" fullWidth={false} accessibilityLabel={`Transcript for ${label}`} variant="text"
-                disabled={phase !== 'idle'} onPress={() => {
+              <RecordingActions label={label} disabled={phase !== 'idle'} shareDisabled={sharePending}
+                onShare={recordings ? () => { void shareAudio(item, label); } : undefined}
+                onTranscript={() => {
                   if (session.getSnapshot().phase !== 'idle') return;
                   ++playRequest.current;
                   player.pause(); dispatchHandoff({ type: 'leave' }); setTranscriptRecording(item);
