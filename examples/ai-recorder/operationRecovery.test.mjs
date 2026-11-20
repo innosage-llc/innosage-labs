@@ -86,11 +86,14 @@ test('status reads retain authorization guidance and treat speaker denial as ter
 test('opening Transcript reads local state and does not activate a guest', async () => {
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
   const body = component.slice(component.indexOf('async function restore() {'), component.indexOf('\n    void restore().catch'));
+  const planEligibility = component.match(/const canChangeInnoSagePlan = ([^;]+);/)[1];
+  const canChangePlan = new Function('canUseFree', 'canChooseSpeakers', 'proAvailable', 'proDenied', `return ${planEligibility};`);
   const legacyId = '113e4567-e89b-42d3-a456-426614174000';
   const denied = { lane: 'pro', id: 'synthetic-pro-operation', workerURL: 'https://worker.test', authorizationDeniedBeforeUpload: true };
   for (const saved of [null, legacyId, JSON.stringify(denied)]) {
     const services = [];
     const restored = {};
+    let hasProProfile;
     const dependencies = {
       active: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
       SecureStore: { getItemAsync: async () => saved }, readFreeOperation,
@@ -99,7 +102,7 @@ test('opening Transcript reads local state and does not activate a guest', async
       clientForService: () => ({ profile: async () => undefined }), supportsProUpload: true,
       setService: service => services.push(service),
       setIdentifySpeakers() {}, setOperation() {}, setPaidOperation() {}, setFreeOperation() {},
-      setUsePro() {}, setProAvailable() {}, setServiceReady() {},
+      setUsePro() {}, setProAvailable: value => { hasProProfile = value; }, setServiceReady() {},
       setJob: job => { restored.job = job; },
       setProDenied: value => { restored.proDenied = value; },
       setMessage() {},
@@ -107,7 +110,12 @@ test('opening Transcript reads local state and does not activate a guest', async
     const restore = new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(body) + ')')(...Object.values(dependencies));
     await restore();
     assert.deepEqual(services, [saved ? 'staging' : 'production']);
-    assert.deepEqual(restored, saved?.startsWith('{') ? { job: { state: 'FAILED' }, proDenied: true } : {});
+    const deniedBeforeTransfer = saved?.startsWith('{') === true;
+    assert.deepEqual(restored, deniedBeforeTransfer ? { job: { state: 'FAILED' }, proDenied: true } : {});
+    assert.equal(hasProProfile, false);
+    assert.equal(canChangePlan(true, true, hasProProfile, restored.proDenied === true), deniedBeforeTransfer);
+    assert.equal(canChangePlan(false, true, hasProProfile, restored.proDenied === true), false);
+    assert.equal(canChangePlan(true, false, hasProProfile, restored.proDenied === true), false);
   }
 });
 

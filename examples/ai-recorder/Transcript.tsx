@@ -429,6 +429,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
   const canUseFree = !isOpenAI && gatewayAvailable(service);
+  const canChangeInnoSagePlan = canUseFree && canChooseSpeakers && (proAvailable || proDenied);
   const retryService = () => {
     setMessage('');
     setConnecting(true);
@@ -498,7 +499,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
               canUseFree={canUseFree}
               supportsPro={supportsProUpload}
               usePro={usePro}
-              canChoosePro={proAvailable && canUseFree && canChooseSpeakers}
+              canChoosePro={canChangeInnoSagePlan}
               proDenied={proDenied}
               isProduction={service === 'production'}
               hasOperation={!!operation}
