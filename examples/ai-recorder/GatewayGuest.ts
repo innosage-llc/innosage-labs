@@ -21,6 +21,7 @@ function readObject(value: string | null): Record<string, unknown> | undefined {
   try { parsed = JSON.parse(value); }
   catch { throw new Error('Could not recover the saved Free access.'); }
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+  throw new Error('Could not recover the saved Free access.');
 }
 
 /** Only the original UUID and Staging JSON formats may lack a bound identity. */
@@ -42,7 +43,6 @@ export function readFreeOperation(saved: unknown): FreeOperation | LegacyFreeOpe
 
 type Dependencies = {
   targets: Readonly<Partial<Record<InnoSageServiceId, string>>>;
-  previousStagingUrl?: string;
   store: {
     getItemAsync(key: string): Promise<string | null>;
     setItemAsync(key: string, value: string): Promise<void>;
@@ -51,7 +51,7 @@ type Dependencies = {
   provision(url: string): Promise<unknown>;
 };
 
-export function createGatewayGuests({ targets, previousStagingUrl, store, fingerprint, provision }: Dependencies) {
+export function createGatewayGuests({ targets, store, fingerprint, provision }: Dependencies) {
   const pending = new Map<InnoSageServiceId, Promise<GatewayGuest>>();
   const key = (service: InnoSageServiceId) => `${legacyKey}.${service}`;
 
@@ -75,8 +75,7 @@ export function createGatewayGuests({ targets, previousStagingUrl, store, finger
   async function legacyGuest(url: string) {
     const saved = readObject(await store.getItemAsync(legacyKey));
     if (typeof saved?.url !== 'string' || typeof saved.token !== 'string' || !bearer.test(saved.token)) return;
-    const oldUrl = saved.url.replace(/\/$/, '');
-    if (oldUrl !== url && oldUrl !== previousStagingUrl) return;
+    if (saved.url.replace(/\/$/, '') !== url) return;
     return { service: 'staging' as const, url, token: saved.token, accountScope: await fingerprint(saved.token) };
   }
 

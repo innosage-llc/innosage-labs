@@ -16,7 +16,6 @@ export const gatewayAvailable = (service: InnoSageServiceId) => !!targets[servic
 
 const guests = createGatewayGuests({
   targets,
-  previousStagingUrl: process.env.EXPO_PUBLIC_RECORDER_PREVIOUS_GATEWAY_URL?.replace(/\/$/, ''),
   store: SecureStore,
   fingerprint: token => digestStringAsync(CryptoDigestAlgorithm.SHA256, token),
   provision: async url => {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ProServiceError } from './ProClient.ts';
+import { freeRecordingLimit, readFreeOperation } from './GatewayGuest.ts';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 // Resolve the app's extensionless import for Node without changing Expo/Metro settings.
@@ -63,6 +64,7 @@ test('manual status checks and automatic polling retain revoked-key guidance', a
     setMessage: value => { state.message = value; },
     setStatusUnknown: value => { state.unknown = value; },
     readOperationWithDeadline, statusRecoveryMessage,
+    speakerUnavailable: () => false,
     controller: new AbortController(),
   };
   const bind = source => new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(source) + ')')(...Object.values(dependencies));
@@ -72,4 +74,70 @@ test('manual status checks and automatic polling retain revoked-key guidance', a
   await bind(poll)();
   assert.equal(state.message, denied.message);
   assert.equal(state.unknown, true);
+});
+
+test('opening Transcript reads local state and does not activate a guest', async () => {
+  const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
+  const body = component.slice(component.indexOf('async function restore() {'), component.indexOf('\n    void restore().catch'));
+  const legacyId = '113e4567-e89b-42d3-a456-426614174000';
+  for (const saved of [null, legacyId]) {
+    const services = [];
+    const dependencies = {
+      active: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
+      SecureStore: { getItemAsync: async () => saved }, readFreeOperation,
+      selectedService: async () => 'production',
+      clientForService: () => ({ profile: async () => undefined }), supportsProUpload: true,
+      setService: service => services.push(service),
+      setIdentifySpeakers() {}, setOperation() {}, setPaidOperation() {}, setFreeOperation() {},
+      setUsePro() {}, setProAvailable() {}, setServiceReady() {},
+    };
+    const restore = new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(body) + ')')(...Object.values(dependencies));
+    await restore();
+    assert.deepEqual(services, [saved ? 'staging' : 'production']);
+  }
+});
+
+test('Free submission checks known limits and binds access before upload', async () => {
+  const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
+  const body = component.slice(component.indexOf('async function submit() {'), component.indexOf('\n  async function save() {'));
+  const run = async ({ service, state, resumed, size = 50_000_000, duration = 900_000, available = true }) => {
+    const events = [];
+    const operationId = 'original-operation';
+    const guest = { service, accountScope: 'a'.repeat(64) };
+    const prior = { lane: 'free', id: operationId, identifySpeakers: true, ...guest };
+    const dependencies = {
+      service, connecting: false, supportsProUpload: true, usePro: false, serviceReady: true,
+      submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
+      operation: resumed ? operationId : undefined, freeOperation: resumed ? prior : undefined,
+      paidOperation: undefined, job: state ? { state } : undefined, identifySpeakers: false,
+      committedResult: async () => undefined, recording: { size },
+      terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
+      gatewayAvailable: id => id === service && available, freeRecordingLimit,
+      recordingDurationMillis: async () => duration,
+      connectGateway: async id => { assert.equal(id, service); events.push('guest'); return guest; },
+      restoreGateway: async existing => { assert.deepEqual(existing, prior); events.push('restore'); return guest; },
+      randomUUID: () => 'new-operation', operationKey: 'synthetic-operation-key',
+      SecureStore: { setItemAsync: async (_key, value) => { events.push(['save', JSON.parse(value)]); } },
+      request: async (operation, upload) => { assert.equal(upload, true); events.push(['upload', operation]); },
+      setBusy() {}, setOperation() {}, setFreeOperation() {}, setPaidOperation() {}, setJob() {}, setStatusUnknown() {},
+      setMessage: message => { if (message) events.push(message); },
+      KnownServiceFailure, ProServiceError, speakerUnavailable: () => false,
+    };
+    const submit = new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(body) + ')')(...Object.values(dependencies));
+    await submit();
+    return { events, prior, guest };
+  };
+  for (const service of ['staging', 'production']) {
+    for (const state of [undefined, 'UPLOADING', 'QUEUED', 'COMPLETED']) {
+      assert.deepEqual((await run({ service, state, resumed: true })).events, []);
+    }
+    assert.deepEqual((await run({ service, size: 50_000_001 })).events, ['This recording is larger than the Free limit of 50 MB.']);
+    assert.deepEqual((await run({ service, duration: 900_001 })).events, ['This recording is longer than the Free limit of 15 minutes.']);
+    assert.deepEqual((await run({ service, available: false })).events, ['Free transcription is unavailable for this environment in this build.']);
+    const fresh = await run({ service });
+    const freshOperation = { lane: 'free', id: 'new-operation', identifySpeakers: false, ...fresh.guest };
+    assert.deepEqual(fresh.events, ['guest', ['save', freshOperation], ['upload', freshOperation]]);
+    const retry = await run({ service, state: 'RESERVED', resumed: true });
+    assert.deepEqual(retry.events, ['restore', ['save', retry.prior], ['upload', retry.prior]]);
+  }
 });

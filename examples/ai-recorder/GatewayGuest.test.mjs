@@ -9,7 +9,6 @@ const configureApp = require('./app.config.js');
 const approved = require('./recorder-free-targets.json');
 const staging = 'https://staging.example.test/recorder';
 const production = 'https://production.example.test/recorder';
-const previous = 'https://old-staging.example.test';
 const id = '113e4567-e89b-42d3-a456-426614174000';
 const oldToken = 'legacy-token'.repeat(4);
 const fingerprint = async token => createHash('sha256').update(token).digest('hex');
@@ -18,7 +17,7 @@ function fixture(targets = { staging, production }) {
   const calls = [];
   const storage = new Map();
   const guests = createGatewayGuests({
-    targets, previousStagingUrl: previous, fingerprint,
+    targets, fingerprint,
     store: {
       getItemAsync: async key => storage.get(key) ?? null,
       setItemAsync: async (key, value) => { storage.set(key, value); },
@@ -55,7 +54,9 @@ test('legacy UUID and two JSON shapes recover only against their approved Stagin
   await assert.rejects(restore(legacy), /original operation/);
   storage.set('recorder.gateway', JSON.stringify({ url: production, token: oldToken }));
   await assert.rejects(restore(legacy), /original operation/);
-  const existing = JSON.stringify({ url: previous, token: oldToken });
+  storage.set('recorder.gateway', JSON.stringify({ url: 'https://unverified.example.test', token: oldToken }));
+  await assert.rejects(restore(legacy), /original operation/);
+  const existing = JSON.stringify({ url: `${staging}/`, token: oldToken });
   storage.set('recorder.gateway', existing);
   assert.equal((await restore(legacy)).url, staging);
   assert.equal((await connect('staging')).token, oldToken);

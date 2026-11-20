@@ -27,6 +27,7 @@ import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyF
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
+type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
   QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
@@ -34,6 +35,8 @@ const stateLabels: Record<string, string> = {
 };
 const pending = new Set(['UPLOADING', 'STAGED', 'QUEUED', 'PROCESSING']);
 const terminal = new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']);
+const speakerUnavailable = (error: unknown) => error instanceof GuestSpeakerUnavailable ||
+  (error instanceof ProServiceError && error.code === 'speaker_unavailable');
 
 async function saveText(file: File, text: string) {
   const temporary = new File(file.parentDirectory, file.name + '.pending');
@@ -140,7 +143,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       const savedOperation = await SecureStore.getItemAsync(operationKey);
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
-      const paid: ProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
+      const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
       const free = saved && saved.lane !== 'openai' && !paid ? readFreeOperation(saved) : undefined;
       const restoredService = paid ? serviceForWorker(paid.workerURL) : free ? free.service
         : saved?.lane === 'openai' ? 'openai' : await selectedService();
@@ -153,6 +156,11 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       setPaidOperation(paid);
       setFreeOperation(free);
       setUsePro(!!paid);
+      if (!committed && paid?.authorizationDeniedBeforeUpload === true) {
+        setJob({ state: 'FAILED' });
+        setProDenied(true);
+        setMessage('Pro authorization is unavailable or expired. Check your API key.');
+      }
       if (committed) {
         setServiceReady(true);
         if (active && paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
@@ -178,17 +186,19 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     return () => { active = false; submission.current?.abort(); };
   }, [operationKey, restoreAttempt]);
 
-  async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined) {
+  async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined, onTransfer?: () => void) {
     let result: Job;
     if (paid) {
       if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
       const operationClient = clientForOperation(paid);
       result = upload
-        ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal)
+        ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal, onTransfer)
         : await operationClient.read(paid, recording.name, signal);
     } else {
       if (!free) throw new KnownServiceFailure('Could not recover this recording’s Free operation.');
-      const guest = await restoreGateway(free);
+      const guest = await restoreGateway(free).catch(() => {
+        throw new KnownServiceFailure('Could not restore Free access for this recording’s original operation.');
+      });
       result = await requestGuestJob(guest, { ...free, accountScope: guest.accountScope }, upload ? recording : undefined, signal);
     }
     const local = await persistResult(result);
@@ -213,6 +223,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   const complete = job?.state === 'COMPLETED';
+  const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (complete && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
@@ -225,7 +236,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     return revision.exists ? revision.text() : undefined;
   }
   useEffect(() => {
-    if ((!freeOperation && !paidOperation) || connecting || !serviceReady || busy || complete || statusUnknown) return;
+    if ((!freeOperation && !paidOperation) || connecting || !serviceReady || busy || complete || statusUnknown || operationEnded) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -236,14 +247,16 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         if (pending.has(result.state) && !controller.signal.aborted) timer = setTimeout(poll, 3000);
       } catch (error) {
         if (!controller.signal.aborted) {
-          setStatusUnknown(true);
+          const denied = speakerUnavailable(error);
+          if (denied) setJob({ state: 'FAILED' });
+          setStatusUnknown(!denied);
           setMessage(statusRecoveryMessage(error));
         }
       }
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [freeOperation, connecting, serviceReady, busy, complete, paidOperation, statusUnknown]);
+  }, [freeOperation, connecting, serviceReady, busy, complete, paidOperation, statusUnknown, operationEnded]);
 
   async function checkOperationStatus() {
     if ((!freeOperation && !paidOperation) || busy || submission.current) return;
@@ -261,7 +274,9 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         : result.state === 'COMPLETED' ? 'Transcript recovered from the same operation.'
           : result.state === 'RESERVED' ? 'This operation is ready to retry.' : 'This operation has ended.');
     } catch (error) {
-      setStatusUnknown(true);
+      const denied = speakerUnavailable(error);
+      if (denied) setJob({ state: 'FAILED' });
+      setStatusUnknown(!denied);
       setMessage(statusRecoveryMessage(error));
     } finally {
       if (submission.current === controller) submission.current = null;
@@ -271,13 +286,16 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 
   async function submit() {
     if ((!supportsProUpload && (usePro || service === 'production')) || connecting || !serviceReady || submission.current || busy) return;
-    if (isOpenAI ? !openAIConfigured && !unsavedOpenAI : statusUnknown || pending.has(job?.state ?? '')) return;
+    if (isOpenAI ? !openAIConfigured && !unsavedOpenAI
+      : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminal.has(job?.state ?? ''))) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
     let openAIRequestStarted = false;
     let serviceRequestStarted = false;
+    let freshPaid: ProOperation | undefined;
+    let paidTransferStarted = false;
     try {
       const alreadySaved = await committedResult();
       if (alreadySaved) {
@@ -314,6 +332,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         controller.signal.throwIfAborted();
         paid = { lane: 'pro', id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`,
           identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size };
+        freshPaid = paid;
       } else if (!paid) {
         if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
         const sizeLimit = freeRecordingLimit(recording.size);
@@ -337,7 +356,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
       try {
         serviceRequestStarted = true;
-        await request(free, true, controller.signal, paid);
+        await request(free, true, controller.signal, paid, () => { paidTransferStarted = true; });
         setStatusUnknown(false);
       } finally {
         clearTimeout(timeout);
@@ -359,10 +378,19 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
           ? 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.'
           : failure ?? 'Could not submit the recording.');
       }
-      if (error instanceof GuestSpeakerUnavailable || (error instanceof ProServiceError && error.code === 'speaker_unavailable')) {
-        setJob({ state: 'FAILED' });
+      if (speakerUnavailable(error)) setJob({ state: 'FAILED' });
+      if (usePro && error instanceof ProServiceError && error.code === 'authorization') {
+        if (freshPaid && !paidTransferStarted) {
+          try {
+            const denied: StoredProOperation = { ...freshPaid, authorizationDeniedBeforeUpload: true };
+            await SecureStore.setItemAsync(operationKey, JSON.stringify(denied));
+            setJob({ state: 'FAILED' });
+            setProDenied(true);
+          } catch {
+            setMessage('Could not save the authorization result. Retry this operation when access is available.');
+          }
+        } else if (!operation) setProDenied(true);
       }
-      if (!operation && usePro && error instanceof ProServiceError && error.code === 'authorization') setProDenied(true);
     } finally {
       if (submission.current === controller) submission.current = null;
       setBusy(false);
@@ -469,8 +497,8 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
               isProduction={service === 'production'}
               hasOperation={!!operation}
               jobState={job && (stateLabels[job.state] ?? job.state)}
-              operationEnded={!!job && terminal.has(job.state)}
-              operationPending={pending.has(job?.state ?? '')}
+              operationEnded={operationEnded}
+              operationPending={!!operation && (!job || pending.has(job.state))}
               statusUnknown={statusUnknown}
               identifySpeakers={identifySpeakers}
               canChooseSpeakers={canChooseSpeakers}
