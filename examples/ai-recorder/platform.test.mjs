@@ -22,6 +22,10 @@ function graph(platform) {
       const specifier = node.moduleSpecifier.text;
       if (!specifier.startsWith('.')) continue;
       const base = resolve(dirname(file), specifier);
+      if (specifier.endsWith('.json')) {
+        JSON.parse(readFileSync(base, 'utf8'));
+        continue;
+      }
       const target = [`.${platform}.tsx`, `.${platform}.ts`, '.native.tsx', '.native.ts', '.tsx', '.ts']
         .map(ext => base + ext).find(existsSync);
       assert.ok(target, `Unresolved local import ${specifier} in ${file}`);

@@ -3,6 +3,7 @@ import { randomUUID } from "expo-crypto";
 import type { File } from "expo-file-system";
 
 type UploadModule = {
+  recordingDurationMillis(uri: string): Promise<number | null>;
   upload(
     id: string,
     url: string,
@@ -14,6 +15,11 @@ type UploadModule = {
   cancel(id: string): void;
   release(id: string): void;
 };
+
+export async function recordingDurationMillis(file: { uri: string }): Promise<number | undefined> {
+  const native = requireNativeModule<UploadModule>('RecorderUpload');
+  return (await native.recordingDurationMillis(file.uri)) ?? undefined;
+}
 
 export async function uploadRecording(
   url: string,
