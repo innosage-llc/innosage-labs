@@ -11,7 +11,7 @@ const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const pid = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value);
 
-function readCandidate(path, run) {
+export function readCandidate(path, run = runLocal) {
   const spec = json(path);
   const sourceRevision = commit(spec?.sourceRevision);
   requireThat(spec.schemaVersion === 1 && typeof spec.versionName === 'string' && spec.versionName.trim() &&

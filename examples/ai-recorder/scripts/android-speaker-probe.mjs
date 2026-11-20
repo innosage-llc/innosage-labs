@@ -183,7 +183,7 @@ function target(adbPort, serial, avd, pid) {
   requireThat(properties['avd.name'] === avd && properties['port.serial'] === serial.slice(9) &&
     properties['grpc.token'] && Number.isInteger(port) && port > 1024 && port <= 65_535, 'Audio endpoint identity mismatch');
   process.kill(Number(pid), 0);
-  const adb = (...args) => runAsync('adb', ['-H', 'localhost', '-P', adbPort, '-s', serial, ...args], { timeout: 20_000 });
+  const adb = (...args) => runAsync('adb', ['-H', '127.0.0.1', '-P', adbPort, '-s', serial, ...args], { timeout: 20_000 });
   return { adb, port, token: properties['grpc.token'], avd, serial, pid, emulator: properties['emulator.version'] };
 }
 
