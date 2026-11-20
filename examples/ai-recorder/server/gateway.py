@@ -1,5 +1,5 @@
 """Private, single-worker Android milestone gateway."""
-from contextlib import closing
+from contextlib import asynccontextmanager, closing, contextmanager
 import hashlib
 import hmac
 import json
@@ -14,12 +14,70 @@ from uuid import UUID
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
 
 MAX_BYTES = 50_000_000
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+PRODUCTION_ROUTER = "https://speech-router.innosage.co:8443"
 operations = Lock()
+
+
+def recorder_environment():
+    environment = os.environ.get("RECORDER_ENVIRONMENT", "staging")
+    if environment not in {"staging", "production"}:
+        raise RuntimeError("Invalid Recorder Gateway environment")
+    return environment
+
+
+def production_router():
+    if (os.environ.get("RECORDER_ROUTER_URL", "").removesuffix("/") != PRODUCTION_ROUTER
+            or not os.environ.get("RECORDER_ROUTER_TOKEN")
+            or os.environ.get("RECORDER_PILOT_TOKEN")):
+        raise RuntimeError("Production Recorder Gateway requires the Production Router and a service credential, with pilot access disabled")
+    return PRODUCTION_ROUTER
+
+
+@contextmanager
+def state_db():
+    environment = recorder_environment()
+    with closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not db.execute("SELECT 1 FROM sqlite_schema WHERE name='recorder_environment'").fetchone():
+            if environment == "production" and db.execute(
+                "SELECT 1 FROM sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*'"
+            ).fetchone():
+                raise RuntimeError("Production Recorder Gateway requires its own new or Production-marked state")
+            db.execute("CREATE TABLE recorder_environment (id INTEGER PRIMARY KEY CHECK(id=1), name TEXT NOT NULL)")
+            db.execute("INSERT INTO recorder_environment VALUES (1, ?)", (environment,))
+        if db.execute("SELECT name FROM recorder_environment WHERE id=1").fetchone() != (environment,):
+            raise RuntimeError("Recorder Gateway state belongs to a different environment")
+        db.commit()
+        yield db
+
+
+def guest_digest(token):
+    # Keep existing Staging identities stable, including pilot-created jobs.
+    material = f"recorder-production-v1:{token}" if recorder_environment() == "production" else token
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    if recorder_environment() == "production":
+        production_router()
+        with state_db():
+            pass
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+
+
+@app.head("/internal/recorder/environment")
+def gateway_environment():
+    return Response(status_code=204, headers={
+        "X-Recorder-Environment": recorder_environment(), "Cache-Control": "no-store",
+    })
 
 
 def identity(request):
@@ -27,12 +85,12 @@ def identity(request):
     if not supplied.startswith("Bearer ") or len(supplied) > 256:
         raise HTTPException(401, "Unauthorized")
     token = supplied[7:]
-    digest = hashlib.sha256(token.encode()).hexdigest()
-    with closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+    digest = guest_digest(token)
+    with state_db() as db:
         db.execute("CREATE TABLE IF NOT EXISTS guests (digest TEXT PRIMARY KEY)")
         registered = db.execute("SELECT 1 FROM guests WHERE digest=?", (digest,)).fetchone()
     if registered is None:
-        pilot = os.environ.get("RECORDER_PILOT_TOKEN", "")
+        pilot = os.environ.get("RECORDER_PILOT_TOKEN", "") if recorder_environment() == "staging" else ""
         if len(pilot) < 32 or not hmac.compare_digest(token, pilot):
             raise HTTPException(401, "Unauthorized")
     return "recorder_free_v1_" + digest
@@ -41,19 +99,21 @@ def identity(request):
 @app.post("/v1/guests")
 def create_guest():
     token = secrets.token_urlsafe(32)
-    with closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+    with state_db() as db:
         db.execute("CREATE TABLE IF NOT EXISTS guests (digest TEXT PRIMARY KEY)")
         db.execute("BEGIN IMMEDIATE")
         if db.execute("SELECT COUNT(*) FROM guests").fetchone()[0] >= 1000:
             raise HTTPException(503, "Guest registration capacity reached")
-        db.execute("INSERT INTO guests VALUES (?)", (hashlib.sha256(token.encode()).hexdigest(),))
+        db.execute("INSERT INTO guests VALUES (?)", (guest_digest(token),))
         db.commit()
-    return {"token": token}
+    return {"token": token, "environment": recorder_environment()}
 
 
 def router_client():
-    address = os.environ["RECORDER_ROUTER_URL"]
+    address = production_router() if recorder_environment() == "production" else os.environ["RECORDER_ROUTER_URL"]
     url = urlsplit(address)
+    if recorder_environment() == "staging" and url.hostname == urlsplit(PRODUCTION_ROUTER).hostname:
+        raise RuntimeError("Staging Recorder Gateway cannot use the Production Router")
     if url.scheme != "https" and not (
         url.scheme == "http" and url.hostname in {"127.0.0.1", "::1", "localhost"}
     ):
@@ -92,7 +152,7 @@ def speaker_result(router, path, headers, status):
 
 
 def job(account, operation, source=None, length=0, digest=None, identify_speakers=None):
-    with operations, closing(sqlite3.connect(Path(os.environ["RECORDER_DB"]))) as db:
+    with operations, state_db() as db:
         db.execute("""CREATE TABLE IF NOT EXISTS transcripts (
             account TEXT, operation TEXT, text TEXT, PRIMARY KEY(account, operation)
         )""")

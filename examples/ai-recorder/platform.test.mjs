@@ -22,6 +22,10 @@ function graph(platform) {
       const specifier = node.moduleSpecifier.text;
       if (!specifier.startsWith('.')) continue;
       const base = resolve(dirname(file), specifier);
+      if (specifier.endsWith('.json')) {
+        JSON.parse(readFileSync(base, 'utf8'));
+        continue;
+      }
       const target = [`.${platform}.tsx`, `.${platform}.ts`, '.native.tsx', '.native.ts', '.tsx', '.ts']
         .map(ext => base + ext).find(existsSync);
       assert.ok(target, `Unresolved local import ${specifier} in ${file}`);
@@ -75,6 +79,17 @@ test('Web uses the shared app/navigation with isolated browser adapters and no n
   assert.doesNotMatch(files.get(resolve(root, 'captureOwner.web.ts')), /getUserMedia|requestRecordingPermissionsAsync/);
 });
 
+test('only the native entry graphs can load the local audio sharing service', () => {
+  for (const platform of ['android', 'ios']) {
+    const native = graph(platform).get(resolve(root, 'recordingShare.ts'));
+    assert.match(native, /from ['"]expo-sharing/);
+  }
+  const web = graph('web');
+  assert.ok(web.has(resolve(root, 'recordingShare.web.ts')));
+  assert.ok(!web.has(resolve(root, 'recordingShare.ts')));
+  for (const source of web.values()) assert.doesNotMatch(source, /from ['"]expo-sharing/);
+});
+
 test('unsupported uploader fails explicitly without loading a native module or performing a request', async () => {
   assert.equal(supportsProUpload, false);
   await assert.rejects(uploadRecording('https://example.invalid', new Blob(['test']), {}), /InnoSage Pro uploads require Android/);
@@ -86,7 +101,7 @@ test('Pro upload cannot reserve an operation on unsupported platforms', () => {
   assert.match(submit, /if \(\(!supportsProUpload && \(usePro \|\| service === 'production'\)\)/);
   const request = transcript.slice(transcript.indexOf('async function request('), transcript.indexOf('async function submit()'));
   assert.match(request, /if \(upload && !supportsProUpload\) throw new Error/);
-  assert.match(transcript, /disabled=\{busy \|\| \(!supportsProUpload && usePro\)\}/);
+  assert.match(transcript, /supportsPro=\{supportsProUpload\}/);
 });
 
 test('iOS offers only usable defaults and routes a remembered Production choice to a supported service', () => {
@@ -96,7 +111,7 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
   assert.match(choices, /const supported: ServiceId\[\] = \['staging', 'openai'\]/);
   assert.match(choices, /service === 'production' [^\n]+unavailable on iOS/);
   assert.match(choices, /if \(id !== 'production'\) onChange/);
-  assert.match(transcript, /Production Pro is unavailable on iOS\. Choose staging Free access or OpenAI direct/);
+  assert.match(transcript, /isProduction=\{service === 'production'\}/);
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });
 

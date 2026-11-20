@@ -1,6 +1,10 @@
 // The bounded-memory uploader is Android-only. Never load its native module on iOS.
 export const supportsProUpload = false;
 
+export async function recordingDurationMillis(_file: { uri: string }): Promise<number | undefined> {
+  return undefined;
+}
+
 export async function uploadRecording(
   _url: string,
   _file: Blob,

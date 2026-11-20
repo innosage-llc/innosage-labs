@@ -350,6 +350,7 @@ export class ProClient {
     file: Blob,
     hash: () => Promise<string>,
     signal?: AbortSignal,
+    onTransfer?: () => void,
   ) {
     if (file.size !== operation.sourceBytes || file.size > PRO_SOURCE_LIMIT)
       throw new Error("This source exceeds 512 MiB or has changed.");
@@ -371,6 +372,7 @@ export class ProClient {
       const sha256 = await hash();
       if (session.uploadExpiresAt * 1000 <= Date.now() + 5000)
         session = await this.reserve(operation, recording, signal);
+      onTransfer?.();
       await this.uploadFile(
         this.path(session) + "/upload",
         file,
