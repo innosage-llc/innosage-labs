@@ -2,10 +2,8 @@ import { DraftSummary } from './DraftSummary';
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
-import { RecorderSwitch } from './RecorderSwitch';
-import { supportsProUpload } from './NativeUpload';
+import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fetch } from 'expo/fetch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
@@ -24,9 +22,12 @@ import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
 import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
-import { connectGateway, type Gateway } from './GatewayConnection';
+import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuestJob, restoreGateway } from './GatewayConnection';
+import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
+import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
+type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
   QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
@@ -34,6 +35,8 @@ const stateLabels: Record<string, string> = {
 };
 const pending = new Set(['UPLOADING', 'STAGED', 'QUEUED', 'PROCESSING']);
 const terminal = new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']);
+const speakerUnavailable = (error: unknown) => error instanceof GuestSpeakerUnavailable ||
+  (error instanceof ProServiceError && error.code === 'speaker_unavailable');
 
 async function saveText(file: File, text: string) {
   const temporary = new File(file.parentDirectory, file.name + '.pending');
@@ -44,18 +47,19 @@ async function saveText(file: File, text: string) {
 export function Transcript({ recording, recordingTitle, onClose }: { recording: File; recordingTitle: string; onClose: () => void }) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
-  const [gateway, setGateway] = useState<Gateway>();
-  const [url, setUrl] = useState('');
-  const [token, setToken] = useState('');
+  const [freeOperation, setFreeOperation] = useState<FreeOperation | LegacyFreeOperation>();
   const [operation, setOperation] = useState<string>();
   const [paidOperation, setPaidOperation] = useState<ProOperation>();
   const [service, setService] = useState<ServiceId>('staging');
+  const [serviceReady, setServiceReady] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
   const isOpenAI = service === 'openai';
   const proClient = isOpenAI ? undefined : clientForService(service);
   const [unsavedOpenAI, setUnsavedOpenAI] = useState<string>();
   const [openAIConfigured, setOpenAIConfigured] = useState(false);
   const [usePro, setUsePro] = useState(false);
   const [proAvailable, setProAvailable] = useState(false);
+  const [proDenied, setProDenied] = useState(false);
   const submission = useRef<AbortController | null>(null);
   const [identifySpeakers, setIdentifySpeakers] = useState(false);
   const [job, setJob] = useState<Job>();
@@ -134,42 +138,44 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   useEffect(() => {
     let active = true;
     async function restore() {
-      const [savedOperation, committed] = await Promise.all([
-        SecureStore.getItemAsync(operationKey), committedResult(),
-      ]);
+      const committed = await committedResult();
+      if (committed && active) await showCompletion(committed);
+      const savedOperation = await SecureStore.getItemAsync(operationKey);
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
-      const saved = savedOperation ? (savedOperation.startsWith('{') ? JSON.parse(savedOperation)
-        : { id: savedOperation, identifySpeakers: false }) : undefined;
-      const restoredService = saved ? (saved.lane === 'openai' ? 'openai' : saved.lane === 'pro' ? serviceForWorker(saved.workerURL) : 'staging')
-        : await selectedService();
-      const paid: ProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
-      const profile = restoredService === 'openai' ? undefined : await clientForService(restoredService).profile();
+      const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
+      const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
+      const free = saved && saved.lane !== 'openai' && !paid ? readFreeOperation(saved) : undefined;
+      const restoredService = paid ? serviceForWorker(paid.workerURL) : free ? free.service
+        : saved?.lane === 'openai' ? 'openai' : await selectedService();
       if (!active) return;
       if (saved) {
-        setIdentifySpeakers(saved.identifySpeakers);
-        setOperation(saved.id);
+        setIdentifySpeakers(free?.identifySpeakers ?? saved.identifySpeakers);
+        setOperation(free?.id ?? saved.id);
       }
       setService(restoredService);
       setPaidOperation(paid);
-      setProAvailable(supportsProUpload && !!profile);
-      setUsePro(!!paid || (supportsProUpload && !savedOperation && !!profile));
+      setFreeOperation(free);
+      setUsePro(!!paid);
+      if (!committed && paid?.authorizationDeniedBeforeUpload === true) {
+        setJob({ state: 'FAILED' });
+        setProDenied(true);
+        setMessage('Pro authorization is unavailable or expired. Check your API key.');
+      }
       if (committed) {
-        await showCompletion(committed);
+        setServiceReady(true);
         if (active && paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
         return;
       }
       if (restoredService === 'openai') {
         const configured = await openAIAccess.profile();
-        if (active) setOpenAIConfigured(configured);
-        return;
-      }
-      if (restoredService === 'production' || paid || (supportsProUpload && !savedOperation && profile)) return;
-      if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
-        const config = await connectGateway();
-        if (active) setGateway(config);
+        if (active) { setOpenAIConfigured(configured); setServiceReady(true); }
       } else {
-        const saved = await SecureStore.getItemAsync('recorder.gateway');
-        if (active && saved) setGateway(JSON.parse(saved));
+        const profile = supportsProUpload ? await clientForService(restoredService).profile() : undefined;
+        if (active) {
+          setProAvailable(!!profile);
+          setUsePro(!!paid || (!saved && !!profile));
+          setServiceReady(true);
+        }
       }
     }
     void restore().catch(error => {
@@ -178,36 +184,22 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     })
       .finally(() => { if (active) setConnecting(false); });
     return () => { active = false; submission.current?.abort(); };
-  }, [operationKey]);
+  }, [operationKey, restoreAttempt]);
 
-  async function request(config: Gateway | undefined, id: string, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined) {
+  async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined, onTransfer?: () => void) {
     let result: Job;
     if (paid) {
       if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
       const operationClient = clientForOperation(paid);
       result = upload
-        ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal)
+        ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal, onTransfer)
         : await operationClient.read(paid, recording.name, signal);
     } else {
-      if (!config) throw new Error('Connect to the transcription service.');
-      const response = await fetch(`${config.url}/v1/jobs/${id}`, {
-        method: upload ? 'PUT' : 'GET',
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          ...(upload ? { 'Content-Type': 'audio/mp4', 'X-Identify-Speakers': String(identifySpeakers) } : {}),
-        },
-        body: upload ? recording : undefined,
-        signal,
+      if (!free) throw new KnownServiceFailure('Could not recover this recording’s Free operation.');
+      const guest = await restoreGateway(free).catch(() => {
+        throw new KnownServiceFailure('Could not restore Free access for this recording’s original operation.');
       });
-      if (response.status === 422) {
-        const failure = await response.json().catch(() => ({}));
-        if (failure.detail?.code === 'SPEAKER_UNAVAILABLE') setJob({ state: 'FAILED' });
-        throw new KnownServiceFailure(typeof failure.detail === 'string' ? failure.detail
-          : failure.detail?.message ?? 'This recording could not be transcribed.');
-      }
-      if (response.status === 413) throw new KnownServiceFailure('This recording exceeds the Free upload limit.');
-      if (!response.ok) throw new Error('Could not reach or complete the transcription. Check the connection and retry.');
-      result = await response.json();
+      result = await requestGuestJob(guest, { ...free, accountScope: guest.accountScope }, upload ? recording : undefined, signal);
     }
     const local = await persistResult(result);
     if (paid && result.state === 'COMPLETED') {
@@ -231,6 +223,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   const complete = job?.state === 'COMPLETED';
+  const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (complete && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
@@ -243,65 +236,47 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
     return revision.exists ? revision.text() : undefined;
   }
   useEffect(() => {
-    if ((!gateway && !paidOperation) || !operation || busy || complete) return;
+    if ((!freeOperation && !paidOperation) || connecting || !serviceReady || busy || complete || statusUnknown || operationEnded) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const result = await request(gateway!, operation!, false, controller.signal, paidOperation);
+        const result = await readOperationWithDeadline(
+          signal => request(freeOperation, false, signal, paidOperation), controller.signal,
+        );
         if (pending.has(result.state) && !controller.signal.aborted) timer = setTimeout(poll, 3000);
       } catch (error) {
         if (!controller.signal.aborted) {
-          setStatusUnknown(true);
+          const denied = speakerUnavailable(error);
+          if (denied) setJob({ state: 'FAILED' });
+          setStatusUnknown(!denied);
           setMessage(statusRecoveryMessage(error));
         }
       }
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [gateway, operation, busy, complete, paidOperation]);
-
-
-  async function connect() {
-    if (service !== 'staging') return;
-    setConnecting(true);
-    try {
-      if (process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL) {
-        setGateway(await connectGateway());
-        setMessage('');
-        return;
-      }
-      const parsed = new URL(url.trim());
-      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search ||
-          parsed.hash || !['/', '/recorder'].includes(parsed.pathname) || token.trim().length < 32) throw new Error();
-      const config = { url: parsed.origin + (parsed.pathname === '/' ? '' : parsed.pathname), token: token.trim() };
-      await SecureStore.setItemAsync('recorder.gateway', JSON.stringify(config));
-      setGateway(config);
-      setToken('');
-      setMessage('');
-    } catch {
-      setMessage('Could not connect. Check the gateway details and network.');
-    } finally {
-      setConnecting(false);
-    }
-  }
+  }, [freeOperation, connecting, serviceReady, busy, complete, paidOperation, statusUnknown, operationEnded]);
 
   async function checkOperationStatus() {
-    if (!operation || (!gateway && !paidOperation) || busy || submission.current) return;
+    if ((!freeOperation && !paidOperation) || busy || submission.current) return;
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
     try {
       const result = await readOperationWithDeadline(
-        signal => request(gateway, operation, false, signal, paidOperation), controller.signal,
+        signal => request(freeOperation, false, signal, paidOperation), controller.signal,
       );
       setStatusUnknown(false);
       setMessage(pending.has(result.state)
         ? 'The same operation is still in progress. This check did not upload your audio again.'
-        : result.state === 'COMPLETED' ? 'Transcript recovered from the same operation.' : 'This operation has ended. Review its status before starting another transcription.');
+        : result.state === 'COMPLETED' ? 'Transcript recovered from the same operation.'
+          : result.state === 'RESERVED' ? 'This operation is ready to retry.' : 'This operation has ended.');
     } catch (error) {
-      setStatusUnknown(true);
+      const denied = speakerUnavailable(error);
+      if (denied) setJob({ state: 'FAILED' });
+      setStatusUnknown(!denied);
       setMessage(statusRecoveryMessage(error));
     } finally {
       if (submission.current === controller) submission.current = null;
@@ -310,13 +285,19 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   async function submit() {
-    if ((!supportsProUpload && (usePro || service === 'production')) || connecting || submission.current || busy || (isOpenAI ? !openAIConfigured && !unsavedOpenAI : !gateway && !usePro)) return;
+    if ((!supportsProUpload && (usePro || service === 'production')) || connecting || !serviceReady || submission.current || busy) return;
+    const terminalJob = !!job && terminal.has(job.state);
+    if (isOpenAI ? !openAIConfigured && !unsavedOpenAI
+      : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminalJob)) return;
+    const startingPro = !isOpenAI && usePro && (!operation || terminalJob);
     setBusy(true);
     setMessage('');
     const controller = new AbortController();
     submission.current = controller;
     let openAIRequestStarted = false;
     let serviceRequestStarted = false;
+    let freshPaid: ProOperation | undefined;
+    let paidTransferStarted = false;
     try {
       const alreadySaved = await committedResult();
       if (alreadySaved) {
@@ -341,9 +322,9 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         setUnsavedOpenAI(undefined);
         return;
       }
-      const terminalJob = job && terminal.has(job.state);
       let paid = terminalJob ? undefined : paidOperation;
-      if ((!operation || terminalJob) && usePro) {
+      let free: FreeOperation | undefined;
+      if (startingPro) {
         if (!supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
@@ -352,17 +333,32 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         controller.signal.throwIfAborted();
         paid = { lane: 'pro', id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`,
           identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size };
+        freshPaid = paid;
+      } else if (!paid) {
+        if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
+        const sizeLimit = freeRecordingLimit(recording.size);
+        if (sizeLimit) throw new KnownServiceFailure(sizeLimit);
+        const limit = freeRecordingLimit(recording.size, await recordingDurationMillis(recording).catch(() => undefined));
+        if (limit) throw new KnownServiceFailure(limit);
+        const existing = terminalJob ? undefined : freeOperation;
+        const guest = existing ? await restoreGateway(existing) : await connectGateway(service);
+        controller.signal.throwIfAborted();
+        free = { lane: 'free', id: existing?.id ?? randomUUID(), identifySpeakers: existing?.identifySpeakers ?? identifySpeakers,
+          service: guest.service, accountScope: guest.accountScope };
       }
-      const id = paid?.id ?? (terminalJob ? randomUUID() : operation ?? randomUUID());
-      await SecureStore.setItemAsync(operationKey, JSON.stringify(paid ?? { id, identifySpeakers, lane: 'free', service: 'staging' }));
+      const next = paid ?? free;
+      if (!next) throw new KnownServiceFailure('Could not recover the transcription operation.');
+      await SecureStore.setItemAsync(operationKey, JSON.stringify(next));
       setPaidOperation(paid);
-      setOperation(id);
+      setFreeOperation(free);
+      setOperation(next.id);
       setJob({ state: 'RESERVED' });
+      if (startingPro) setProDenied(false);
       controller.signal.throwIfAborted();
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
       try {
         serviceRequestStarted = true;
-        await request(gateway, id, true, controller.signal, paid);
+        await request(free, true, controller.signal, paid, () => { paidTransferStarted = true; });
         setStatusUnknown(false);
       } finally {
         clearTimeout(timeout);
@@ -371,20 +367,36 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
       const failure = error instanceof Error ? error.message : undefined;
       const openAIDefinitiveFailure = !!failure && /^(OpenAI rejected this API key\.|Check that your OpenAI project key|Check your OpenAI project quota|OpenAI rejected the recording size\.|Choose a non-empty M4A recording|Enter an OpenAI Platform API key\.)/.test(failure);
       const knownServiceFailure = error instanceof KnownServiceFailure || error instanceof ProServiceError || !!failure && /^(This recording exceeds the supported file size\.|This recording or speaker identification is unavailable\.|This source exceeds 512 MiB or has changed\.|This source exceeds the service limit\.)/.test(failure);
+      const proAuthorizationDenied = usePro && error instanceof ProServiceError && error.code === 'authorization';
+      const mayOfferFreeAfterDenial = proAuthorizationDenied && startingPro && !paidTransferStarted;
       if (isOpenAI) {
         setStatusUnknown(false);
         setMessage(openAIRequestStarted && !openAIDefinitiveFailure
           ? 'OpenAI transcription may have completed, but its status cannot be checked here. Confirm before retrying to avoid duplicate submission; the original audio remains on this device.'
           : failure ?? 'Could not save the transcript.');
       } else {
-        const uncertainOperation = serviceRequestStarted && !knownServiceFailure;
-        if (uncertainOperation) setStatusUnknown(true);
-        else setStatusUnknown(false);
-        setMessage(uncertainOperation
-          ? 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.'
-          : failure ?? 'Could not submit the recording.');
+        const mustRecoverPaid = proAuthorizationDenied && !mayOfferFreeAfterDenial;
+        const uncertainOperation = serviceRequestStarted && (!knownServiceFailure || mustRecoverPaid);
+        setStatusUnknown(uncertainOperation);
+        if (uncertainOperation) {
+          setMessage(mustRecoverPaid
+            ? 'Pro authorization is unavailable or expired. Restore access and check the same operation before retrying.'
+            : 'Connection interrupted. Status is unknown. Check this same operation before retrying; your original audio remains on this device.');
+        } else setMessage(failure ?? 'Could not submit the recording.');
       }
-      if (error instanceof ProServiceError && error.code === 'speaker_unavailable') setJob({ state: 'FAILED' });
+      if (speakerUnavailable(error)) setJob({ state: 'FAILED' });
+      if (mayOfferFreeAfterDenial) {
+        if (freshPaid) {
+          try {
+            const denied: StoredProOperation = { ...freshPaid, authorizationDeniedBeforeUpload: true };
+            await SecureStore.setItemAsync(operationKey, JSON.stringify(denied));
+            setJob({ state: 'FAILED' });
+            setProDenied(true);
+          } catch {
+            setMessage('Could not save the authorization result. Retry this operation when access is available.');
+          }
+        } else setProDenied(true);
+      }
     } finally {
       if (submission.current === controller) submission.current = null;
       setBusy(false);
@@ -416,6 +428,13 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   }
 
   const canChooseSpeakers = !busy && (!operation || ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job?.state ?? ''));
+  const canUseFree = !isOpenAI && gatewayAvailable(service);
+  const canChangeInnoSagePlan = canUseFree && canChooseSpeakers && (proAvailable || proDenied);
+  const retryService = () => {
+    setMessage('');
+    setConnecting(true);
+    setRestoreAttempt(attempt => attempt + 1);
+  };
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   return (
     <Modal onRequestClose={requestClose}>
@@ -425,27 +444,14 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
           <Text style={{ color: palette.text }}>{recordingTitle}</Text>
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          <View style={styles.serviceCard}>
+          {complete || isOpenAI ? <View style={styles.serviceCard}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
-            <Text style={{ color: palette.muted }}>{isOpenAI
-              ? 'Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.'
-              : !supportsProUpload && (service === 'production' || usePro) ? 'Pro uploads are unavailable on iOS.'
-              : service === 'production'
-                ? 'Transcription uploads this M4A recording to InnoSage Production for speech recognition.'
-                : usePro
-                  ? 'Transcription uploads this M4A recording to InnoSage Staging Pro for speech recognition.'
-                  : 'Transcription uploads this M4A recording through InnoSage Staging to Edge Speech for recognition.'}</Text>
-            <Text style={{ color: palette.muted }}>{isOpenAI
-              ? 'Limit: M4A under 25 MB.'
-              : !supportsProUpload && (service === 'production' || usePro) ? 'For new transcriptions choose staging Free access or OpenAI direct.'
-              : service === 'production' || usePro
-                ? 'InnoSage Pro limit: up to 4 hours and 512 MiB.'
-                : proAvailable
-                  ? 'Free staging limit: up to 15 minutes and 50 MB. Staging Pro supports up to 4 hours and 512 MiB.'
-                  : supportsProUpload ? 'Free staging limit: up to 15 minutes and 50 MB. Configure a staging Pro key for recordings up to 4 hours and 512 MiB.'
-                    : 'Free staging limit: up to 15 minutes and 50 MB.'}</Text>
-          </View>
-          {!complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
+            {isOpenAI ? <>
+              <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
+              <Text style={{ color: palette.muted }}>Limit: M4A under 25 MB.</Text>
+            </> : null}
+          </View> : null}
+          {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {complete ? (
             <>
@@ -485,44 +491,31 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
                 <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
               )}
             </>
-          ) : gateway || usePro ? (
-            <>
-              <Text style={{ color: palette.muted }}>{usePro ? 'InnoSage Pro · up to 4 hours · 512 MiB' : 'Free staging · up to 15 minutes · 50 MB'}</Text>
-              {proAvailable ? <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: palette.text }}>Use InnoSage Pro</Text>
-                <View style={{ minWidth: 60 }}>
-                  <RecorderSwitch value={usePro} enabled={canChooseSpeakers && service === 'staging' && (supportsProUpload || usePro)} onCheckedChange={value => {
-                    setUsePro(value);
-                    if (!value && !gateway) void connect();
-                  }} label="Use InnoSage Pro" />
-                </View>
-              </View> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: palette.text }}>Identify speakers</Text>
-                <View style={{ minWidth: 60 }}>
-                  <RecorderSwitch value={identifySpeakers} onCheckedChange={setIdentifySpeakers} enabled={canChooseSpeakers}
-                    label="Identify speakers" />
-                </View>
-              </View>
-              <Text style={{ color: palette.muted }}>Add speaker labels to this transcript. May take longer.</Text>
-              {job ? <Text style={{ color: palette.text }}>{stateLabels[job.state] ?? job.state}</Text> : null}
-              {busy ? <ActivityIndicator accessibilityLabel="Submitting recording" /> : null}
-              {statusUnknown && operation ? <ActionButton title={busy ? 'Checking status…' : 'Check same operation'} variant="outlined" disabled={busy} onPress={checkOperationStatus} /> : null}
-              {!supportsProUpload && usePro ? <Text style={{ color: palette.muted }}>Pro uploads are unavailable on iOS. Choose staging Free access or OpenAI direct. Existing Pro results can still be read.</Text> : null}
-              <ActionButton title={job && ['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED'].includes(job.state) ? 'Start new transcription' : operation ? 'Retry or resume' : 'Transcribe'} variant="primary" disabled={busy || (!supportsProUpload && usePro)} onPress={submit} />
-            </>
-          ) : service === 'production' ? (
-            <Text style={{ color: palette.text }}>{supportsProUpload
-              ? 'Save and verify a production Pro key in Transcription service before starting. Free transcription is available on staging.'
-              : 'Production Pro is unavailable on iOS. Choose staging Free access or OpenAI direct in Transcription service, then reopen this recording.'}</Text>
           ) : (
-            <View style={{ gap: spacing.md }}>
-              {process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL ? null : <>
-              <TextInput accessibilityLabel="Gateway URL" placeholder="https://…" autoCapitalize="none" value={url} onChangeText={setUrl} style={input} />
-              <TextInput accessibilityLabel="Pilot access token" placeholder="Pilot access token" secureTextEntry autoCapitalize="none" value={token} onChangeText={setToken} style={input} />
-              </>}
-              <ActionButton title={connecting ? "Connecting…" : "Connect"} variant="primary" disabled={connecting} onPress={connect} />
-            </View>
+            <InnoSageTranscriptAction
+              serviceLabel={services[service].label}
+              loading={connecting}
+              serviceReady={serviceReady}
+              canUseFree={canUseFree}
+              supportsPro={supportsProUpload}
+              usePro={usePro}
+              canChoosePro={canChangeInnoSagePlan}
+              proDenied={proDenied}
+              isProduction={service === 'production'}
+              hasOperation={!!operation}
+              jobState={job && (stateLabels[job.state] ?? job.state)}
+              operationEnded={operationEnded}
+              operationPending={!!operation && (!job || pending.has(job.state))}
+              statusUnknown={statusUnknown}
+              identifySpeakers={identifySpeakers}
+              canChooseSpeakers={canChooseSpeakers}
+              busy={busy}
+              onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
+              onIdentifySpeakers={setIdentifySpeakers}
+              onRetryService={retryService}
+              onCheckStatus={checkOperationStatus}
+              onTranscribe={submit}
+            />
           )}
         </ScrollView>
         </KeyboardAvoidingView>

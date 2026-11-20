@@ -1,5 +1,6 @@
 package co.innosage.recorderupload
 
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
@@ -16,6 +17,15 @@ class RecorderUploadModule : Module() {
   private val destroyed = AtomicBoolean(false)
   private val connections = ConcurrentHashMap<String, HttpURLConnection>()
   private val cancelled = ConcurrentHashMap.newKeySet<String>()
+
+  private fun localRecording(uri: String): File {
+    val parsed = Uri.parse(uri)
+    require(parsed.scheme == "file")
+    val source = File(requireNotNull(parsed.path)).canonicalFile
+    val root = requireNotNull(appContext.reactContext).filesDir.canonicalFile
+    require(source.path.startsWith(root.path + File.separator) && source.isFile)
+    return source
+  }
 
   override fun definition() = ModuleDefinition {
     Name("RecorderUpload")
@@ -45,6 +55,21 @@ class RecorderUploadModule : Module() {
       }
     }
 
+    AsyncFunction("recordingDurationMillis") Coroutine { uri: String ->
+      withContext(Dispatchers.IO) {
+        val source = localRecording(uri)
+        val metadata = MediaMetadataRetriever()
+        try {
+          metadata.setDataSource(source.path)
+          metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }
+        } catch (_: RuntimeException) {
+          null // No reliable local duration. The server still validates the decoded audio.
+        } finally {
+          metadata.release()
+        }
+      }
+    }
+
     AsyncFunction("upload") Coroutine { id: String, address: String, uri: String,
                                         capability: String, hash: String, expectedBytes: Double ->
       withContext(Dispatchers.IO) {
@@ -53,11 +78,7 @@ class RecorderUploadModule : Module() {
         require(Regex("^/v1/sessions/tx_[A-Za-z0-9_-]+/upload$").matches(url.path))
         require(Regex("^[A-Za-z0-9_-]{16,4096}$").matches(capability))
         require(Regex("^[a-f0-9]{64}$").matches(hash))
-        val parsed = Uri.parse(uri)
-        require(parsed.scheme == "file")
-        val source = File(requireNotNull(parsed.path)).canonicalFile
-        val root = requireNotNull(appContext.reactContext).filesDir.canonicalFile
-        require(source.path.startsWith(root.path + File.separator) && source.isFile)
+        val source = localRecording(uri)
         require(source.length() > 0 && source.length() <= 512L * 1024 * 1024)
         require(source.length().toDouble() == expectedBytes)
         val connection = url.openConnection() as HttpURLConnection

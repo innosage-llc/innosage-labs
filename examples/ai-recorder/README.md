@@ -139,11 +139,30 @@ phone acceptance and spoken-marker continuity remain separate checks.
 
 ## Transcription milestone
 
-Build with `EXPO_PUBLIC_RECORDER_GATEWAY_URL` set to your HTTPS Gateway base URL.
-The acceptance build uses a public staging endpoint. Opening Transcript provisions
-a device guest credential and retains it in Expo SecureStore. The phone needs
-ordinary internet access. A VPN, service credential or manual token entry is not
-part of this journey. Without a build URL, the sample offers manual pilot setup.
+Open a saved M4A in Library, choose **Transcript**, check the displayed service,
+and tap **Transcribe** to authorize upload. Opening Transcript keeps a new recording
+local. The first Free submission provisions a device guest credential for the
+selected environment and saves it in Expo SecureStore. Recovery uses the original
+service, operation and guest identity. This build supports Staging Free access.
+
+For an installable Staging Android release, set the approved input before Expo
+prebuild and keep both values set through the existing offline Gradle release recipe.
+
+```sh
+export RECORDER_STAGING_ANDROID_RELEASE=1
+export EXPO_NO_DOTENV=1
+export EXPO_PUBLIC_RECORDER_GATEWAY_URL="$(node -p "require('./recorder-free-targets.json').staging")"
+```
+
+The app config rejects a missing or different build input for that release.
+Without an approved input, a development build marks Free transcription
+unavailable. Older jobs recover with their original credential when it belongs
+to the approved Staging route. Recovery for a different historical origin
+requires evidence that both routes share the same identity authority and data.
+Keep older Staging credentials in place during upgrades.
+Before reverting to an older build, finish jobs created with the new Free
+credential storage. Older builds cannot resume jobs that exist only in the new
+format. Preserve local recordings and completed transcripts throughout.
 
 The single-worker FastAPI Gateway uses SQLite and the Speech Router's
 Recorder-specific Free Guest profile. Configure these server-only variables:

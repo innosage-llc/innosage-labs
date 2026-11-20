@@ -68,11 +68,14 @@ test('canonical validation retains a saved key when a candidate is rejected', as
 test('paid file larger than Free limit uploads directly, and ambiguous retry does not resubmit', async () => {
   const f = fixture();
   await f.client.configure('synthetic-pro-key');
+  let transferAttempts = 0;
+  const onTransfer = () => { transferAttempts++; assert.equal(f.state.uploads, 0); };
   f.state.loseUploadResponse = true;
-  await assert.rejects(f.client.upload(f.operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64)));
+  await assert.rejects(f.client.upload(f.operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64), undefined, onTransfer));
   assert.equal(f.state.uploads, 1);
-  const recovered = await f.client.upload(f.operation, 'synthetic.m4a', f.file, async () => { throw new Error('Must not hash/upload accepted work again'); });
+  const recovered = await f.client.upload(f.operation, 'synthetic.m4a', f.file, async () => { throw new Error('Must not hash/upload accepted work again'); }, undefined, onTransfer);
   assert.equal(recovered.state, 'PROCESSING');
+  assert.equal(transferAttempts, 1);
   assert.equal(f.state.reservations, 1);
   assert.equal(f.state.uploads, 1);
   assert.equal(f.state.cleanup, 0);
@@ -88,7 +91,8 @@ test('revoked access and different account deny admission before reserving a job
   const f = fixture();
   await f.client.configure('synthetic-pro-key');
   f.state.authorized = false;
-  await assert.rejects(f.client.read(f.operation, 'synthetic.m4a'));
+  await assert.rejects(f.client.upload(f.operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64), undefined,
+    () => { throw new Error('Unauthorized attempt reached transfer'); }), { code: 'authorization' });
   assert.equal(f.state.reservations, 0);
   f.state.authorized = true; f.state.scope = 'd'.repeat(64);
   await assert.rejects(f.client.read(f.operation, 'synthetic.m4a'));
