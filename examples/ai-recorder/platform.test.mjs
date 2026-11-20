@@ -101,7 +101,7 @@ test('Pro upload cannot reserve an operation on unsupported platforms', () => {
   assert.match(submit, /if \(\(!supportsProUpload && \(usePro \|\| service === 'production'\)\)/);
   const request = transcript.slice(transcript.indexOf('async function request('), transcript.indexOf('async function submit()'));
   assert.match(request, /if \(upload && !supportsProUpload\) throw new Error/);
-  assert.match(transcript, /disabled=\{busy \|\| \(!supportsProUpload && usePro\)\}/);
+  assert.match(transcript, /supportsPro=\{supportsProUpload\}/);
 });
 
 test('iOS offers only usable defaults and routes a remembered Production choice to a supported service', () => {
@@ -111,7 +111,7 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
   assert.match(choices, /const supported: ServiceId\[\] = \['staging', 'openai'\]/);
   assert.match(choices, /service === 'production' [^\n]+unavailable on iOS/);
   assert.match(choices, /if \(id !== 'production'\) onChange/);
-  assert.match(transcript, /Production Pro is unavailable on iOS\. Choose staging Free access or OpenAI direct/);
+  assert.match(transcript, /isProduction=\{service === 'production'\}/);
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });
 

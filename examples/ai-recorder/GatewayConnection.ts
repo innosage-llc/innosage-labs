@@ -8,8 +8,6 @@ import type { SpeakerResult } from './transcriptCompletion';
 import type { InnoSageServiceId } from './ServiceConfig';
 import allowedTargets from './recorder-free-targets.json';
 
-export type { Gateway, GatewayGuest } from './GatewayGuest';
-
 const stagingInput = process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL?.replace(/\/$/, '');
 const targets: Partial<Record<InnoSageServiceId, string>> = stagingInput === allowedTargets.staging
   ? { staging: allowedTargets.staging } : {};
@@ -22,18 +20,17 @@ const guests = createGatewayGuests({
   store: SecureStore,
   fingerprint: token => digestStringAsync(CryptoDigestAlgorithm.SHA256, token),
   provision: async url => {
-    const response = await fetch(`${url}/v1/guests`, {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
-    });
-    if (!response.ok) throw new Error('Could not activate Free access. Check your connection and retry.');
-    return (await response.json()).token;
+    try {
+      const response = await fetch(`${url}/v1/guests`, {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+      });
+      if (response.ok) return (await response.json()).token;
+    } catch { /* Keep transport details private. */ }
+    throw new KnownServiceFailure('Could not activate Free access. Check your connection and retry.');
   },
 });
 
-export function connectGateway(service: InnoSageServiceId = 'staging') {
-  return guests.connect(service);
-}
-
+export const connectGateway = guests.connect;
 export const restoreGateway = guests.restore;
 
 type GuestJob = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };

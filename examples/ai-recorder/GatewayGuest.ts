@@ -17,7 +17,9 @@ const legacyKey = 'recorder.gateway';
 
 function readObject(value: string | null): Record<string, unknown> | undefined {
   if (!value) return;
-  const parsed: unknown = JSON.parse(value);
+  let parsed: unknown;
+  try { parsed = JSON.parse(value); }
+  catch { throw new Error('Could not recover the saved Free access.'); }
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
 }
 
