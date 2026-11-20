@@ -14,7 +14,7 @@ from uuid import UUID
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
 
 MAX_BYTES = 50_000_000
@@ -71,6 +71,13 @@ async def lifespan(_app):
 
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+
+
+@app.head("/internal/recorder/environment")
+def gateway_environment():
+    return Response(status_code=204, headers={
+        "X-Recorder-Environment": recorder_environment(), "Cache-Control": "no-store",
+    })
 
 
 def identity(request):

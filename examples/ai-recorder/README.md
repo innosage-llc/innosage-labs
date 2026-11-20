@@ -190,7 +190,9 @@ Guest registration is capped at 1,000 identities per deployment. A Production
 instance requires a separate private process and state, the fixed Production
 Router HTTPS origin, and its existing environment-specific service authority.
 Production startup rejects an existing unmarked or Staging-marked database.
-Its Guest response names its environment and its account digest is distinct
+The private environment probe lets the Router check the expected Gateway
+before forwarding audio or credentials on the same TLS connection. Its Guest
+response names its environment and its account digest is distinct
 from Staging. Preserve the existing Staging database and pilot recovery on
 upgrade. The inactive candidate grants no service rollout.
 

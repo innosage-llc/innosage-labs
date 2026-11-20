@@ -90,10 +90,16 @@ class GatewayTest(unittest.TestCase):
         }
 
     def test_production_uses_separate_state_and_rejects_staging_credentials(self):
+        identity = self.client.head("/internal/recorder/environment")
+        self.assertEqual(identity.status_code, 204)
+        self.assertEqual(identity.headers["X-Recorder-Environment"], "staging")
         stage_guest = self.client.post("/v1/guests").json()["token"]
         stage_digest = gateway.guest_digest(stage_guest)
         operation = "/v1/jobs/" + str(uuid4())
         with patch.dict(os.environ, self.production_config()), TestClient(gateway.app) as production:
+            identity = production.head("/internal/recorder/environment")
+            self.assertEqual(identity.status_code, 204)
+            self.assertEqual(identity.headers["X-Recorder-Environment"], "production")
             self.assertNotEqual(gateway.guest_digest(stage_guest), stage_digest)
             self.assertEqual(production.get(operation, headers=gateway.bearer(stage_guest)).status_code, 401)
             self.assertEqual(production.get(operation, headers=self.headers).status_code, 401)

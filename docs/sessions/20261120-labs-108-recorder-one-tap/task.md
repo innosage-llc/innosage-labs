@@ -19,3 +19,7 @@ prepares an explicit Android parity build and a separately bound, default-off
 Production Guest path. Verify the existing Production Router and the exact
 release set before activating it. Both environments retain the shared Free
 limits, recovery rules and environment-specific Pro profiles.
+
+Independent review found that valid client identity could still reach a miswired
+upstream bridge. The candidate adds the private Gateway environment probe for
+the Router to check before forwarding any credential or audio.
