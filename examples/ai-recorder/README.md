@@ -88,6 +88,11 @@ QA aids; they are not AI Recorder features or supported app platforms.
 
 ### Acceptance and release gates
 
+For an Android staging release candidate, follow the
+[offline Library playback verification](docs/release-verification/README.md)
+and retain the receipt for the exact installed APK. This check needs a human
+listener on the authorized test phone.
+
 - **Capture:** On a physical Android phone, verify spoken markers before screen
   lock, while locked, and in another app remain in the saved M4A in order; verify
   local playback after relaunch and offline. Emulator evidence alone does not
