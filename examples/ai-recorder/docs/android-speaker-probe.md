@@ -81,7 +81,10 @@ repeatability and runtime justify adoption.
 
 For the redesigned Library in [Labs #120](https://github.com/innosage-llc/innosage-labs/issues/120),
 run the same command with `journey-detail` in place of `journey`. Keep the
-dedicated emulator offline and start with an empty Library. The probe saves A,
+dedicated emulator offline and start with an empty Library. Disable guest
+touch sounds with `adb_task shell settings put system sound_effects_enabled 0`
+so the speaker measures recording playback without the Android click sound.
+The probe saves A,
 starts B from the same Record control, and verifies that the control returns
 to the same position after each save. It terminates and cold-launches Recorder
 before selecting the earlier recording. The earlier row must open silently,

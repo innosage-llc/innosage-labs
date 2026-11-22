@@ -181,6 +181,7 @@ async function main() {
     const directory = join(output, 'journey');
     const apk = join(output, 'staging.apk');
     const mode = existsSync(join(source, 'examples/ai-recorder/ui/recording-detail.tsx')) ? 'journey-detail' : 'journey';
+    if (mode === 'journey-detail') await taskAdb('shell', 'settings', 'put', 'system', 'sound_effects_enabled', '0');
     await runAsync(process.execPath, [probe, mode, adbPort, serial, avd, String(emulator.pid), apk, directory], {
       signal, timeout: 240_000, onResult: result => writeFileSync(join(output, 'journey.log'), result.stdout + result.stderr),
     });

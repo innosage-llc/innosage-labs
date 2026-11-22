@@ -407,6 +407,10 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       (await adb('shell', 'wm', 'density')).trim() === 'Physical density: 420',
     'Journey requires the task Pixel 8 display profile');
     await assertOffline(adb);
+    if (detail) {
+      const touchSounds = await adb('shell', 'settings', 'get', 'system', 'sound_effects_enabled');
+      requireThat(touchSounds.trim() === '0', 'Disable guest touch sounds before measuring recording playback silence');
+    }
     await adb('install', '-r', apk);
     await forceStop();
     await launch();
