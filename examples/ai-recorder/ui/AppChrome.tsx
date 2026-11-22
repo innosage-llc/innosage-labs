@@ -2,8 +2,9 @@
 // The separate iOS candidate must supply its native adapter before enabling iOS.
 import { StatusBar } from 'react-native';
 import { Host, Icon, IconButton, NavigationBar, NavigationBarItem, Text, TopAppBar } from '@expo/ui/jetpack-compose';
-import { fillMaxWidth } from '@expo/ui/jetpack-compose/modifiers';
+import { defaultMinSize, fillMaxWidth } from '@expo/ui/jetpack-compose/modifiers';
 import BackIcon from '@expo/material-symbols/arrow_back.xml';
+import DownloadIcon from '@expo/material-symbols/download.xml';
 import RecordIcon from '@expo/material-symbols/mic.xml';
 import LibraryIcon from '@expo/material-symbols/folder.xml';
 import SettingsIcon from '@expo/material-symbols/settings.xml';
@@ -12,9 +13,15 @@ import { destinations, type RootDestination } from './navigation';
 
 const icons = { record: RecordIcon, library: LibraryIcon, settings: SettingsIcon };
 
-export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false }: {
-  title: string; onBack?: () => void; backLabel?: string; backDisabled?: boolean;
-}) {
+export type AppHeaderProps = {
+  title: string;
+  onBack?: () => void;
+  backLabel?: string;
+  backDisabled?: boolean;
+  libraryImport?: { importing: boolean; disabled: boolean; onPress: () => void };
+};
+
+export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false, libraryImport }: AppHeaderProps) {
   const { palette, mode } = useTheme();
   return <>
     <StatusBar barStyle={mode === 'light' ? 'dark-content' : 'light-content'} />
@@ -29,6 +36,20 @@ export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = fa
           </IconButton>
         </TopAppBar.NavigationIcon> : null}
         <TopAppBar.Title><Text>{title}</Text></TopAppBar.Title>
+        {libraryImport ? <TopAppBar.Actions>
+          <IconButton
+            enabled={!libraryImport.disabled}
+            onClick={libraryImport.onPress}
+            modifiers={[defaultMinSize({ minWidth: 48, minHeight: 48 })]}
+          >
+            <Icon
+              source={DownloadIcon}
+              contentDescription={libraryImport.importing ? 'Importing audio' : 'Import audio'}
+              size={24}
+              tint={libraryImport.disabled ? palette.muted : palette.text}
+            />
+          </IconButton>
+        </TopAppBar.Actions> : null}
       </TopAppBar>
     </Host>
   </>;

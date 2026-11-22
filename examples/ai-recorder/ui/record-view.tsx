@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
 import { ActionButton } from './ActionButton';
 import { RecordControl } from './RecordControl';
 import type { CapturePhase } from './navigation';
@@ -73,7 +73,9 @@ export function RecordView({
         </View>
       ) : (
         <Text style={[typography.body, { color: palette.muted, textAlign: 'center' }]}>
-          Recordings are stored on this device.
+          {Platform.OS === 'web'
+            ? 'Recording and file import are available in the Android and iOS apps. This browser supports Record, Library and Settings navigation.'
+            : 'Recordings are stored on this device.'}
         </Text>
       )}
     </ScrollView>

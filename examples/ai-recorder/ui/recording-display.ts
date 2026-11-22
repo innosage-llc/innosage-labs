@@ -17,8 +17,12 @@ export function formatRecordingTime(time: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-export function recordingDuration(seconds?: number) {
+export function knownRecordingDuration(seconds?: number) {
   return seconds !== undefined && Number.isFinite(seconds) && seconds > 0
     ? formatRecordingTime(seconds)
-    : 'Duration unknown';
+    : undefined;
+}
+
+export function recordingDuration(seconds?: number) {
+  return knownRecordingDuration(seconds) ?? 'Duration unknown';
 }

@@ -1,23 +1,5 @@
-import { ActionButton } from './ActionButton';
+export type LibraryAudioIconProps = { highlighted: boolean };
 
-export type LibraryImportButtonProps = {
-  importing: boolean;
-  disabled: boolean;
-  onPress: () => void;
-};
-
-export function LibraryImportButton({ importing, disabled, onPress }: LibraryImportButtonProps) {
-  return (
-    <ActionButton
-      title={importing ? 'Importing…' : 'Import audio'}
-      variant="text"
-      fullWidth={false}
-      disabled={disabled}
-      onPress={onPress}
-    />
-  );
-}
-
-export function LibraryAudioIcon() {
+export function LibraryAudioIcon(_props: LibraryAudioIconProps) {
   return null;
 }

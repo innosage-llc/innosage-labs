@@ -1,8 +1,8 @@
 import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import { LibraryAudioIcon, LibraryImportButton } from './library-icons';
+import { LibraryAudioIcon } from './library-icons';
 import type { CapturePhase } from './navigation';
-import { recordingDate, recordingDuration, type RecordingSummary } from './recording-display';
+import { knownRecordingDuration, recordingDate, type RecordingSummary } from './recording-display';
 import { useTheme } from './theme';
 
 type LibraryItem =
@@ -18,9 +18,8 @@ export type LibraryViewProps = {
   ref?: Ref<LibraryViewHandle>;
   recordings: readonly RecordingSummary[];
   phase: CapturePhase;
+  /** Most recently saved capture during the Record-to-Library handoff. */
   highlightedUri?: string;
-  importEnabled: boolean;
-  onImport: () => void;
   onOpenRecording: (uri: string) => void;
 };
 
@@ -47,7 +46,7 @@ function groupByDay(recordings: readonly RecordingSummary[]): LibraryItem[] {
 }
 
 export function LibraryView({
-  ref, recordings, phase, highlightedUri, importEnabled, onImport, onOpenRecording,
+  ref, recordings, phase, highlightedUri, onOpenRecording,
 }: LibraryViewProps) {
   const { palette, spacing, typography } = useTheme();
   const data = useMemo(() => groupByDay(recordings), [recordings]);
@@ -73,90 +72,91 @@ export function LibraryView({
   }), [data]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ alignItems: 'flex-end', paddingHorizontal: spacing.lg }}>
-        <LibraryImportButton
-          importing={phase === 'importing'}
-          disabled={disabled || !importEnabled}
-          onPress={onImport}
-        />
-      </View>
-      <FlatList
-        ref={list}
-        data={data}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}
-        keyExtractor={item => item.key}
-        onLayout={() => { listReady.current = true; }}
-        onViewableItemsChanged={onViewableItemsChanged}
-        onScrollToIndexFailed={({ index, averageItemLength }) => {
-          list.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
-        }}
-        ListEmptyComponent={
-          <View style={{ paddingTop: spacing.xxl, gap: spacing.sm }}>
-            <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>
-              Your recordings live here
-            </Text>
-            <Text style={[typography.body, { color: palette.muted }]}>
-              Make a recording or import an M4A file. Playback and transcript choices stay on this device.
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => {
-          if (item.kind === 'day') {
-            return (
-              <Text
-                accessibilityRole="header"
-                style={[typography.heading, {
-                  color: palette.text, paddingTop: spacing.lg, paddingBottom: spacing.sm,
-                }]}
-              >
-                {item.label}
-              </Text>
-            );
-          }
-
-          const { label, uri, durationSeconds } = item.recording;
-          const duration = recordingDuration(durationSeconds);
-          const highlighted = uri === highlightedUri;
-
+    <FlatList
+      ref={list}
+      style={{ flex: 1 }}
+      data={data}
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}
+      keyExtractor={item => item.key}
+      onLayout={() => { listReady.current = true; }}
+      onViewableItemsChanged={onViewableItemsChanged}
+      onScrollToIndexFailed={({ index, averageItemLength }) => {
+        list.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+      }}
+      ListEmptyComponent={
+        <View style={{ paddingTop: spacing.xxl, gap: spacing.sm }}>
+          <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>
+            Your recordings live here
+          </Text>
+          <Text style={[typography.body, { color: palette.muted }]}>
+            Make a recording or import an M4A file. Playback and transcript choices stay on this device.
+          </Text>
+        </View>
+      }
+      renderItem={({ item }) => {
+        if (item.kind === 'day') {
           return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={highlighted ? `${label}, ${duration}, Newly saved recording` : `${label}, ${duration}`}
-              accessibilityHint="Opens recording details"
-              accessibilityState={{ disabled }}
-              disabled={disabled}
-              onPress={() => onOpenRecording(uri)}
-              android_ripple={{ color: palette.border }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.md,
-                minHeight: 48,
-                marginBottom: spacing.sm,
-                padding: spacing.lg,
-                borderRadius: 28,
-                borderWidth: 2,
-                borderColor: highlighted ? palette.accent : palette.surface,
-                backgroundColor: palette.surface,
-                overflow: 'hidden',
-              }}
+            <Text
+              accessibilityRole="header"
+              style={[typography.caption, {
+                color: palette.muted, paddingTop: spacing.lg, paddingBottom: spacing.sm,
+              }]}
             >
-              <LibraryAudioIcon />
-              <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
-                <Text textBreakStrategy="simple" style={[typography.heading, { color: palette.text }]}>{label}</Text>
-                <Text style={[typography.body, { color: palette.muted }]}>{duration}</Text>
-                {highlighted ? (
-                  <Text accessibilityLiveRegion="polite" style={[typography.body, { color: palette.accent }]}>
-                    Newly saved recording
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
+              {item.label}
+            </Text>
           );
-        }}
-      />
-    </View>
+        }
+
+        const { label, uri, createdAt, durationSeconds } = item.recording;
+        const date = recordingDate(createdAt);
+        const time = date?.toLocaleTimeString();
+        // Existing captures can carry a full localized timestamp as their label.
+        const title = label === date?.toLocaleString() ? time ?? label : label;
+        const titleIsTime = title === time || title === date?.toLocaleTimeString(undefined, {
+          hour: 'numeric', minute: '2-digit',
+        });
+        const duration = knownRecordingDuration(durationSeconds);
+        const metadata = [titleIsTime ? undefined : time, duration].filter(Boolean);
+        const highlighted = uri === highlightedUri;
+        const status = highlighted ? 'Just saved' : undefined;
+
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={[title, ...metadata, status].filter(Boolean).join(', ')}
+            accessibilityHint="Opens recording details"
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            onPress={() => onOpenRecording(uri)}
+            android_ripple={{ color: palette.border }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: spacing.md,
+              minHeight: 48,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              borderRadius: spacing.md,
+              backgroundColor: highlighted ? palette.surface : undefined,
+              overflow: 'hidden',
+            }}
+          >
+            <LibraryAudioIcon highlighted={highlighted} />
+            <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
+              <Text textBreakStrategy="simple" style={[typography.heading, { color: palette.text }]}>{title}</Text>
+              {metadata.length > 0 ? (
+                <Text style={[typography.caption, { color: palette.muted }]}>{metadata.join(' · ')}</Text>
+              ) : null}
+              {status ? (
+                <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: palette.accent }]}>
+                  {status}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      }}
+    />
   );
 }
