@@ -227,7 +227,7 @@ async function onAudio({ port, token }, use) {
   }
 }
 
-async function listen(device, output, label, xml, duration = 10_000) {
+async function listen(device, output, label, xml, duration = 10_000, tapControl) {
   const chunks = [];
   const prefix = [];
   let playing = !label;
@@ -245,7 +245,8 @@ async function listen(device, output, label, xml, duration = 10_000) {
       });
       if (label) {
         await Promise.race([capture.then(() => { throw new Error('Speaker stream ended before Play'); }), delay(300)]);
-        await press(device.adb, xml, label);
+        if (tapControl) await tapControl();
+        else await press(device.adb, xml, label);
         playing = true;
       }
       await capture;
@@ -379,9 +380,9 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
     screenshot(name);
     return xml;
   }
-  async function control(kind, label, xml, duration = label ? 15_000 : 2500) {
+  async function control(kind, label, xml, duration = label ? 15_000 : 2500, tapControl) {
     const directory = outDir(join(out, kind));
-    const pcm = await listen(device, directory, label, xml, duration);
+    const pcm = await listen(device, directory, label, xml, duration, tapControl);
     receipt.controls[kind] = pcm;
     return pcm;
   }
@@ -469,6 +470,7 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       requireThat(!playLabels(library).length && !library.includes('content-desc="Share audio') &&
         !library.includes('content-desc="Transcript for '), 'Library exposes per-recording actions');
       receipt.labels = { A: rows[1].title, B: rows[0].title };
+      receipt.row_labels = { A: rows[1].row, B: rows[0].row };
       receipt.stage = 'open-earlier';
       const quiet = await control('open-A', rows[1].row, library, 3500);
       requireThat(quiet.samples >= rate / 2 && quiet.peak <= 64 && quiet.marker === null,
@@ -478,8 +480,18 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       screenshot('earlier-detail');
       requireThat(xmlControl(earlier, `Share audio for ${rows[1].title}`) &&
         xmlControl(earlier, `Transcript for ${rows[1].title}`), 'Earlier detail actions are missing');
+      const playLabel = `Play ${rows[1].title}`;
+      const play = xmlControl(earlier, playLabel);
+      requireThat(play, 'Earlier detail Play control is missing');
+      receipt.stage = 'rapid-back';
+      const cancelled = await control('rapid-back-A', playLabel, earlier, 7500,
+        () => adb('shell', `input tap ${play.x} ${play.y}; input keyevent 4`));
+      const afterCancel = await tree(adb);
+      requireThat(cancelled.samples >= rate / 2 && cancelled.peak <= 64 && cancelled.marker === null && captureRows(afterCancel).length === 2,
+        'Rapid Back did not cancel playback and restore the Library');
+      await press(adb, afterCancel, rows[1].row);
       receipt.stage = 'play-earlier';
-      assertMarker(await control('A', `Play ${rows[1].title}`, earlier), 'A');
+      assertMarker(await control('A', playLabel, await tree(adb)), 'A');
       await press(adb, await tree(adb), 'Back to Library');
       const returned = await tree(adb);
       requireThat(captureRows(returned).some(item => item.title === rows[1].title), 'Top Back did not restore Library');

@@ -44,7 +44,9 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-export function Transcript({ recording, recordingTitle, onClose }: { recording: File; recordingTitle: string; onClose: () => void }) {
+export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
+  recording: File; recordingTitle: string; backLabel?: string; onClose: () => void;
+}) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
   const [freeOperation, setFreeOperation] = useState<FreeOperation | LegacyFreeOperation>();
@@ -439,7 +441,7 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   return (
     <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <AppHeader title="Transcript" onBack={requestClose} backLabel="Back to library" backDisabled={!canGoBack} />
+        <AppHeader title="Transcript" onBack={requestClose} backLabel={backLabel} backDisabled={!canGoBack} />
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
           <Text style={{ color: palette.text }}>{recordingTitle}</Text>

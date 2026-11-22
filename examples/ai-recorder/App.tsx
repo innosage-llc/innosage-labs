@@ -49,23 +49,34 @@ function recordingLabel(file: File) {
 }
 
 function summarizeRecordings(files: File[]): RecordingSummary[] {
-  const recordings = files.map(file => ({
-    file,
-    createdAt: Number(file.name.split('-')[1]),
-  }));
-  const counts = new Map<number, number>();
-  for (const { file, createdAt } of recordings) {
-    if (file.name.startsWith('Import-') || !recordingDate(createdAt)) continue;
-    const minute = Math.floor(createdAt / 60_000);
-    counts.set(minute, (counts.get(minute) ?? 0) + 1);
-  }
-  return recordings.map(({ file, createdAt }) => {
-    if (file.name.startsWith('Import-')) return { uri: file.uri, label: recordingLabel(file), createdAt };
+  const minutes = new Map<string, number>();
+  const seconds = new Map<string, number>();
+  const recordings = files.map(file => {
+    const createdAt = Number(file.name.split('-')[1]);
     const date = recordingDate(createdAt);
-    const label = date?.toLocaleTimeString(undefined, {
-      hour: 'numeric', minute: '2-digit',
-      second: (counts.get(Math.floor(createdAt / 60_000)) ?? 0) > 1 ? '2-digit' : undefined,
-    }) ?? file.name;
+    if (!date || file.name.startsWith('Import-')) return { kind: 'file' as const, file, createdAt };
+    const shortTime = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const longTime = date.toLocaleTimeString();
+    const day = date.toDateString();
+    const minuteKey = `${day} ${shortTime}`;
+    const secondKey = `${day} ${longTime}`;
+    minutes.set(minuteKey, (minutes.get(minuteKey) ?? 0) + 1);
+    seconds.set(secondKey, (seconds.get(secondKey) ?? 0) + 1);
+    return { kind: 'time' as const, file, createdAt, date, shortTime, longTime, minuteKey, secondKey };
+  });
+  return recordings.map(recording => {
+    const { file, createdAt } = recording;
+    if (recording.kind === 'file') {
+      const label = file.name.startsWith('Import-') ? recordingLabel(file) : file.name;
+      return { uri: file.uri, label, createdAt };
+    }
+    const { date, shortTime, longTime, minuteKey, secondKey } = recording;
+    let label = (minutes.get(minuteKey) ?? 0) > 1 ? longTime : shortTime;
+    if ((seconds.get(secondKey) ?? 0) > 1) {
+      label = date.toLocaleTimeString(undefined, {
+        hour: 'numeric', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, timeZoneName: 'shortOffset',
+      });
+    }
     return { uri: file.uri, label, createdAt };
   });
 }
@@ -140,7 +151,9 @@ function RecorderScreen() {
 
   function closeRecording() {
     ++playRequest.current;
-    if (playingFile === detailUri && player.playing) player.pause();
+    player.pause();
+    pendingSeek.current = undefined;
+    setSeekPosition(undefined);
     setDetailUri(undefined);
     setMessage('');
   }
@@ -334,7 +347,8 @@ function RecorderScreen() {
         } : undefined}
       /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
-      {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)} onClose={() => setTranscriptRecording(undefined)} /> : null}
+      {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)}
+        backLabel="Back to recording details" onClose={() => setTranscriptRecording(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
         <View style={{ flex: 1 }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatRecordingTime(durationMillis / 1000)}</Text>
