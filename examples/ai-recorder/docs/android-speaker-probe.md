@@ -77,6 +77,20 @@ retain their own scope. The audio journey needs an isolated audio-configured
 emulator and a fresh synthetic Library. Keep it out of pre-merge until
 repeatability and runtime justify adoption.
 
+## Verify repeat capture and recording detail
+
+For the redesigned Library in [Labs #120](https://github.com/innosage-llc/innosage-labs/issues/120),
+run the same command with `journey-detail` in place of `journey`. Keep the
+dedicated emulator offline and start with an empty Library. The probe saves A,
+starts B from the same Record control, and verifies that the control returns
+to the same position after each save. It terminates and cold-launches Recorder
+before selecting the earlier recording. The earlier row must open silently,
+and explicit Play must emit A. It plays B as a separate positive control and
+checks that both the detail Back control and Android Back return to the list.
+
+The result retains the APK and screenshot hashes alongside the speaker
+evidence. Keep the raw screenshots, PCM, and emulator discovery data local.
+
 ## Replay the speaker controls
 
 Use Node 24, an installed Android Emulator and a **task-owned** `labs85-` AVD

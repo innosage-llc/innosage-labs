@@ -1,18 +1,19 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
-import { BackHandler, FlatList, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
+import { BackHandler, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useAudioPlayer,
   useAudioPlayerStatus,
   useAudioRecorderState,
 } from 'expo-audio';
-import { PlaybackSeek } from './PlaybackSeek';
 import { Transcript } from './Transcript';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
 import { ActionButton } from './ui/ActionButton';
-import { RecordControl } from './ui/RecordControl';
-import { RecordingActions } from './ui/recording-actions';
+import { LibraryView, type LibraryViewHandle } from './ui/library-view';
+import { RecordView } from './ui/record-view';
+import { RecordingDetail } from './ui/recording-detail';
+import { formatRecordingTime, recordingDate, type RecordingSummary } from './ui/recording-display';
 import { shareRecording } from './recordingShare';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
 import { hasSavedFeedback } from './ui/recordFeedback';
@@ -47,9 +48,26 @@ function recordingLabel(file: File) {
   return new Date(Number(file.name.split('-')[1])).toLocaleString();
 }
 
-function formatTime(time: number) {
-  const seconds = Math.floor(time);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+function summarizeRecordings(files: File[]): RecordingSummary[] {
+  const recordings = files.map(file => ({
+    file,
+    createdAt: Number(file.name.split('-')[1]),
+  }));
+  const counts = new Map<number, number>();
+  for (const { file, createdAt } of recordings) {
+    if (file.name.startsWith('Import-') || !recordingDate(createdAt)) continue;
+    const minute = Math.floor(createdAt / 60_000);
+    counts.set(minute, (counts.get(minute) ?? 0) + 1);
+  }
+  return recordings.map(({ file, createdAt }) => {
+    if (file.name.startsWith('Import-')) return { uri: file.uri, label: recordingLabel(file), createdAt };
+    const date = recordingDate(createdAt);
+    const label = date?.toLocaleTimeString(undefined, {
+      hour: 'numeric', minute: '2-digit',
+      second: (counts.get(Math.floor(createdAt / 60_000)) ?? 0) > 1 ? '2-digit' : undefined,
+    }) ?? file.name;
+    return { uri: file.uri, label, createdAt };
+  });
 }
 
 function RecorderScreen() {
@@ -57,6 +75,7 @@ function RecorderScreen() {
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
+  const summaries = useMemo(() => summarizeRecordings(files), [files]);
   const session = getCaptureSession();
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   useEffect(() => {
@@ -71,18 +90,16 @@ function RecorderScreen() {
   const sharing = useRef(false);
   const [sharePending, setSharePending] = useState(false);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
-  const library = useRef<FlatList<File>>(null);
-  const [libraryReady, setLibraryReady] = useState(false);
-  const visibleUris = useRef(new Set<string>());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: { item: File }[] }) => {
-    visibleUris.current = new Set(viewableItems.map(token => token.item.uri));
-  }).current;
+  const library = useRef<LibraryViewHandle>(null);
   const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
   useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
   const [transcriptRecording, setTranscriptRecording] = useState<File>();
+  const [detailUri, setDetailUri] = useState<string>();
+  const detailRecording = summaries.find(recording => recording.uri === detailUri);
+  const detailFile = files.find(file => file.uri === detailUri);
   const [playingFile, setPlayingFile] = useState<string>();
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
@@ -104,10 +121,36 @@ function RecorderScreen() {
   function navigate(next: RootDestination) {
     if (!canSwitchDestination(session.getSnapshot().phase) || next === destination) return;
     dispatchHandoff({ type: 'leave' });
-    visibleUris.current.clear();
-    setLibraryReady(false);
+    setDetailUri(undefined);
     setDestination(next);
     setMessage('');
+  }
+
+  function openRecording(uri: string) {
+    if (session.getSnapshot().phase !== 'idle') return;
+    if (!files.some(file => file.uri === uri && file.exists)) {
+      setFiles(listRecordings());
+      setMessage('This recording is no longer available on this device.');
+      return;
+    }
+    dispatchHandoff({ type: 'leave' });
+    setMessage('');
+    setDetailUri(uri);
+  }
+
+  function closeRecording() {
+    ++playRequest.current;
+    if (playingFile === detailUri && player.playing) player.pause();
+    setDetailUri(undefined);
+    setMessage('');
+  }
+
+  function openTranscript(file: File) {
+    if (session.getSnapshot().phase !== 'idle') return;
+    ++playRequest.current;
+    player.pause();
+    setMessage('');
+    setTranscriptRecording(file);
   }
 
   function viewSavedRecording() {
@@ -124,19 +167,16 @@ function RecorderScreen() {
 
   useEffect(() => {
     const request = handoff.request;
-    if (destination !== 'library' || !libraryReady || !request || request.located) return;
+    if (destination !== 'library' || !request || request.located) return;
     return locateRecording(() => {
-      const index = files.findIndex(file => file.uri === request.uri);
-      if (index < 0) return false;
-      library.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
-      if (!visibleUris.current.has(request.uri)) return false;
+      if (!library.current?.locateRecording(request.uri)) return false;
       dispatchHandoff({ type: 'located', id: request.id });
       return true;
     }, () => {
       dispatchHandoff({ type: 'expire', id: request.id });
       setMessage('Find your saved recording by its date and time in Library.');
     });
-  }, [destination, libraryReady, files, handoff.request]);
+  }, [destination, summaries, handoff.request]);
 
   useEffect(() => {
     const request = handoff.request;
@@ -268,42 +308,52 @@ function RecorderScreen() {
   }, [destination, phase]);
 
   const showSavedFeedback = hasSavedFeedback(phase, handoff.savedUri, message);
+  const detailOwnsPlayer = detailUri !== undefined && playingFile === detailUri;
 
   return (
-    <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}>
+    <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
+      libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle' || !recordings, onPress: importAudio }}>
+      {detailRecording && detailFile && !transcriptRecording ? <RecordingDetail
+        recording={detailRecording}
+        playing={detailOwnsPlayer && playback.playing}
+        disabled={phase !== 'idle'}
+        shareDisabled={sharePending}
+        message={message}
+        onBack={closeRecording}
+        onTogglePlayback={() => { void togglePlayback(detailFile); }}
+        onShare={() => { void shareAudio(detailFile, recordingLabel(detailFile)); }}
+        onTranscript={() => openTranscript(detailFile)}
+        seek={detailOwnsPlayer && playback.isLoaded && playback.duration > 0 ? {
+          max: playback.duration,
+          value: position,
+          onValueChange: value => {
+            pendingSeek.current = value;
+            setSeekPosition(value);
+          },
+          onValueChangeFinished: finishSeek,
+        } : undefined}
+      /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)} onClose={() => setTranscriptRecording(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
         <View style={{ flex: 1 }}>
-          <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatTime(durationMillis / 1000)}</Text>
+          <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatRecordingTime(durationMillis / 1000)}</Text>
         </View>
         <ActionButton title="Return" fullWidth={false} variant="text" onPress={() => navigate('record')} />
       </View> : null}
-      {message && destination !== 'record' ? <View style={styles.notice}>
+      {message && destination !== 'record' && !detailRecording ? <View style={styles.notice}>
         <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text>
         {showSavedFeedback ? <ActionButton title="View in Library" variant="text"
           fullWidth={false} onPress={viewSavedRecording} /> : null}
       </View> : null}
-      {destination === 'record' ? <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: spacing.xxl }}>
-        <View style={{ alignItems: 'center', gap: spacing.xl }}>
-          {phase === 'recording' || message ? <Text accessibilityLiveRegion="polite" style={[typography.heading, { color: palette.text, textAlign: 'center' }]}>
-            {phase === 'recording' ? 'Recording' : message}
-          </Text> : null}
-          {phase === 'recording' ? <>
-            <Text selectable accessibilityLabel={`Recording duration ${formatTime(durationMillis / 1000)}`}
-              style={styles.timer}>{formatTime(durationMillis / 1000)}</Text>
-            {message ? <Text accessibilityLiveRegion="polite" style={[styles.copy, { textAlign: 'center' }]}>{message}</Text> : null}
-          </> : null}
-          {showSavedFeedback ? <View>
-            <ActionButton title="View in Library" variant="tonal" fullWidth={false} onPress={viewSavedRecording} />
-          </View> : null}
-          <RecordControl phase={phase} onPress={phase === 'recording' ? stop : start} />
-          {!showSavedFeedback ? <Text style={[styles.support, { textAlign: 'center' }]}>
-            {Platform.OS === 'web' ? 'Recording and file import are available in the Android and iOS apps. This browser supports Record, Library and Settings navigation.' : 'Recordings are stored on this device.'}
-          </Text> : null}
-        </View>
-      </ScrollView> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+      {destination === 'record' ? <RecordView
+        phase={phase}
+        message={message}
+        durationMillis={durationMillis}
+        savedUri={handoff.savedUri}
+        onPressRecord={phase === 'recording' ? stop : start}
+        onViewInLibrary={viewSavedRecording}
+      /> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={styles.copy}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
         <View style={styles.valueCard}>
@@ -312,75 +362,13 @@ function RecorderScreen() {
           <Text style={styles.support}>Choose the service for new transcriptions. Existing jobs keep the service they started with.</Text>
           <ActionButton title="Choose service and manage keys" variant="primary" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
         </View>
-      </ScrollView> : <View style={{ flex: 1, paddingHorizontal: spacing.lg, gap: spacing.md }}>
-      <ActionButton title={phase === 'importing' ? 'Importing…' : 'Import audio'} fullWidth={false}
-        disabled={phase !== 'idle' || !recordings} variant="text" onPress={importAudio} />
-      <FlatList
+      </ScrollView> : <LibraryView
         ref={library}
-        onLayout={() => setLibraryReady(true)}
-        onViewableItemsChanged={onViewableItemsChanged}
-        onScrollToIndexFailed={({ index, averageItemLength }) => {
-          library.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
-        }}
-        data={files}
-        keyExtractor={(file) => file.uri}
-        ListEmptyComponent={<View style={styles.emptyState}>
-          <Text style={styles.cardTitle}>Your recordings live here</Text>
-          <Text style={styles.support}>Make a recording or import an M4A file. Playback and transcript choices stay on this device.</Text>
-        </View>}
-        extraData={{ playback, handoff, sharePending }}
-        renderItem={({ item }) => {
-          const selected = playingFile === item.uri;
-          const action = selected && playback.playing ? 'Pause' : 'Play';
-          const label = recordingLabel(item);
-          const highlighted = handoff.request?.located && handoff.request.uri === item.uri;
-          return (
-            <View style={[styles.recordingCard, { backgroundColor: palette.background,
-              borderColor: highlighted ? palette.accent : palette.border,
-              borderWidth: highlighted ? 2 : 0 }]}>
-              {highlighted ? <Text accessibilityLiveRegion="polite" style={{ color: palette.accent, fontWeight: '600' }}>Newly saved recording</Text> : null}
-              <View style={styles.row}>
-                <Text style={[styles.filename, { color: palette.text, fontWeight: '600' }]}>{label}</Text>
-                <ActionButton
-                  fullWidth={false}
-                  variant="text"
-                  title={action}
-                  accessibilityLabel={`${action} ${label}`}
-                  disabled={phase !== 'idle'}
-                  onPress={() => togglePlayback(item)}
-                />
-              </View>
-              {selected && playback.isLoaded && playback.duration > 0 ? (
-                <>
-                  <PlaybackSeek
-                      max={playback.duration}
-                      value={position}
-                      enabled={phase === 'idle'}
-                      label={`Playback position for ${label}`}
-                      onValueChange={(value) => {
-                        pendingSeek.current = value;
-                        setSeekPosition(value);
-                      }}
-                      onValueChangeFinished={finishSeek}
-                    />
-                  <View style={styles.times}>
-                    <Text style={styles.filename}>{formatTime(position)}</Text>
-                    <Text style={styles.copy}>{formatTime(playback.duration)}</Text>
-                  </View>
-                </>
-              ) : null}
-              <RecordingActions label={label} disabled={phase !== 'idle'} shareDisabled={sharePending}
-                onShare={recordings ? () => { void shareAudio(item, label); } : undefined}
-                onTranscript={() => {
-                  if (session.getSnapshot().phase !== 'idle') return;
-                  ++playRequest.current;
-                  player.pause(); dispatchHandoff({ type: 'leave' }); setTranscriptRecording(item);
-                }} />
-            </View>
-          );
-        }}
-      />
-      </View>}
+        recordings={summaries}
+        phase={phase}
+        highlightedUri={handoff.request?.located ? handoff.request.uri : undefined}
+        onOpenRecording={openRecording}
+      />}
     </RootShell>
   );
 }
@@ -392,15 +380,8 @@ export default function App() {
 const styles = StyleSheet.create({
   copy: { fontSize: 16, lineHeight: 24, color: '#49454F' },
   support: { fontSize: 14, lineHeight: 21, color: '#49454F' },
-  filename: { flex: 1, fontSize: 15, color: '#1D1B20' },
   cardTitle: { fontSize: 17, lineHeight: 24, fontWeight: '600', color: '#1D1B20' },
   valueCard: { padding: 20, gap: 12, borderRadius: 24, backgroundColor: '#F3EDF7' },
-  timer: { fontSize: 48, lineHeight: 56, fontVariant: ['tabular-nums'], fontWeight: '500', color: '#1D1B20' },
-  emptyState: { gap: 10, paddingTop: 28, paddingBottom: 16 },
-  recordingCard: { padding: 16, marginBottom: 12, gap: 10, borderRadius: 20, backgroundColor: '#F3EDF7' },
   recordingBanner: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3EDF7' },
   notice: { padding: 16, gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  slider: { width: '100%' },
-  times: { flexDirection: 'row', justifyContent: 'space-between' },
 });
