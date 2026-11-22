@@ -106,8 +106,13 @@ function evidence(directory, receipt, candidate, avd, head, apk, mode) {
     const expected = detail && marker ? marker : 'B';
     const scored = spawnSync(process.execPath, [probe, 'score', expected, path], { encoding: 'utf8', timeout: 15_000 });
     const score = scored.stdout ? JSON.parse(scored.stdout) : {};
+    const sparseQuiet = detail && marker === null;
+    const enoughSamples = sparseQuiet
+      ? observation?.declared_format && observation.recorder_player_active === false &&
+        observation.window_ms >= (name === 'open-A' ? 3500 : 7500) && score.samples > 0
+      : score.samples >= 8000;
     requireThat(scored.status === (marker === expected ? 0 : 1) && score.marker === marker &&
-      observation?.marker === marker && score.samples === observation.samples && score.samples >= 8000 && pcm.length === observation.bytes &&
+      observation?.marker === marker && score.samples === observation.samples && enoughSamples && pcm.length === observation.bytes &&
       sha(pcm) === observation.sha256 && (detail || name === 'B' || observation.rejection) && (marker !== null || score.peak <= 64),
     `Missing or invalid ${name} speaker evidence`);
   }

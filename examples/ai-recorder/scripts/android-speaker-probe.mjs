@@ -234,6 +234,7 @@ async function listen(device, output, label, xml, duration = 10_000, tapControl)
   let count = 0;
   let declaredFormat = false;
   const pcmPath = join(output, 'speaker.pcm');
+  const began = performance.now();
   try {
     await onAudio(device, async (session, token) => {
       const capture = rpc(session, token, 'streamAudio', monoFormat, duration, frame => {
@@ -259,13 +260,26 @@ async function listen(device, output, label, xml, duration = 10_000, tapControl)
   const pcm = Buffer.concat(chunks);
   const before = score(Buffer.concat(prefix));
   requireThat(before.marker === null, 'A marker appeared before Play');
-  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat,
+  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat, window_ms: Math.round(performance.now() - began),
     before_play_samples: before.samples, ...score(pcm) };
 }
 
 function assertMarker(pcm, expected) {
   requireThat(pcm.samples >= rate / 2, 'Missing speaker PCM');
   requireThat(pcm.marker === expected, `Expected audible ${expected}, observed ${pcm.marker ?? 'no marker'}`);
+}
+
+async function assertQuietSelection(adb, pid, pcm, windowMs) {
+  // Android may suspend the emulator mixer when no player is active. Check
+  // the real time window and decoded frames, plus Recorder's guest audio state.
+  requireThat(pcm.window_ms >= windowMs && pcm.declared_format && pcm.samples > 0 && pcm.peak <= 64 && pcm.marker === null,
+    'Speaker stream did not verify quiet output');
+  const audio = await adb('shell', 'dumpsys', 'audio');
+  requireThat(audio.includes('PlaybackActivityMonitor dump time:') && audio.includes('  players:'),
+    'Guest playback state is unavailable');
+  const playing = new RegExp(`AudioPlaybackConfiguration[^\\n]*u/pid:\\d+/${pid} state:started`);
+  requireThat(!playing.test(audio), 'Recorder still has an active guest player');
+  pcm.recorder_player_active = false;
 }
 
 async function observe([adbPort, serial, avd, pid, label, expected, output]) {
@@ -478,8 +492,7 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       receipt.row_labels = { A: rows[1].row, B: rows[0].row };
       receipt.stage = 'open-earlier';
       const quiet = await control('open-A', rows[1].row, library, 3500);
-      requireThat(quiet.samples >= rate / 2 && quiet.peak <= 64 && quiet.marker === null,
-        'Opening the earlier row did not stay silent');
+      await assertQuietSelection(adb, receipt.after_pid, quiet, 3500);
       const earlier = await tree(adb);
       writeFileSync(join(out, 'earlier-detail.xml'), earlier);
       screenshot('earlier-detail');
@@ -491,9 +504,9 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       receipt.stage = 'rapid-back';
       const cancelled = await control('rapid-back-A', playLabel, earlier, 7500,
         () => adb('shell', `input tap ${play.x} ${play.y}; input keyevent 4`));
+      await assertQuietSelection(adb, receipt.after_pid, cancelled, 7500);
       const afterCancel = await tree(adb);
-      requireThat(cancelled.samples >= rate / 2 && cancelled.peak <= 64 && cancelled.marker === null && captureRows(afterCancel).length === 2,
-        'Rapid Back did not cancel playback and restore the Library');
+      requireThat(captureRows(afterCancel).length === 2, 'Rapid Back did not restore the Library');
       await press(adb, afterCancel, rows[1].row);
       receipt.stage = 'play-earlier';
       assertMarker(await control('A', playLabel, await tree(adb)), 'A');

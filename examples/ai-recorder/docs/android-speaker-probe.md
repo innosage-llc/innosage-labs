@@ -91,6 +91,10 @@ before selecting the earlier recording. The earlier row must open silently,
 and explicit Play must emit A. It plays B as a separate positive control and
 checks that both the detail Back control and Android Back return to the list.
 Play followed immediately by Android Back must keep the speaker silent.
+For those two quiet checks the guest mixer may emit sparse PCM. The probe
+requires the full observation window, valid quiet frames, and no active
+Recorder player reported by Android. A and B still require positive tone
+recognition over recorded speaker samples.
 
 The result retains the APK and screenshot hashes alongside the speaker
 evidence. Keep the raw screenshots, PCM, and emulator discovery data local.
