@@ -234,19 +234,23 @@ async function listen(device, output, label, xml, duration = 10_000, tapControl)
   let count = 0;
   let declaredFormat = false;
   const pcmPath = join(output, 'speaker.pcm');
-  const began = performance.now();
+  let observedFrom;
+  let observedUntil;
   try {
     await onAudio(device, async (session, token) => {
-      const capture = rpc(session, token, 'streamAudio', monoFormat, duration, frame => {
+      if (!label) observedFrom = performance.now();
+      // Leave time for the initial speaker pre-roll in addition to the requested window.
+      const capture = rpc(session, token, 'streamAudio', monoFormat, duration + (label ? 1000 : 0), frame => {
         const packet = pcmFromPacket(frame);
         count += packet.pcm.length;
         requireThat(count <= rate * 2 * 30, 'Speaker capture exceeded expected size');
         declaredFormat ||= packet.format;
         (playing ? chunks : prefix).push(packet.pcm);
-      });
+      }).then(() => { observedUntil = performance.now(); });
       if (label) {
         await Promise.race([capture.then(() => { throw new Error('Speaker stream ended before Play'); }), delay(300)]);
         // Measure from dispatch, including any sound while the input command is still running.
+        observedFrom = performance.now();
         playing = true;
         if (tapControl) await tapControl();
         else await press(device.adb, xml, label);
@@ -260,7 +264,7 @@ async function listen(device, output, label, xml, duration = 10_000, tapControl)
   const pcm = Buffer.concat(chunks);
   const before = score(Buffer.concat(prefix));
   requireThat(before.marker === null, 'A marker appeared before Play');
-  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat, window_ms: Math.round(performance.now() - began),
+  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat, window_ms: Math.floor(observedUntil - observedFrom),
     before_play_samples: before.samples, ...score(pcm) };
 }
 
