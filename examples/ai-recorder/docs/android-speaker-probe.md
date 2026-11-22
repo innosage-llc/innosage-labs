@@ -87,6 +87,7 @@ to the same position after each save. It terminates and cold-launches Recorder
 before selecting the earlier recording. The earlier row must open silently,
 and explicit Play must emit A. It plays B as a separate positive control and
 checks that both the detail Back control and Android Back return to the list.
+Play followed immediately by Android Back must keep the speaker silent.
 
 The result retains the APK and screenshot hashes alongside the speaker
 evidence. Keep the raw screenshots, PCM, and emulator discovery data local.

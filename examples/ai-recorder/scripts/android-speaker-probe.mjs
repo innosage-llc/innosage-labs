@@ -245,9 +245,10 @@ async function listen(device, output, label, xml, duration = 10_000, tapControl)
       });
       if (label) {
         await Promise.race([capture.then(() => { throw new Error('Speaker stream ended before Play'); }), delay(300)]);
+        // Measure from dispatch, including any sound while the input command is still running.
+        playing = true;
         if (tapControl) await tapControl();
         else await press(device.adb, xml, label);
-        playing = true;
       }
       await capture;
     });
