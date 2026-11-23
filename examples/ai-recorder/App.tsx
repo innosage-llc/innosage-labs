@@ -87,30 +87,37 @@ function RecorderScreen() {
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
-  const [importDurations, setImportDurations] = useState(() => new Map<string, number | undefined>());
+  const [recordingDurations, setRecordingDurations] = useState(() => new Map<string, number | undefined>());
+  const durationRequests = useRef(new Map<string, Promise<number | undefined>>());
   const fileSummaries = useMemo(() => summarizeRecordings(files), [files]);
   const summaries = useMemo(() => fileSummaries.map(summary => {
-    const durationSeconds = importDurations.get(summary.uri);
+    const durationSeconds = recordingDurations.get(summary.uri);
     return durationSeconds === undefined ? summary : { ...summary, durationSeconds };
-  }), [fileSummaries, importDurations]);
+  }), [fileSummaries, recordingDurations]);
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    const pending = files.filter(file => file.name.startsWith('Import-') && !importDurations.has(file.uri));
+    const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
+    const requests = durationRequests.current;
     let current = true;
     async function readDurations() {
       // Use the local metadata reader so opening Library leaves playback idle.
-      const resolved = new Map(importDurations);
+      const resolved = new Map(recordingDurations);
       for (const file of pending) {
-        const millis = await recordingDurationMillis(file).catch(() => undefined);
+        let request = requests.get(file.uri);
+        if (!request) {
+          request = recordingDurationMillis(file).catch(() => undefined);
+          requests.set(file.uri, request);
+        }
+        const millis = await request;
         if (!current) return;
         resolved.set(file.uri, millis === undefined ? undefined : millis / 1000);
       }
-      setImportDurations(resolved);
+      setRecordingDurations(resolved);
     }
     void readDurations();
     return () => { current = false; };
-  }, [files, importDurations]);
+  }, [files, recordingDurations]);
   const session = getCaptureSession();
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   useEffect(() => {
