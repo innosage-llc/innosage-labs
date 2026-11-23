@@ -2,11 +2,11 @@ import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { LibraryAudioIcon } from './library-icons';
 import type { CapturePhase } from './navigation';
-import { knownRecordingDuration, recordingDate, type RecordingSummary } from './recording-display';
+import { knownRecordingDuration, recordingDate, recordingDayLabel, recordingRowText, type RecordingSummary } from './recording-display';
 import { useTheme } from './theme';
 
 type LibraryItem =
-  | { kind: 'day'; key: string; label: string }
+  | { kind: 'day'; key: string; date: Date | undefined }
   | { kind: 'recording'; key: string; recording: RecordingSummary };
 
 export type LibraryViewHandle = {
@@ -33,10 +33,7 @@ function groupByDay(recordings: readonly RecordingSummary[]): LibraryItem[] {
   for (const { recording, date } of sorted) {
     const day = date?.toDateString() ?? 'unknown';
     if (day !== previousDay) {
-      const label = date?.toLocaleDateString(undefined, {
-        year: 'numeric', month: 'long', day: 'numeric',
-      }) ?? 'Unknown date';
-      items.push({ kind: 'day', key: `day:${day}`, label });
+      items.push({ kind: 'day', key: `day:${day}`, date });
       previousDay = day;
     }
     items.push({ kind: 'recording', key: `recording:${recording.uri}`, recording });
@@ -50,6 +47,7 @@ export function LibraryView({
 }: LibraryViewProps) {
   const { palette, spacing, typography } = useTheme();
   const data = useMemo(() => groupByDay(recordings), [recordings]);
+  const today = new Date();
   const list = useRef<FlatList<LibraryItem>>(null);
   const listReady = useRef(false);
   const visibleUris = useRef(new Set<string>());
@@ -99,25 +97,19 @@ export function LibraryView({
           return (
             <Text
               accessibilityRole="header"
-              style={[typography.caption, {
+              style={[typography.dayLabel, {
                 color: palette.muted, paddingTop: spacing.lg, paddingBottom: spacing.sm,
               }]}
             >
-              {item.label}
+              {recordingDayLabel(item.date, today)}
             </Text>
           );
         }
 
         const { label, uri, createdAt, durationSeconds } = item.recording;
-        const date = recordingDate(createdAt);
-        const time = date?.toLocaleTimeString();
-        // Existing captures can carry a full localized timestamp as their label.
-        const title = label === date?.toLocaleString() ? time ?? label : label;
-        const titleIsTime = title === time || title === date?.toLocaleTimeString(undefined, {
-          hour: 'numeric', minute: '2-digit',
-        });
+        const { title, time } = recordingRowText(label, recordingDate(createdAt));
         const duration = knownRecordingDuration(durationSeconds);
-        const metadata = [titleIsTime ? undefined : time, duration].filter(Boolean);
+        const metadata = [time, duration].filter(Boolean);
         const highlighted = uri === highlightedUri;
         const status = highlighted ? 'Just saved' : undefined;
 

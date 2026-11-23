@@ -4,7 +4,7 @@ import type { PlaybackSeekProps } from '../PlaybackSeek.types';
 import { ActionButton } from './ActionButton';
 import { DetailShell } from './DetailShell';
 import { RecordingActions } from './recording-actions';
-import { formatRecordingTime, recordingDuration, type RecordingSummary } from './recording-display';
+import { formatRecordingTime, knownRecordingDuration, recordingDuration, type RecordingSummary } from './recording-display';
 import { useTheme } from './theme';
 
 export type RecordingDetailProps = {
@@ -25,7 +25,7 @@ export function RecordingDetail({
 }: RecordingDetailProps) {
   const { palette, spacing, typography } = useTheme();
   const activeSeek = seek && Number.isFinite(seek.max) && seek.max > 0 ? seek : undefined;
-  const duration = recordingDuration(activeSeek?.max ?? recording.durationSeconds);
+  const duration = knownRecordingDuration(recording.durationSeconds) ?? recordingDuration(activeSeek?.max);
   const action = playing ? 'Pause' : 'Play';
 
   return (

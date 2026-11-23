@@ -23,6 +23,7 @@ export type AppHeaderProps = {
 
 export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false, libraryImport }: AppHeaderProps) {
   const { palette, mode } = useTheme();
+  const isLibraryRoot = title === 'Library' && !onBack;
   return <>
     <StatusBar barStyle={mode === 'light' ? 'dark-content' : 'light-content'} />
     <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: '100%' }}>
@@ -35,7 +36,9 @@ export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = fa
             <Icon source={BackIcon} contentDescription={backLabel} size={24} />
           </IconButton>
         </TopAppBar.NavigationIcon> : null}
-        <TopAppBar.Title><Text>{title}</Text></TopAppBar.Title>
+        <TopAppBar.Title>
+          {isLibraryRoot ? <Text style={{ typography: 'headlineMedium' }}>{title}</Text> : <Text>{title}</Text>}
+        </TopAppBar.Title>
         {libraryImport ? <TopAppBar.Actions>
           <IconButton
             enabled={!libraryImport.disabled}
