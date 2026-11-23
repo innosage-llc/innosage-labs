@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
-import { BackHandler, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Platform, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useAudioPlayer,
@@ -7,6 +7,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
+import { recordingDurationMillis } from './NativeUpload';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
 import { ActionButton } from './ui/ActionButton';
@@ -86,7 +87,30 @@ function RecorderScreen() {
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
-  const summaries = useMemo(() => summarizeRecordings(files), [files]);
+  const [importDurations, setImportDurations] = useState(() => new Map<string, number | undefined>());
+  const fileSummaries = useMemo(() => summarizeRecordings(files), [files]);
+  const summaries = useMemo(() => fileSummaries.map(summary => {
+    const durationSeconds = importDurations.get(summary.uri);
+    return durationSeconds === undefined ? summary : { ...summary, durationSeconds };
+  }), [fileSummaries, importDurations]);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const pending = files.filter(file => file.name.startsWith('Import-') && !importDurations.has(file.uri));
+    if (!pending.length) return;
+    let current = true;
+    async function readDurations() {
+      // Use the local metadata reader so opening Library leaves playback idle.
+      const resolved = new Map(importDurations);
+      for (const file of pending) {
+        const millis = await recordingDurationMillis(file).catch(() => undefined);
+        if (!current) return;
+        resolved.set(file.uri, millis === undefined ? undefined : millis / 1000);
+      }
+      setImportDurations(resolved);
+    }
+    void readDurations();
+    return () => { current = false; };
+  }, [files, importDurations]);
   const session = getCaptureSession();
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   useEffect(() => {
@@ -349,7 +373,7 @@ function RecorderScreen() {
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)}
         backLabel="Back to recording details" onClose={() => setTranscriptRecording(undefined)} /> : null}
-      {phase === 'recording' && destination !== 'record' ? <View style={styles.recordingBanner}>
+      {phase === 'recording' && destination !== 'record' ? <View style={[styles.recordingBanner, { backgroundColor: palette.surface }]}>
         <View style={{ flex: 1 }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatRecordingTime(durationMillis / 1000)}</Text>
         </View>
@@ -369,11 +393,11 @@ function RecorderScreen() {
         onViewInLibrary={viewSavedRecording}
       /> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
-        <Text style={styles.copy}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
-        <View style={styles.valueCard}>
-          <Text style={styles.cardTitle}>Transcription service</Text>
-          <Text style={styles.support}>{serviceLabel}</Text>
-          <Text style={styles.support}>Choose the service for new transcriptions. Existing jobs keep the service they started with.</Text>
+        <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
+        <View style={[styles.valueCard, { backgroundColor: palette.surface }]}>
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Transcription service</Text>
+          <Text style={[styles.support, { color: palette.muted }]}>{serviceLabel}</Text>
+          <Text style={[styles.support, { color: palette.muted }]}>Choose the service for new transcriptions. Existing jobs keep the service they started with.</Text>
           <ActionButton title="Choose service and manage keys" variant="primary" disabled={phase !== 'idle'} onPress={() => setShowPro(true)} />
         </View>
       </ScrollView> : <LibraryView
@@ -388,14 +412,16 @@ function RecorderScreen() {
 }
 
 export default function App() {
-  return <SafeAreaProvider><ThemeProvider><RecorderScreen /></ThemeProvider></SafeAreaProvider>;
+  const scheme = useColorScheme();
+  const mode = Platform.OS === 'android' && scheme === 'dark' ? 'dark' : 'light';
+  return <SafeAreaProvider><ThemeProvider mode={mode}><RecorderScreen /></ThemeProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
-  copy: { fontSize: 16, lineHeight: 24, color: '#49454F' },
-  support: { fontSize: 14, lineHeight: 21, color: '#49454F' },
-  cardTitle: { fontSize: 17, lineHeight: 24, fontWeight: '600', color: '#1D1B20' },
-  valueCard: { padding: 20, gap: 12, borderRadius: 24, backgroundColor: '#F3EDF7' },
-  recordingBanner: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3EDF7' },
+  copy: { fontSize: 16, lineHeight: 24 },
+  support: { fontSize: 14, lineHeight: 21 },
+  cardTitle: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
+  valueCard: { padding: 20, gap: 12, borderRadius: 24 },
+  recordingBanner: { paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   notice: { padding: 16, gap: 8 },
 });

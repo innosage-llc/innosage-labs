@@ -446,7 +446,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
           <Text style={{ color: palette.text }}>{recordingTitle}</Text>
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          {complete || isOpenAI ? <View style={styles.serviceCard}>
+          {complete || isOpenAI ? <View style={[styles.serviceCard, { backgroundColor: palette.surface }]}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
             {isOpenAI ? <>
               <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
@@ -529,5 +529,5 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 }
 
 const styles = {
-  serviceCard: { padding: 16, gap: 8, backgroundColor: '#F3EDF7', borderRadius: 20 } as const,
+  serviceCard: { padding: 16, gap: 8, borderRadius: 20 } as const,
 };
