@@ -138,7 +138,11 @@ export function LibraryView({
             <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
               <Text textBreakStrategy="simple" style={[typography.heading, { color: palette.text }]}>{title}</Text>
               {metadata.length > 0 ? (
-                <Text style={[typography.caption, { color: palette.muted }]}>{metadata.join(' · ')}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.xs }}>
+                  {metadata.map(field => (
+                    <Text key={field} style={[typography.caption, { color: palette.muted }]}>{field}</Text>
+                  ))}
+                </View>
               ) : null}
               {status ? (
                 <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: palette.accent }]}>
