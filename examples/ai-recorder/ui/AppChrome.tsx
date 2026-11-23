@@ -1,8 +1,9 @@
 // Android baseline. These are installed Material 3 components, not a custom tab bar.
 // The separate iOS candidate must supply its native adapter before enabling iOS.
 import { StatusBar, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Host, Icon, IconButton, NavigationBar, NavigationBarItem, Text, TopAppBar } from '@expo/ui/jetpack-compose';
-import { defaultMinSize, fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
+import { defaultMinSize, fillMaxWidth, height, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import BackIcon from '@expo/material-symbols/arrow_back.xml';
 import DownloadIcon from '@expo/material-symbols/download.xml';
 import RecordIcon from '@expo/material-symbols/mic.xml';
@@ -62,10 +63,18 @@ export function RootNavigation({ selected, onSelect, enabled }: {
   selected: RootDestination; onSelect: (destination: RootDestination) => void; enabled: boolean;
 }) {
   const { palette, mode } = useTheme();
+  const { bottom: bottomInset } = useSafeAreaInsets();
+  // NavigationBar consumes the bottom system inset within this height.
+  const navigationBarHeight = 56 + bottomInset;
   return <>
     <View pointerEvents="none" style={{ height: StyleSheet.hairlineWidth, backgroundColor: palette.border }} />
     <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: '100%' }}>
-      <NavigationBar containerColor={palette.background} contentColor={palette.text} tonalElevation={0} modifiers={[fillMaxWidth()]}>
+      <NavigationBar
+        containerColor={palette.background}
+        contentColor={palette.text}
+        tonalElevation={0}
+        modifiers={[fillMaxWidth(), height(navigationBarHeight)]}
+      >
         {destinations.map(destination => <NavigationBarItem key={destination.id}
           selected={selected === destination.id} enabled={enabled}
           modifiers={[semantics({ contentDescription: destination.label })]}
