@@ -2,7 +2,7 @@
 // The separate iOS candidate must supply its native adapter before enabling iOS.
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { Host, Icon, IconButton, NavigationBar, NavigationBarItem, Text, TopAppBar } from '@expo/ui/jetpack-compose';
-import { defaultMinSize, fillMaxWidth } from '@expo/ui/jetpack-compose/modifiers';
+import { defaultMinSize, fillMaxWidth, semantics } from '@expo/ui/jetpack-compose/modifiers';
 import BackIcon from '@expo/material-symbols/arrow_back.xml';
 import DownloadIcon from '@expo/material-symbols/download.xml';
 import RecordIcon from '@expo/material-symbols/mic.xml';
@@ -68,13 +68,12 @@ export function RootNavigation({ selected, onSelect, enabled }: {
       <NavigationBar containerColor={palette.background} contentColor={palette.text} tonalElevation={0} modifiers={[fillMaxWidth()]}>
         {destinations.map(destination => <NavigationBarItem key={destination.id}
           selected={selected === destination.id} enabled={enabled}
+          modifiers={[semantics({ contentDescription: destination.label })]}
           onClick={() => onSelect(destination.id)} colors={{
-            selectedIconColor: palette.accent, selectedTextColor: palette.text,
+            selectedIconColor: palette.accent,
             selectedIndicatorColor: mode === 'light' ? '#E8DEF8' : '#4A4458', unselectedIconColor: palette.muted,
-            unselectedTextColor: palette.muted,
           }}>
           <NavigationBarItem.Icon><Icon source={icons[destination.id]} size={24} /></NavigationBarItem.Icon>
-          <NavigationBarItem.Label><Text>{destination.label}</Text></NavigationBarItem.Label>
         </NavigationBarItem>)}
       </NavigationBar>
     </Host>
