@@ -1,5 +1,5 @@
 import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, Text, View } from 'react-native';
 import { LibraryAudioIcon } from './library-icons';
 import type { CapturePhase } from './navigation';
 import { knownRecordingDuration, recordingDate, recordingDayLabel, recordingRowText, type RecordingSummary } from './recording-display';
@@ -136,7 +136,16 @@ export function LibraryView({
           >
             <LibraryAudioIcon highlighted={highlighted} />
             <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
-              <Text textBreakStrategy="simple" style={[typography.heading, { color: palette.text }]}>{title}</Text>
+              <Text
+                textBreakStrategy="simple"
+                style={[
+                  typography.heading,
+                  { color: palette.text },
+                  Platform.OS === 'android' && { fontWeight: '500' },
+                ]}
+              >
+                {title}
+              </Text>
               {metadata.length > 0 ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.xs }}>
                   {metadata.map(field => (

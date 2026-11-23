@@ -1,6 +1,6 @@
 // Android baseline. These are installed Material 3 components, not a custom tab bar.
 // The separate iOS candidate must supply its native adapter before enabling iOS.
-import { StatusBar } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { Host, Icon, IconButton, NavigationBar, NavigationBarItem, Text, TopAppBar } from '@expo/ui/jetpack-compose';
 import { defaultMinSize, fillMaxWidth } from '@expo/ui/jetpack-compose/modifiers';
 import BackIcon from '@expo/material-symbols/arrow_back.xml';
@@ -62,18 +62,21 @@ export function RootNavigation({ selected, onSelect, enabled }: {
   selected: RootDestination; onSelect: (destination: RootDestination) => void; enabled: boolean;
 }) {
   const { palette, mode } = useTheme();
-  return <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: '100%' }}>
-    <NavigationBar containerColor={palette.surface} contentColor={palette.text} tonalElevation={0} modifiers={[fillMaxWidth()]}>
-      {destinations.map(destination => <NavigationBarItem key={destination.id}
-        selected={selected === destination.id} enabled={enabled}
-        onClick={() => onSelect(destination.id)} colors={{
-          selectedIconColor: palette.text, selectedTextColor: palette.text,
-          selectedIndicatorColor: mode === 'light' ? '#E8DEF8' : '#4A4458', unselectedIconColor: palette.muted,
-          unselectedTextColor: palette.muted,
-        }}>
-        <NavigationBarItem.Icon><Icon source={icons[destination.id]} size={24} /></NavigationBarItem.Icon>
-        <NavigationBarItem.Label><Text>{destination.label}</Text></NavigationBarItem.Label>
-      </NavigationBarItem>)}
-    </NavigationBar>
-  </Host>;
+  return <>
+    <View pointerEvents="none" style={{ height: StyleSheet.hairlineWidth, backgroundColor: palette.border }} />
+    <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: '100%' }}>
+      <NavigationBar containerColor={palette.background} contentColor={palette.text} tonalElevation={0} modifiers={[fillMaxWidth()]}>
+        {destinations.map(destination => <NavigationBarItem key={destination.id}
+          selected={selected === destination.id} enabled={enabled}
+          onClick={() => onSelect(destination.id)} colors={{
+            selectedIconColor: palette.accent, selectedTextColor: palette.text,
+            selectedIndicatorColor: mode === 'light' ? '#E8DEF8' : '#4A4458', unselectedIconColor: palette.muted,
+            unselectedTextColor: palette.muted,
+          }}>
+          <NavigationBarItem.Icon><Icon source={icons[destination.id]} size={24} /></NavigationBarItem.Icon>
+          <NavigationBarItem.Label><Text>{destination.label}</Text></NavigationBarItem.Label>
+        </NavigationBarItem>)}
+      </NavigationBar>
+    </Host>
+  </>;
 }
