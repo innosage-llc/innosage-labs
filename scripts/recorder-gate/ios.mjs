@@ -14,32 +14,28 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
   const now = () => performance.now();
   try {
     await log.waitFor('Filtering the log data');
-    const launched = now();
-    const uptime = Number(command('python3', ['-c', 'import time; print(time.monotonic())']).trim());
-    const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
-    firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
-    // Inject launch uptime into the generated .xctestrun, not into the product.
-    command('python3', ['-c', `import plistlib,pathlib,sys
-p=next(pathlib.Path(sys.argv[1]).glob('Build/Products/*.xctestrun'))
-d=plistlib.loads(p.read_bytes())
-def update(v):
- if isinstance(v,dict):
-  if v.get('BlueprintName')=='StartupGateUITests' or 'StartupGateUITests' in str(v.get('TestBundlePath','')):
-   v.setdefault('EnvironmentVariables',{})['LABS85_LAUNCH_UPTIME']=sys.argv[2]
-  for item in v.values(): update(item)
- elif isinstance(v,list):
-  for item in v:update(item)
-update(d);p.write_bytes(plistlib.dumps(d))
-print(p)`, derived, String(uptime)]);
     const testRun = command('python3', ['-c', 'import pathlib,sys;print(next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun")))', derived]).trim();
     child = spawn('xcodebuild', ['test-without-building', '-xctestrun', testRun, '-destination', `id=${uuid}`, '-only-testing:StartupGateUITests/StartupGateTests/testRecordHome', '-resultBundlePath', join(output, 'startup.xcresult')], { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NSUnbufferedIO: 'YES' } });
-    let termination; let done = false;
+    let termination; let done = false; let resolveArmed;
+    const armed = new Promise(resolve => { resolveArmed = resolve; });
     for (const stream of [child.stdout, child.stderr]) stream.on('data', data => {
       text += data.toString();
       if (text.length > 8*1024*1024) { fatal = 'XCTest output limit'; child.kill(); }
+      if (/^LABS85_XCTEST_ARMED$/m.test(text)) resolveArmed();
       if (fault === 'terminate' && !termination && text.includes('LABS85_READY')) termination = setTimeout(() => { try { sim('terminate', uuid, BUNDLE); onFault(); } catch {} }, 1000);
     });
     const result = new Promise((ok, fail) => { child.on('error', fail); child.on('exit', code => { done = true; ok(code); }); });
+    await Promise.race([
+      armed,
+      result.then(() => { throw new Error('XCTest exited before observer armed'); }),
+      new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('XCTest observer arm deadline exceeded')), 60000); }),
+    ]).finally(() => clearTimeout(deadline));
+    requireThat(!fatal && !done, fatal ?? 'XCTest observer not alive at launch');
+    const launched = now();
+    const launchUptimeMs = 1000 * Number(command('python3', ['-c', 'import time; print(time.monotonic())']).trim());
+    requireThat(Number.isFinite(launchUptimeMs) && launchUptimeMs > 0, 'host launch clock unavailable');
+    const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
+    firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
     timer = setInterval(() => {
       try {
         const listing = sim('spawn', uuid, 'launchctl', 'list');
@@ -52,7 +48,7 @@ print(p)`, derived, String(uptime)]);
     }, 250);
     const code = await Promise.race([result,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('XCTest observation deadline exceeded')),95000);})]).finally(() => { clearTimeout(termination);clearTimeout(deadline); });
     requireThat(code === 0 && done && !fatal, fatal ?? 'XCTest failed');
-    const metrics = parseAccessibility(text);
+    const metrics = parseAccessibility(text, launchUptimeMs);
     requireThat(pidSamples.length >= 2, 'Simulator process evidence incomplete');
     sim('io', uuid, 'screenshot', join(output, 'screen.png'));
     const final = { identity: firstPid, ready: true, alive: true, foreground: true, fatal: false };
@@ -62,10 +58,15 @@ print(p)`, derived, String(uptime)]);
 
 // Independently check the XCTest accessibility timeline rather than trusting a
 // duration summary. PID samples remain a separate process-lifetime observation.
-export function parseAccessibility(text) {
+export function parseAccessibility(text, launchUptimeMs = 0) {
   const lines = [...text.matchAll(/LABS85_OBSERVATION_JSON (\{[^\n]+\})/g)];
   requireThat(lines.length === 1, 'XCTest observation missing or duplicated');
   const m = JSON.parse(lines[0][1]);
+  if (launchUptimeMs > 0) {
+    requireThat(m.clock === 'system_uptime_ms' && Number.isFinite(m.ready_ms) && Array.isArray(m.samples_ms), 'unbound XCTest observation clock');
+    m.ready_ms -= launchUptimeMs;
+    m.samples_ms = m.samples_ms.map(at => Number.isFinite(at) ? at - launchUptimeMs : NaN);
+  }
   requireThat(Number.isFinite(m.ready_ms) && m.ready_ms >= 0 && m.ready_ms <= 30000 && m.max_gap_ms === 1500, 'XCTest readiness/bound incomplete');
   requireThat(Array.isArray(m.samples_ms) && m.samples_ms.length >= 2 && m.samples_ms[0] === m.ready_ms, 'XCTest accessibility samples missing');
   let maximum = 0;

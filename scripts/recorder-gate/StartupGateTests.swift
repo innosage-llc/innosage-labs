@@ -5,10 +5,20 @@ final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
         let app = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
-        let env = ProcessInfo.processInfo.environment
-        let launched = try XCTUnwrap(Double(env["LABS85_LAUNCH_UPTIME"] ?? ""))
+        let armedAt = ProcessInfo.processInfo.systemUptime
+        // The host cold-launches only after the observer process is ready.
+        // Absolute clock samples let the host enforce the original readiness
+        // deadline independently of harness initialization.
+        XCTAssertEqual(app.state, .notRunning, "Observer must start before the product")
+        FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED\n".utf8))
+        while app.state != .runningForeground {
+            guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
+                throw StabilityWindow.Invalid.readiness
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         let ready = app.buttons["Start recording"].firstMatch
-        var window = StabilityWindow(launchedAt: launched)
+        var window = StabilityWindow(launchedAt: ProcessInfo.processInfo.systemUptime)
         var announced = false
         while true {
             let started = ProcessInfo.processInfo.systemUptime
@@ -16,7 +26,10 @@ final class StartupGateTests: XCTestCase {
             let visible = ready.exists && ready.isHittable
             let completed = ProcessInfo.processInfo.systemUptime
             let complete = try window.record(started: started, completed: completed, foreground: foreground, ready: visible)
-            if window.readyAt != nil && !announced { print("LABS85_READY"); announced = true }
+            if window.readyAt != nil && !announced {
+                FileHandle.standardOutput.write(Data("LABS85_READY\n".utf8))
+                announced = true
+            }
             if complete { break } // only a successful completing query ends the window
             Thread.sleep(forTimeInterval: 0.1)
         }
@@ -33,8 +46,8 @@ final class StartupGateTests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         // Exact sample times are retained in xctest.log and parsed by the host.
-        let samples = window.completedAt.filter { $0 >= readyAt }.map { ($0 - launched) * 1000 }
-        let data = try JSONSerialization.data(withJSONObject: ["ready_ms": (readyAt-launched)*1000, "stable_ms": window.stableDuration*1000, "max_gap_ms": window.maxGap*1000, "observed_max_gap_ms": window.maxObservedGap*1000, "samples_ms": samples])
-        print("LABS85_OBSERVATION_JSON \(String(decoding: data, as: UTF8.self))")
+        let samples = window.completedAt.filter { $0 >= readyAt }.map { $0 * 1000 }
+        let data = try JSONSerialization.data(withJSONObject: ["clock": "system_uptime_ms", "ready_ms": readyAt*1000, "stable_ms": window.stableDuration*1000, "max_gap_ms": window.maxGap*1000, "observed_max_gap_ms": window.maxObservedGap*1000, "samples_ms": samples])
+        FileHandle.standardOutput.write(Data("LABS85_OBSERVATION_JSON \(String(decoding: data, as: UTF8.self))\n".utf8))
     }
 }
