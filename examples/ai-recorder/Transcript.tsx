@@ -218,6 +218,9 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       const cleanupOnly = !!paid.voiceIdentification && !voiceProfileStageEnabled(serviceForWorker(paid.workerURL));
       const saved = cleanupOnly ? await committedResult() : undefined;
       if (cleanupOnly) signal?.throwIfAborted();
+      if (cleanupOnly && !saved && upload) {
+        throw new KnownServiceFailure('Voice matching is off. Check this operation’s status without uploading again.');
+      }
       if (!saved && upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
       const operationClient = clientForOperation(paid);
       const result = saved ?? (upload
