@@ -147,12 +147,35 @@ function RecorderScreen() {
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
   const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
+  const playbackError = (playback as typeof playback & { error?: string | null }).error;
   useEffect(() => {
+    if (Platform.OS !== 'android' || !detailUri || detailUri !== playingFile) return;
+    if (playbackError) {
+      ++playRequest.current;
+      androidPlayRequested.current = false;
+      setAndroidPlayPending(false);
+      player.pause();
+      setPlayingFile(undefined);
+      setMessage('Could not play the recording.');
+      return;
+    }
+    if (!androidPlayPending) return;
     if (playback.playing || playback.didJustFinish) {
       androidPlayRequested.current = false;
       setAndroidPlayPending(false);
+      return;
     }
-  }, [playback.playing, playback.didJustFinish]);
+    // A refused native audio-focus request can return without a status event.
+    const timeout = setTimeout(() => {
+      if (!androidPlayRequested.current) return;
+      ++playRequest.current;
+      androidPlayRequested.current = false;
+      setAndroidPlayPending(false);
+      player.pause();
+      setMessage('Playback did not start. Try again.');
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [androidPlayPending, detailUri, player, playingFile, playback.playing, playback.didJustFinish, playbackError, setMessage]);
   const recorder = session.recorder;
   useEffect(() => {
     if (!capture.savedUri) return;
@@ -362,6 +385,7 @@ function RecorderScreen() {
       if (request !== playRequest.current || session.getSnapshot().phase !== 'idle') return;
       player.play();
     } catch {
+      if (request !== playRequest.current) return;
       cancelAndroidPlayRequest();
       setMessage('Could not play the recording.');
     }
