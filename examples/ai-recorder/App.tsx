@@ -95,16 +95,21 @@ function RecorderScreen() {
     const durationSeconds = recordingDurations.get(summary.uri);
     return durationSeconds === undefined ? summary : { ...summary, durationSeconds };
   }), [fileSummaries, recordingDurations]);
+  const session = getCaptureSession();
+  const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const latestCapture = capture.savedUri;
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
+    const latest = pending.find(file => file.uri === latestCapture);
+    const ordered = latest ? [latest, ...pending.filter(file => file !== latest)] : pending;
     const requests = durationRequests.current;
     let current = true;
     async function readDurations() {
       // Use the local metadata reader so opening Library leaves playback idle.
       const resolved = new Map(recordingDurations);
-      for (const file of pending) {
+      for (const file of ordered) {
         let request = requests.get(file.uri);
         if (!request) {
           request = recordingDurationMillis(file).catch(() => undefined);
@@ -113,14 +118,17 @@ function RecorderScreen() {
         const millis = await request;
         if (!current) return;
         resolved.set(file.uri, millis === undefined ? undefined : millis / 1000);
+        if (file === latest && ordered.length > 1) {
+          // Show saved feedback promptly even during an initial scan of a large Library.
+          setRecordingDurations(resolved);
+          return;
+        }
       }
       setRecordingDurations(resolved);
     }
     void readDurations();
     return () => { current = false; };
-  }, [files, recordingDurations]);
-  const session = getCaptureSession();
-  const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  }, [files, recordingDurations, latestCapture]);
   useEffect(() => {
     let current = true;
     void session.ready.then(() => { if (current) setFiles(listRecordings()); });

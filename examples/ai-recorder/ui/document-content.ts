@@ -1,7 +1,7 @@
-type TranscriptBlock = { timestamp?: string; text: string };
+type TranscriptBlock = { timestamp?: string; endTimestamp?: string; text: string };
 
 const timestamp = '(?:\\d+:)?\\d+:\\d{2}(?:\\.\\d{1,3})?';
-const timedLine = new RegExp(`^\\[(${timestamp})(?:\\s*[-–]\\s*${timestamp})?\\]\\s*(.*)$`);
+const timedLine = new RegExp(`^\\[(${timestamp})(?:\\s*[-–]\\s*(${timestamp}))?\\]\\s*(.*)$`);
 
 export function transcriptReaderBlocks(text: string): TranscriptBlock[] {
   const blocks: TranscriptBlock[] = [];
@@ -9,7 +9,7 @@ export function transcriptReaderBlocks(text: string): TranscriptBlock[] {
   for (const line of text.split(/\r?\n/)) {
     const timed = timedLine.exec(line.trim());
     if (timed) {
-      block = { timestamp: timed[1], text: timed[2] };
+      block = { timestamp: timed[1], ...(timed[2] ? { endTimestamp: timed[2] } : {}), text: timed[3] };
       blocks.push(block);
     } else if (!line.trim()) {
       if (block?.timestamp === undefined || block?.text) block = undefined;

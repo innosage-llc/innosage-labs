@@ -23,6 +23,12 @@ export function captureRows(xml) {
     .sort((a, b) => a.bounds.y - b.bounds.y);
 }
 
+export function hasSavedRecordingFeedback(xml) {
+  const row = xml.match(/<node\b[^>]*resource-id="(?:(?:[^":]+:)?id\/)?last-recording-saved"[^>]*>/);
+  return !!row && !/(?:visible-to-user|displayed)="false"/.test(row[0]) ||
+    ['Saved on this device', 'Last recording saved'].some(label => xmlControl(xml, label));
+}
+
 // adb may not have attached logcat when the first marker is written. Repeat the
 // pre-launch handshake until the actual stream echoes it, under one deadline.
 export async function confirmAndroidMonitor({ log, marker, write, timeout = 5000, now = () => performance.now(), sleep = ms => new Promise(r => setTimeout(r, ms)) }) {

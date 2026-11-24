@@ -30,7 +30,7 @@ test('long pauses split paragraphs and mismatched words retain the existing resu
 
 test('reader displays real timestamp ranges and leaves untimed revisions untimed', () => {
   assert.deepEqual(transcriptReaderBlocks('[00:00.000 - 00:01.500] Hello.\n[00:02.000] Speaker 2: Yes.\nNext line.'), [
-    { timestamp: '00:00.000', text: 'Hello.' },
+    { timestamp: '00:00.000', endTimestamp: '00:01.500', text: 'Hello.' },
     { timestamp: '00:02.000', text: 'Speaker 2: Yes.\nNext line.' },
   ]);
   assert.deepEqual(transcriptReaderBlocks('Untimed revision.\n\n[Note] Keep this.'), [

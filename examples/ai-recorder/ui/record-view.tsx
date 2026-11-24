@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Platform, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Platform, ScrollView, Text, View } from 'react-native';
 import { Host, ListItem, Text as NativeText } from '@expo/ui';
 import { ActionButton } from './ActionButton';
 import { RecordControl } from './RecordControl';
@@ -24,16 +24,22 @@ export function RecordView({
   const { mode, palette, spacing, typography } = useTheme();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [controlHeight, setControlHeight] = useState(0);
+  const [statusHeight, setStatusHeight] = useState(0);
   const recording = phase === 'recording';
   const saved = hasSavedFeedback(phase, savedUri, message);
   const android = Platform.OS === 'android';
+  useEffect(() => {
+    if (android && saved) AccessibilityInfo.announceForAccessibility('Last recording saved');
+  }, [android, saved, savedUri]);
   const savedDate = recordingDate(savedRecording?.createdAt);
   const savedTime = savedDate ? recordingTimeLabel(savedDate, 'minute') : undefined;
   const savedDuration = knownRecordingDuration(savedRecording?.durationSeconds);
   const elapsed = formatRecordingTime(durationMillis / 1000);
   const heading = [typography.heading, { color: palette.text, textAlign: 'center' as const }];
-  // Center the control region independently of feedback below it. The footer stays in scroll flow.
-  const top = Math.max(spacing.xxl, (viewportHeight - controlHeight) * (android && !recording ? 0.45 : 0.5));
+  const hasStatus = recording || Boolean(message && !saved);
+  // Reserve room for the status above the Android button without shifting the capture target.
+  const anchor = (viewportHeight - controlHeight) * (android ? 0.45 : 0.5);
+  const top = Math.max(spacing.xxl, anchor - (android && hasStatus ? statusHeight + spacing.md : 0));
 
   return (
     <ScrollView
@@ -48,13 +54,15 @@ export function RecordView({
       }}
     >
       <View
-        onLayout={({ nativeEvent }) => setControlHeight(nativeEvent.layout.height)}
+        onLayout={android ? undefined : ({ nativeEvent }) => setControlHeight(nativeEvent.layout.height)}
         style={{ alignItems: 'center', gap: spacing.md }}
       >
-        {recording || (message && !saved) ? (
-          <Text accessibilityLiveRegion="polite" style={heading}>{recording ? 'Recording' : message}</Text>
-        ) : null}
-        {recording ? (
+        {hasStatus ? <View style={{ alignItems: 'center', gap: spacing.md }}
+          onLayout={android ? ({ nativeEvent }) => setStatusHeight(nativeEvent.layout.height) : undefined}>
+          <Text accessibilityLiveRegion="polite" style={android ? [typography.dayLabel, { color: palette.muted }] : heading}>
+            {recording ? 'Recording' : message}
+          </Text>
+          {recording ? (
           <>
             <Text
               selectable
@@ -69,13 +77,16 @@ export function RecordView({
               </Text>
             ) : null}
           </>
-        ) : null}
-        <RecordControl phase={phase} onPress={onPressRecord} />
+          ) : null}
+        </View> : null}
+        <View onLayout={android ? ({ nativeEvent }) => setControlHeight(nativeEvent.layout.height) : undefined}>
+          <RecordControl phase={phase} onPress={onPressRecord} />
+        </View>
       </View>
       {saved && android ? (
         <View style={{ marginTop: spacing.xxxl, borderTopWidth: 1, borderTopColor: palette.border }}>
           <Host matchContents={{ vertical: true }} colorScheme={mode}>
-            <ListItem onPress={onViewInLibrary}
+            <ListItem onPress={onViewInLibrary} testID="last-recording-saved"
               colors={{ containerColor: palette.background, contentColor: palette.text, supportingContentColor: palette.muted }}
               supportingText={[savedTime, savedDuration].filter(Boolean).join(' · ') || undefined}
               trailing={<NativeText textStyle={{ color: palette.accent }}>View in Library</NativeText>}>

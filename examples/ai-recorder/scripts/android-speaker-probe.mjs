@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { homedir } from 'node:os';
 import { BUNDLE, requireThat, sha, writeJSON } from '../../../scripts/recorder-gate/core.mjs';
 import { git, outDir, runAsync } from '../../../scripts/recorder-gate/host.mjs';
-import { captureRows, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
+import { captureRows, hasSavedRecordingFeedback, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
 
 const rate = 16_000;
 const tones = { A: [440, 587, 740, 495], B: [880, 1175, 1480, 990] };
@@ -450,7 +450,7 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       await adb('shell', 'input', 'tap', String(startControl.x), String(startControl.y));
       const saved = await tree(adb);
       writeFileSync(join(out, `saved-${marker}.xml`), saved);
-      requireThat(saved.includes('Saved on this device'), `Save ${marker} was not confirmed`);
+      requireThat(hasSavedRecordingFeedback(saved), `Save ${marker} was not confirmed`);
       if (detail) {
         const nextCapture = xmlControl(saved, 'Start recording');
         requireThat(nextCapture && Math.abs(nextCapture.x - startControl.x) <= 4 && Math.abs(nextCapture.y - startControl.y) <= 4,

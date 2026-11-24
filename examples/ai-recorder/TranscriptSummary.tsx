@@ -177,10 +177,11 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
   );
 }
 
-export function SavedRecordingSummary({ recording, recordingTitle, onClose }: {
+export function SavedRecordingSummary({ recording, recordingTitle, onClose, backLabel = 'Back to recording details' }: {
   recording: File;
   recordingTitle: string;
   onClose: () => void;
+  backLabel?: string;
 }) {
   const { palette, spacing, typography } = useTheme();
   const android = Platform.OS === 'android';
@@ -198,7 +199,7 @@ export function SavedRecordingSummary({ recording, recordingTitle, onClose }: {
     return () => { current = false; };
   }, [recording]);
   return <Modal onRequestClose={onClose}>
-    <DetailShell title="Summary" quietTitle backLabel="Back to recording details" onBack={onClose}>
+    <DetailShell title="Summary" quietTitle backLabel={backLabel} onBack={onClose}>
       <ScrollView contentContainerStyle={{ padding: spacing.xxl, gap: spacing.md }}>
         <Text accessibilityRole={android ? 'header' : undefined}
           style={android ? [typography.title, { color: palette.text }] : [typography.dayLabel, { color: palette.muted }]}>{recordingTitle}</Text>

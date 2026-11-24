@@ -527,7 +527,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   {!readerText.trim() ? <Text style={[typography.body, { color: palette.muted }]}>This revision is empty.</Text> : null}
                   {transcriptReaderBlocks(readerText).map((block, index) => (
                     <View key={index} style={{ gap: spacing.xs }}>
-                      {block.timestamp ? <Text style={[typography.caption, { color: palette.muted }]}>{block.timestamp}</Text> : null}
+                      {block.timestamp ? <Text style={[typography.caption, { color: palette.muted }]}>
+                        {block.endTimestamp ? `${block.timestamp} – ${block.endTimestamp}` : block.timestamp}
+                      </Text> : null}
                       {block.text ? <Text selectable style={[typography.body, { color: palette.text }]}>{block.text}</Text> : null}
                     </View>
                   ))}
@@ -618,7 +620,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           setDraftRevision(snapshot.revision);
           if (android) setDraft(draftText(snapshot));
         }} /> : null}
-      {showSavedSummary ? <SavedRecordingSummary recording={recording} recordingTitle={recordingTitle}
+      {showSavedSummary ? <SavedRecordingSummary recording={recording} recordingTitle={recordingTitle} backLabel="Back to transcript"
         onClose={() => setShowSavedSummary(false)} /> : null}
     </Modal>
   );
