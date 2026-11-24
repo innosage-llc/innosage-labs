@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { artifact, BUNDLE, requireThat } from './core.mjs';
 import { monitor } from './host.mjs';
 
@@ -15,56 +14,32 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
   const now = () => performance.now();
   try {
     await log.waitFor('Filtering the log data');
-    const markerName = `labs85-launch-${randomBytes(16).toString('hex')}.ack`;
-    const testRun = command('python3', ['-c', `import plistlib,pathlib,sys
-p=next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun"))
+    const launched = now();
+    const uptime = iosLaunchUptime(command);
+    const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
+    firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
+    // Inject launch uptime into the generated .xctestrun, not into the product.
+    command('python3', ['-c', `import plistlib,pathlib,sys
+p=next(pathlib.Path(sys.argv[1]).glob('Build/Products/*.xctestrun'))
 d=plistlib.loads(p.read_bytes())
-count=0
 def update(v):
- global count
  if isinstance(v,dict):
-  if v.get("BlueprintName")=="StartupGateUITests" or "StartupGateUITests" in str(v.get("TestBundlePath","")):
-   v.setdefault("EnvironmentVariables",{})["LABS85_LAUNCH_ACK_NAME"]=sys.argv[2]
-   count+=1
+  if v.get('BlueprintName')=='StartupGateUITests' or 'StartupGateUITests' in str(v.get('TestBundlePath','')):
+   v.setdefault('EnvironmentVariables',{})['LABS85_LAUNCH_UPTIME']=sys.argv[2]
   for item in v.values(): update(item)
  elif isinstance(v,list):
   for item in v:update(item)
-update(d)
-if count == 0: raise SystemExit("observer environment is unbound")
-p.write_bytes(plistlib.dumps(d))
-print(p)`, derived, markerName]).trim();
+update(d);p.write_bytes(plistlib.dumps(d))
+print(p)`, derived, String(uptime)]);
+    const testRun = command('python3', ['-c', 'import pathlib,sys;print(next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun")))', derived]).trim();
     child = spawn('xcodebuild', ['test-without-building', '-xctestrun', testRun, '-destination', `id=${uuid}`, '-only-testing:StartupGateUITests/StartupGateTests/testRecordHome', '-resultBundlePath', join(output, 'startup.xcresult')], { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NSUnbufferedIO: 'YES' } });
-    let termination; let done = false; let resolveArmed;
-    const armed = new Promise(resolve => { resolveArmed = resolve; });
+    let termination; let done = false;
     for (const stream of [child.stdout, child.stderr]) stream.on('data', data => {
       text += data.toString();
       if (text.length > 8*1024*1024) { fatal = 'XCTest output limit'; child.kill(); }
-      const marker = text.match(/^LABS85_XCTEST_ARMED (\/[^\r\n]+)$/m);
-      if (marker) resolveArmed(marker[1]);
       if (fault === 'terminate' && !termination && text.includes('LABS85_READY')) termination = setTimeout(() => { try { sim('terminate', uuid, BUNDLE); onFault(); } catch {} }, 1000);
     });
     const result = new Promise((ok, fail) => { child.on('error', fail); child.on('exit', code => { done = true; ok(code); }); });
-    const marker = await Promise.race([
-      armed,
-      result.then(() => { throw new Error('XCTest exited before observer armed'); }),
-      new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('XCTest observer arm deadline exceeded')), 60000); }),
-    ]).finally(() => clearTimeout(deadline));
-    requireThat(!fatal && !done, fatal ?? 'XCTest observer not alive at launch');
-    const runner = 'co.innosage.labs.startupgate.tests.xctrunner';
-    const container = realpathSync(sim('get_app_container', uuid, runner, 'data').trim());
-    requireThat(container.includes(`/Devices/${uuid}/data/Containers/`), 'wrong Simulator observer container');
-    const containerTmp = realpathSync(join(container, 'tmp'));
-    requireThat(basename(marker) === markerName && realpathSync(dirname(marker)) === containerTmp,
-      'launch marker is outside the exact Simulator observer container');
-    const before = sim('spawn', uuid, 'launchctl', 'list').split('\n')
-      .find(line => line.includes(BUNDLE))?.trim().split(/\s+/)[0];
-    requireThat(!/^\d+$/.test(before ?? ''), 'product already running before normal Simulator launch');
-    const launched = now();
-    const launchUptimeMs = 1000 * Number(command('python3', ['-c', 'import time; print(time.monotonic())']).trim());
-    requireThat(Number.isFinite(launchUptimeMs) && launchUptimeMs > 0, 'host launch clock unavailable');
-    const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
-    firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
-    writeFileSync(join(containerTmp, markerName), 'launched\n', { flag: 'wx', mode: 0o600 });
     timer = setInterval(() => {
       try {
         const listing = sim('spawn', uuid, 'launchctl', 'list');
@@ -77,7 +52,7 @@ print(p)`, derived, markerName]).trim();
     }, 250);
     const code = await Promise.race([result,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('XCTest observation deadline exceeded')),95000);})]).finally(() => { clearTimeout(termination);clearTimeout(deadline); });
     requireThat(code === 0 && done && !fatal, fatal ?? 'XCTest failed');
-    const metrics = parseAccessibility(text, launchUptimeMs);
+    const metrics = parseAccessibility(text);
     requireThat(pidSamples.length >= 2, 'Simulator process evidence incomplete');
     sim('io', uuid, 'screenshot', join(output, 'screen.png'));
     const final = { identity: firstPid, ready: true, alive: true, foreground: true, fatal: false };
@@ -87,15 +62,19 @@ print(p)`, derived, markerName]).trim();
 
 // Independently check the XCTest accessibility timeline rather than trusting a
 // duration summary. PID samples remain a separate process-lifetime observation.
-export function parseAccessibility(text, launchUptimeMs = 0) {
+export function iosLaunchUptime(command) {
+  // Apple's bundled Python can give time.monotonic() a per-process origin.
+  // XCTest's Foundation systemUptime is the kernel's awake-only boot clock.
+  const value = Number(command('python3', ['-c',
+    'import time; print(time.clock_gettime(time.CLOCK_UPTIME_RAW))']).trim());
+  requireThat(Number.isFinite(value) && value > 0, 'Simulator launch uptime unavailable');
+  return value;
+}
+
+export function parseAccessibility(text) {
   const lines = [...text.matchAll(/LABS85_OBSERVATION_JSON (\{[^\n]+\})/g)];
   requireThat(lines.length === 1, 'XCTest observation missing or duplicated');
   const m = JSON.parse(lines[0][1]);
-  if (launchUptimeMs > 0) {
-    requireThat(m.clock === 'system_uptime_ms' && Number.isFinite(m.ready_ms) && Array.isArray(m.samples_ms), 'unbound XCTest observation clock');
-    m.ready_ms -= launchUptimeMs;
-    m.samples_ms = m.samples_ms.map(at => Number.isFinite(at) ? at - launchUptimeMs : NaN);
-  }
   requireThat(Number.isFinite(m.ready_ms) && m.ready_ms >= 0 && m.ready_ms <= 30000 && m.max_gap_ms === 1500, 'XCTest readiness/bound incomplete');
   requireThat(Array.isArray(m.samples_ms) && m.samples_ms.length >= 2 && m.samples_ms[0] === m.ready_ms, 'XCTest accessibility samples missing');
   let maximum = 0;

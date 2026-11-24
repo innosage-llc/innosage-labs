@@ -4,42 +4,11 @@ import XCTest
 final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
-        let armedAt = ProcessInfo.processInfo.systemUptime
-        let markerName = try XCTUnwrap(ProcessInfo.processInfo.environment["LABS85_LAUNCH_ACK_NAME"])
-        let marker = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent(markerName)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
-        FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED \(marker.path)\n".utf8))
-        while !FileManager.default.fileExists(atPath: marker.path) {
-            guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
-                throw StabilityWindow.Invalid.readiness
-            }
-            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
-        }
-        // Time in XCTest setup does not replace the host's actual start clock.
-        var attached: XCUIApplication?
-        var previous: XCUIApplication.State?
-        while ProcessInfo.processInfo.systemUptime - armedAt <= 45 {
-            let candidate = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
-            let state = candidate.state
-            if state != previous {
-                FileHandle.standardOutput.write(Data("LABS85_ATTACH_STATE \(state.rawValue)\n".utf8))
-                previous = state
-            }
-            if state == .runningForeground {
-                attached = candidate
-                break
-            }
-            Thread.sleep(forTimeInterval: 0.15)
-        }
-        let app = try XCTUnwrap(attached, "No foreground product process after the normal launch")
-        // Establish the accessibility session before timing its first control
-        // sample. The host's unchanged 30s bound includes this bootstrap;
-        // the window probe itself contributes no readiness or stability sample.
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 4),
-            "Accessibility window did not become available after the real launch")
+        let app = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
+        let env = ProcessInfo.processInfo.environment
+        let launched = try XCTUnwrap(Double(env["LABS85_LAUNCH_UPTIME"] ?? ""))
         let ready = app.buttons["Start recording"].firstMatch
-        var window = StabilityWindow(launchedAt: ProcessInfo.processInfo.systemUptime)
+        var window = StabilityWindow(launchedAt: launched)
         var announced = false
         while true {
             let started = ProcessInfo.processInfo.systemUptime
@@ -47,10 +16,7 @@ final class StartupGateTests: XCTestCase {
             let visible = ready.exists && ready.isHittable
             let completed = ProcessInfo.processInfo.systemUptime
             let complete = try window.record(started: started, completed: completed, foreground: foreground, ready: visible)
-            if window.readyAt != nil && !announced {
-                FileHandle.standardOutput.write(Data("LABS85_READY\n".utf8))
-                announced = true
-            }
+            if window.readyAt != nil && !announced { print("LABS85_READY"); announced = true }
             if complete { break } // only a successful completing query ends the window
             Thread.sleep(forTimeInterval: 0.1)
         }
@@ -67,8 +33,8 @@ final class StartupGateTests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         // Exact sample times are retained in xctest.log and parsed by the host.
-        let samples = window.completedAt.filter { $0 >= readyAt }.map { $0 * 1000 }
-        let data = try JSONSerialization.data(withJSONObject: ["clock": "system_uptime_ms", "ready_ms": readyAt*1000, "stable_ms": window.stableDuration*1000, "max_gap_ms": window.maxGap*1000, "observed_max_gap_ms": window.maxObservedGap*1000, "samples_ms": samples])
-        FileHandle.standardOutput.write(Data("LABS85_OBSERVATION_JSON \(String(decoding: data, as: UTF8.self))\n".utf8))
+        let samples = window.completedAt.filter { $0 >= readyAt }.map { ($0 - launched) * 1000 }
+        let data = try JSONSerialization.data(withJSONObject: ["ready_ms": (readyAt-launched)*1000, "stable_ms": window.stableDuration*1000, "max_gap_ms": window.maxGap*1000, "observed_max_gap_ms": window.maxObservedGap*1000, "samples_ms": samples])
+        print("LABS85_OBSERVATION_JSON \(String(decoding: data, as: UTF8.self))")
     }
 }

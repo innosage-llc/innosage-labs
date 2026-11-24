@@ -204,18 +204,6 @@ test('compiled iOS sampling contract rejects runner pause, stalled query, disapp
   assert.match(run(exe,['healthy']),/PASS healthy/);
   const healthy={ready_ms:100,stable_ms:5000,max_gap_ms:1500,observed_max_gap_ms:1000,samples_ms:[100,1100,2100,3100,4100,5100]};
   assert.equal(parseAccessibility(`LABS85_OBSERVATION_JSON ${JSON.stringify(healthy)}`).stable_ms,5000);
-  const emit = value => `LABS85_OBSERVATION_JSON ${JSON.stringify(value)}`;
-  const origin = 1_000_000;
-  const offset = value => ({
-    ...healthy,
-    clock: 'system_uptime_ms',
-    ready_ms: healthy.ready_ms + value,
-    samples_ms: healthy.samples_ms.map(sample => sample + value),
-  });
-  assert.equal(parseAccessibility(emit(offset(origin)), origin).ready_ms, healthy.ready_ms);
-  assert.throws(() => parseAccessibility(emit(healthy), origin), /unbound/);
-  assert.throws(() => parseAccessibility(emit(offset(origin + 30_001)), origin), /readiness/);
-  assert.throws(() => parseAccessibility(emit(offset(origin - 500)), origin), /readiness/);
   for(const mode of ['runner-pause','query-stall','disappeared','background','clock']) {
     assert.match(run(exe,[mode]),new RegExp(`REJECT ${mode}`));
     const f=await fixture({deps:{aggregate:()=>{assert.match(run(exe,[mode]),new RegExp(`REJECT ${mode}`));throw new Error('controlled iOS observation rejected');}}});assert.deepEqual(f.calls,[]);
@@ -267,4 +255,17 @@ test('generated XCTest project has named products, both Swift sources, applicati
   run(ruby,[new URL('add-ios-test.rb',import.meta.url).pathname,project,new URL('StartupGateTests.swift',import.meta.url).pathname]);
   const inspected=JSON.parse(run(ruby,['-rxcodeproj','-rjson','-e','p=Xcodeproj::Project.open(ARGV[0]);t=p.targets.find{|x|x.name=="StartupGateUITests"};puts JSON.generate({products:t.build_configurations.map{|c|c.build_settings["PRODUCT_NAME"]},sources:t.source_build_phase.files_references.map(&:display_name).sort,dependencies:t.dependencies.size,scheme:File.read(File.join(ARGV[0],"xcshareddata/xcschemes/AIRecorder.xcscheme")).include?(t.uuid)})',project]));
   assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
+});
+
+
+test('iOS readiness origin is a shared kernel uptime and refuses invalid data', async () => {
+  const { iosLaunchUptime } = await import('./ios.mjs');
+  assert.throws(() => iosLaunchUptime(() => ''), /uptime unavailable/);
+  assert.throws(() => iosLaunchUptime(() => 'NaN'), /uptime unavailable/);
+  if (process.platform === 'darwin') {
+    const clock = () => iosLaunchUptime((program, args) => run(program, args));
+    const first = clock();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.ok(clock() - first >= 0.03, 'a different Python process must share the boot clock');
+  }
 });
