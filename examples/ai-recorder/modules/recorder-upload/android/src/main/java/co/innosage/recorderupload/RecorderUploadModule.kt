@@ -74,14 +74,14 @@ class RecorderUploadModule : Module() {
     }
 
     AsyncFunction("clipConfirmedRecording") Coroutine { id: String, uri: String, expectedBytes: Double,
-                                                        startMs: Double, endMs: Double ->
+                                                        expectedSha256: String, startMs: Double, endMs: Double ->
       withContext(Dispatchers.IO) {
         require(Regex("^[a-f0-9-]{36}$").matches(id))
         require(listOf(expectedBytes, startMs, endMs).all { it.isFinite() && it.toLong().toDouble() == it })
         check(clipping.compareAndSet(false, true))
         try {
           val clip = ExactVoiceClip.read(requireNotNull(appContext.reactContext).filesDir, uri, expectedBytes.toLong(),
-            startMs.toLong(), endMs.toLong()) { destroyed.get() || cancelled.contains(id) }
+            expectedSha256, startMs.toLong(), endMs.toLong()) { destroyed.get() || cancelled.contains(id) }
           NativeArrayBuffer.copyOf(ByteBuffer.wrap(clip))
         } catch (_: Exception) {
           throw IllegalStateException("Could not clip the selected recording interval")

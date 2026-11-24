@@ -57,7 +57,7 @@ export async function prepareConfirmedRecordingSpan({
   hash: (value: string) => Promise<string> | string;
   /** Trusted, owning Recorder reopens its original and independently verifies the original-source SHA. */
   readCurrentOriginal: (signal?: AbortSignal) => Promise<Original>;
-  nativeClip: (original: { uri: string; size: number }, startMs: number, endMs: number, signal?: AbortSignal) => Promise<VoiceProfileClip>;
+  nativeClip: (original: Original, startMs: number, endMs: number, signal?: AbortSignal) => Promise<VoiceProfileClip>;
 }) {
   if (stageEnabled !== true || operation.lane !== 'pro' || operation.identifySpeakers !== true ||
       operation.voiceIdentification === undefined || confirmation?.participantConfirmed !== true ||
@@ -100,7 +100,7 @@ export async function prepareConfirmedRecordingSpan({
       const liveOriginal = await readCurrentOriginal(signal);
       signal?.throwIfAborted();
       if (!originalValid(liveOriginal) || !sameOriginal(owner, liveOriginal)) throw invalid();
-      const clip = await nativeClip({ uri: owner.uri, size: owner.size }, span.startMs, span.endMs, signal);
+      const clip = await nativeClip({ uri: owner.uri, size: owner.size, sha256: owner.sha256 }, span.startMs, span.endMs, signal);
       signal?.throwIfAborted();
       const bytes = clip?.bytes;
       if (clip?.mimeType !== 'audio/wav' || !(bytes instanceof Uint8Array) ||

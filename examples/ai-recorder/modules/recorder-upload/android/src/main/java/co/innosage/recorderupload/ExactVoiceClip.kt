@@ -12,20 +12,23 @@ import android.system.OsConstants
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 
 /** Read one requested interval from an immutable-by-app-policy finalized local capture. */
 internal object ExactVoiceClip {
   private const val AAC = "audio/mp4a-latm"
   private const val MAX_SOURCE = 512L * 1024 * 1024
+  private val digestShape = Regex("^[a-f0-9]{64}$")
   private val recordingName = Regex("^Recording-[0-9]+-[a-f0-9-]{36}\\.m4a$")
 
-  fun read(filesDir: File, uri: String, expectedBytes: Long, startMs: Long, endMs: Long,
+  fun read(filesDir: File, uri: String, expectedBytes: Long, expectedSha256: String, startMs: Long, endMs: Long,
            cancelled: () -> Boolean): ByteArray {
     require(Build.VERSION.SDK_INT >= 28) // MediaExtractor.sampleSize
     val deadline = SystemClock.elapsedRealtime() + 15_000L
     fun checkpoint() = check(!cancelled() && SystemClock.elapsedRealtime() < deadline)
     require(startMs in 0..14_400_000 && endMs in startMs + 2_000..startMs + 30_000)
-    require(expectedBytes in 1..MAX_SOURCE)
+    require(expectedBytes in 1..MAX_SOURCE && digestShape.matches(expectedSha256))
+    val expectedDigest = ByteArray(32) { index -> expectedSha256.substring(index * 2, index * 2 + 2).toInt(16).toByte() }
     val path = Uri.parse(uri)
     require(path.scheme == "file" && path.authority.isNullOrEmpty() && path.query == null && path.fragment == null)
     val appRoot = File(filesDir, "recordings")
@@ -42,7 +45,11 @@ internal object ExactVoiceClip {
     try {
       val original = Os.fstat(fd)
       require(OsConstants.S_ISREG(original.st_mode) && original.st_nlink == 1L && original.st_size == expectedBytes)
+      require(digestMatches(fd, expectedBytes, expectedDigest, ::checkpoint))
       val bytes = decode(fd, expectedBytes, startMs, endMs, ::checkpoint)
+      // Verify the same descriptor again before accepting output; coarse file
+      // timestamps alone do not detect every same-size in-place modification.
+      require(digestMatches(fd, expectedBytes, expectedDigest, ::checkpoint))
       val still = Os.lstat(source.path)
       val status = Os.fstat(fd)
       fun unchanged(info: android.system.StructStat) = info.st_ino == original.st_ino &&
@@ -54,6 +61,29 @@ internal object ExactVoiceClip {
       return bytes
     } finally {
       Os.close(fd)
+    }
+  }
+
+  /** Positional reads share the exact decoder FD without seeking or closing it. */
+  private fun digestMatches(fd: java.io.FileDescriptor, length: Long, expected: ByteArray,
+                            checkpoint: () -> Unit): Boolean {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(64 * 1024)
+    try {
+      var offset = 0L
+      while (offset < length) {
+        checkpoint()
+        val required = minOf(buffer.size.toLong(), length - offset).toInt()
+        val read = Os.pread(fd, buffer, 0, required, offset)
+        if (read !in 1..required) return false
+        digest.update(buffer, 0, read)
+        offset += read
+      }
+      checkpoint()
+      if (Os.pread(fd, buffer, 0, 1, length) != 0) return false
+      return MessageDigest.isEqual(digest.digest(), expected)
+    } finally {
+      buffer.fill(0)
     }
   }
 

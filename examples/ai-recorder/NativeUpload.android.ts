@@ -4,7 +4,7 @@ import type { File } from "expo-file-system";
 
 type UploadModule = {
   recordingDurationMillis(uri: string): Promise<number | null>;
-  clipConfirmedRecording(id: string, uri: string, expectedBytes: number, startMs: number, endMs: number): Promise<ArrayBuffer>;
+  clipConfirmedRecording(id: string, uri: string, expectedBytes: number, expectedSha256: string, startMs: number, endMs: number): Promise<ArrayBuffer>;
   upload(
     id: string,
     url: string,
@@ -59,7 +59,7 @@ export const supportsProUpload = true;
 
 /** App-owned original and confirmed source reference must already be bound by the calling flow. */
 export async function clipConfirmedRecording(
-  original: { uri: string; size: number }, startMs: number, endMs: number, signal?: AbortSignal,
+  original: { uri: string; size: number; sha256: string }, startMs: number, endMs: number, signal?: AbortSignal,
 ): Promise<{ bytes: Uint8Array; mimeType: "audio/wav" }> {
   const native = requireNativeModule<UploadModule>("RecorderUpload");
   signal?.throwIfAborted();
@@ -68,7 +68,7 @@ export async function clipConfirmedRecording(
   signal?.addEventListener("abort", cancel, { once: true });
   try {
     if (signal?.aborted) { cancel(); signal.throwIfAborted(); }
-    const clip = await native.clipConfirmedRecording(id, original.uri, original.size, startMs, endMs);
+    const clip = await native.clipConfirmedRecording(id, original.uri, original.size, original.sha256, startMs, endMs);
     signal?.throwIfAborted();
     if (!(clip instanceof ArrayBuffer) || clip.byteLength < 44 || clip.byteLength > 6 * 1024 * 1024)
       throw new Error("Could not clip the selected recording interval");

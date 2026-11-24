@@ -47,7 +47,7 @@ test('trusted local closure binds exact row, private source proof and caller-ind
   assert.equal(f.calls.length, 0);
   const result = await clipper({...span});
   assert.equal(result.mimeType, 'audio/wav');
-  assert.deepEqual(f.calls, [{source:{uri:original.uri,size:original.size},startMs:1000,endMs:5000}]);
+  assert.deepEqual(f.calls, [{source:{uri:original.uri,size:original.size,sha256:original.sha256},startMs:1000,endMs:5000}]);
   await assert.rejects(clipper(span), /bound/);
   assert.equal(f.calls.length, 1);
 });
