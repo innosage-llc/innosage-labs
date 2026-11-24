@@ -11,6 +11,7 @@ import { AppHeader } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
+import { RecorderSwitch } from './RecorderSwitch';
 import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
 import { draftText, transcriptSeed } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
@@ -26,6 +27,8 @@ import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuest
 import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
+import { finishVoiceAfterSavingOriginal, voiceProfileStageEnabled } from './VoiceProfileFlow';
+import { summarizeVoiceProfileResult, VoiceProfileStatus, type VoiceProfileReview } from './ui/voice-profile/voice-profile-status';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
 const stateLabels: Record<string, string> = {
@@ -64,6 +67,10 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const [proDenied, setProDenied] = useState(false);
   const submission = useRef<AbortController | null>(null);
   const [identifySpeakers, setIdentifySpeakers] = useState(false);
+  const [matchVoiceProfiles, setMatchVoiceProfiles] = useState(false);
+  const [voiceProfileResult, setVoiceProfileResult] = useState<{
+    operation: ProOperation; review?: VoiceProfileReview; expanded?: boolean;
+  }>();
   const [job, setJob] = useState<Job>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -73,7 +80,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const [dirty, setDirty] = useState(false);
   const seededRevision = useRef(false);
   const [revisionReadFailed, setRevisionReadFailed] = useState(false);
-  const [showOriginal, setShowOriginal] = useState(false);
+  const [showOriginal, setShowOriginal] = useState<boolean>();
   const hasDraftEditor = useMemo(draftEditorIsBundled, []);
   const [draftDocument, setDraftDocument] = useState<Awaited<ReturnType<typeof createDraftDocument>>>();
   const [editingDraft, setEditingDraft] = useState(false);
@@ -139,16 +146,22 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
   useEffect(() => {
     let active = true;
-    async function restore() {
-      const committed = await committedResult();
-      if (committed && active) await showCompletion(committed);
+    async function readSavedOperation() {
       const savedOperation = await SecureStore.getItemAsync(operationKey);
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
       const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
       const free = saved && saved.lane !== 'openai' && !paid ? readFreeOperation(saved) : undefined;
-      const restoredService = paid ? serviceForWorker(paid.workerURL) : free ? free.service
+      const restoredService: ServiceId = paid ? serviceForWorker(paid.workerURL) : free ? free.service
         : saved?.lane === 'openai' ? 'openai' : await selectedService();
+      return { saved, paid, free, restoredService };
+    }
+    async function restore() {
+      const committed = await committedResult();
+      const { saved, paid, free, restoredService } = await readSavedOperation().catch(async error => {
+        if (committed && active) await showCompletion(committed);
+        throw error;
+      });
       if (!active) return;
       if (saved) {
         setIdentifySpeakers(free?.identifySpeakers ?? saved.identifySpeakers);
@@ -164,8 +177,10 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         setMessage('Pro authorization is unavailable or expired. Check your API key.');
       }
       if (committed) {
+        await showCompletion(committed);
+        if (!active) return;
         setServiceReady(true);
-        if (active && paid) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
+        if (paid && !paid.voiceIdentification) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
         return;
       }
       if (restoredService === 'openai') {
@@ -204,7 +219,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       result = await requestGuestJob(guest, { ...free, accountScope: guest.accountScope }, upload ? recording : undefined, signal);
     }
     const local = await persistResult(result);
-    if (paid && result.state === 'COMPLETED') {
+    if (paid && !paid.voiceIdentification && result.state === 'COMPLETED') {
       await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
     }
     return local;
@@ -226,12 +241,42 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
   const complete = job?.state === 'COMPLETED';
   const operationEnded = terminal.has(job?.state ?? '');
+  const canOfferVoiceProfiles = voiceProfileStageEnabled(service) && supportsProUpload && usePro &&
+    serviceReady && !connecting && !statusUnknown && (!operation || operationEnded);
+  const voiceProfileOperation = voiceProfileStageEnabled(service) &&
+    paidOperation?.workerURL === services.staging.workerURL && paidOperation.voiceIdentification ? paidOperation : undefined;
+  const showingOriginal = showOriginal ?? !!voiceProfileOperation;
+  const voiceLookup = voiceProfileResult?.operation === voiceProfileOperation ? voiceProfileResult : undefined;
+  const voiceReview = voiceLookup?.review;
+  const recordingName = recording.name;
   useEffect(() => {
-    if (complete && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
+    // A completed job reaches the screen only through the durable original receipt.
+    if (!complete || !voiceProfileOperation) return;
+    const controller = new AbortController();
+    const client = clientForOperation(voiceProfileOperation);
+    void finishVoiceAfterSavingOriginal({
+      client, operation: voiceProfileOperation, recording: recordingName,
+      originalSaved: true, signal: controller.signal,
+    }).then(async result => {
+      if (controller.signal.aborted || result.status === 'pending') return;
+      const review = result.status === 'ready' && result.result.status === 'completed'
+        ? summarizeVoiceProfileResult(result.result.segments) : undefined;
+      setVoiceProfileResult({ operation: voiceProfileOperation, review });
+      // An unavailable lookup can be retried on reopen if the service never confirmed a terminal result.
+      if (result.status === 'ready') {
+        await client.cleanup(voiceProfileOperation, recordingName).catch(() => {
+          if (!controller.signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
+        });
+      }
+    });
+    return () => controller.abort();
+  }, [complete, recordingName, voiceProfileOperation]);
+  useEffect(() => {
+    if (complete && !voiceProfileOperation && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
       setEditingDraft(true);
     }
-  }, [complete, busy, draftDocument, revisionReadFailed]);
+  }, [complete, voiceProfileOperation, busy, draftDocument, revisionReadFailed]);
   async function readCommittedRevision() {
     const snapshot = await draftDocument?.recover();
     if (snapshot) return draftText(snapshot);
@@ -334,7 +379,8 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         const accountScope = await proClient.identity(profile.key, controller.signal);
         controller.signal.throwIfAborted();
         paid = { lane: 'pro', id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`,
-          identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size };
+          identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size,
+          ...(canOfferVoiceProfiles && identifySpeakers && matchVoiceProfiles ? { voiceIdentification: {} } : {}) };
         freshPaid = paid;
       } else if (!paid) {
         if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
@@ -355,7 +401,10 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       setFreeOperation(free);
       setOperation(next.id);
       setJob({ state: 'RESERVED' });
-      if (startingPro) setProDenied(false);
+      if (startingPro) {
+        setProDenied(false);
+        setMatchVoiceProfiles(false);
+      }
       controller.signal.throwIfAborted();
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
       try {
@@ -455,24 +504,40 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
           </View> : null}
           {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
+          {!complete && canOfferVoiceProfiles ? <View style={{ gap: spacing.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text style={{ ...typography.body, color: palette.text, flex: 1 }}>Match saved voice profiles</Text>
+              <RecorderSwitch label="Match saved voice profiles" value={matchVoiceProfiles}
+                enabled={!busy && identifySpeakers} onCheckedChange={setMatchVoiceProfiles} />
+            </View>
+            <Text style={{ ...typography.body, color: palette.muted }}>
+              {identifySpeakers ? 'Check this recording for matches with saved voice profiles.' : 'Turn on Identify speakers to use saved voice profiles.'}
+            </Text>
+          </View> : null}
           {complete ? (
             <>
-              <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: '600' }}>{showOriginal ? 'Original transcript' : 'Editable revision'}</Text>
-              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showOriginal ? 'Saved locally; read-only' : dirty ? 'Unsaved changes' : draftRevision > 0 || revision.exists ? 'Saved locally' : 'Not saved yet'}</Text>
+              <Text accessibilityRole="header" style={{ color: palette.text, fontWeight: '600' }}>{showingOriginal ? 'Original transcript' : 'Editable revision'}</Text>
+              <Text style={{ color: palette.muted }}>{isOpenAI ? 'OpenAI' : 'Edge Speech'} · {showingOriginal ? 'Saved locally; read-only' : dirty ? 'Unsaved changes' : draftRevision > 0 || revision.exists ? 'Saved locally' : 'Not saved yet'}</Text>
               {job?.speakerLabeling?.requested ? <Text style={{ color: palette.muted }}>
                 {job.speakerLabeling.status === 'completed'
                   ? 'Speakers identified. Labels distinguish voices, not people’s names.'
                   : 'Speaker identification could not be completed. The transcript is available.'}
               </Text> : null}
-              {showOriginal || !hasDraftEditor ? <TextInput
-                accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && !revisionReadFailed && canEditTranscript(showOriginal, busy)}
-                value={showOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
-                style={[input, { minHeight: 180, textAlignVertical: 'top' }]} /> : null}
-              {!showOriginal && hasDraftEditor ? <ActionButton
+              {showingOriginal || !hasDraftEditor ? <TextInput
+                accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && !revisionReadFailed && canEditTranscript(showingOriginal, busy)}
+                value={showingOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
+                style={[input, { minHeight: 180, textAlignVertical: 'top' }, showingOriginal && voiceProfileOperation && styles.voiceOriginal]} /> : null}
+              {voiceProfileOperation ? <VoiceProfileStatus
+                pending={!voiceLookup} available={!!voiceReview}
+                matchedCount={voiceReview?.matchedCount ?? 0} reviewCount={voiceReview?.reviewCount ?? 0}
+                unknownCount={voiceReview?.unknownCount ?? 0}
+                expandedReview={voiceLookup?.expanded ? voiceReview?.reviewBySpeaker : undefined}
+                onReview={() => setVoiceProfileResult(current => current && { ...current, expanded: !current.expanded })} /> : null}
+              {!showingOriginal && hasDraftEditor ? <ActionButton
                 title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument || revisionReadFailed}
                 onPress={() => setEditingDraft(true)} /> : null}
-              <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
-              {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
+              <ActionButton title={showingOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showingOriginal)} />
+              {!showingOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               {hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
                 output={summaryFile} hasRevision={draftRevision > 0 || revision.exists} readRevision={readCommittedRevision}
                 readRevisionWithId={async () => {
@@ -512,8 +577,16 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
               identifySpeakers={identifySpeakers}
               canChooseSpeakers={canChooseSpeakers}
               busy={busy}
-              onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
-              onIdentifySpeakers={setIdentifySpeakers}
+              onUsePro={value => {
+                setUsePro(value);
+                setProDenied(false);
+                setMessage('');
+                if (!value) setMatchVoiceProfiles(false);
+              }}
+              onIdentifySpeakers={value => {
+                setIdentifySpeakers(value);
+                if (!value) setMatchVoiceProfiles(false);
+              }}
               onRetryService={retryService}
               onCheckStatus={checkOperationStatus}
               onTranscribe={submit}
@@ -530,4 +603,5 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
 const styles = {
   serviceCard: { padding: 16, gap: 8, borderRadius: 20 } as const,
+  voiceOriginal: { maxHeight: 180 },
 };
