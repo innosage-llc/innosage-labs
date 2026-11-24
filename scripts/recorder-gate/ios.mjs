@@ -15,7 +15,7 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
   try {
     await log.waitFor('Filtering the log data');
     const launched = now();
-    const uptime = Number(command('python3', ['-c', 'import time; print(time.monotonic())']).trim());
+    const uptime = iosLaunchUptime(command);
     const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
     firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
     // Inject launch uptime into the generated .xctestrun, not into the product.
@@ -62,6 +62,15 @@ print(p)`, derived, String(uptime)]);
 
 // Independently check the XCTest accessibility timeline rather than trusting a
 // duration summary. PID samples remain a separate process-lifetime observation.
+export function iosLaunchUptime(command) {
+  // Apple's bundled Python can give time.monotonic() a per-process origin.
+  // XCTest's Foundation systemUptime is the kernel's awake-only boot clock.
+  const value = Number(command('python3', ['-c',
+    'import time; print(time.clock_gettime(time.CLOCK_UPTIME_RAW))']).trim());
+  requireThat(Number.isFinite(value) && value > 0, 'Simulator launch uptime unavailable');
+  return value;
+}
+
 export function parseAccessibility(text) {
   const lines = [...text.matchAll(/LABS85_OBSERVATION_JSON (\{[^\n]+\})/g)];
   requireThat(lines.length === 1, 'XCTest observation missing or duplicated');
