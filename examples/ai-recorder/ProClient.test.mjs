@@ -5,14 +5,13 @@ import { ProClient } from './ProClient.ts';
 import { VoiceProfileIntents } from './VoiceProfileIntents.ts';
 import { voiceProfileManagement } from './VoiceProfileManagement.ts';
 
-function fixture(clipVoiceSample) {
+function fixture(clipVoiceSample, track = false, worker = "https://worker.test") {
   const values = new Map();
   const store = { getItemAsync: async key => values.get(key) ?? null,
     setItemAsync: async (key, value) => { values.set(key, value); },
     deleteItemAsync: async key => { values.delete(key); } };
   const state = { scope: 'a'.repeat(64), authorized: true, reservations: 0, uploads: 0,
     cleanup: 0, phase: 'RESERVED', loseUploadResponse: false, wrongRouter: false, mode: false, rejectStatusOnce: false };
-  const worker = 'https://worker.test';
   const router = 'https://router.test';
   const calls = [];
   async function http(url, init = {}) {
@@ -81,7 +80,7 @@ function fixture(clipVoiceSample) {
     if (state.rejectStatusOnce) { state.rejectStatusOnce = false; return Response.json({ error: 'capability_denied' }, { status: 401 }); }
     return Response.json({ state: state.phase });
   }
-  const client = new ProClient(worker, router, http, store, async (url, file, headers, signal) => { await http(url, { headers, signal, body: file }); }, clipVoiceSample);
+  const client = new ProClient(worker, router, http, store, async (url, file, headers, signal) => { await http(url, { headers, signal, body: file }); }, clipVoiceSample, track);
   const operation = { id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`, lane: 'pro',
     workerURL: worker, accountScope: state.scope, sourceBytes: 60_000_000, identifySpeakers: false };
   const file = { size: operation.sourceBytes };
@@ -385,4 +384,68 @@ test('202 and malformed terminal receipts cannot clear the persisted enrollment 
   assert.deepEqual(await open().enroll(input), f.state.voiceProfile);
   assert.equal(f.state.enrollment.key, key);
   assert.equal((await open().restore()).pendingEnrollment, false);
+});
+
+const proofFixture = () => fixture(undefined, true, 'https://api-staging.draft.innosage.co');
+const opted = (f) => ({...f.operation, identifySpeakers:true, voiceIdentification:{}});
+const proofEntries = (f) => [...f.values.entries()].filter(([key]) => key.includes('submitted-original'));
+
+test('submitted proof is durable before transfer, and usable only after exact completed existing original is read', async () => {
+  const f = proofFixture();
+  await f.client.configure('synthetic-pro-key');
+  const operation = opted(f);
+  f.state.loseUploadResponse = true;
+  await assert.rejects(f.client.upload(operation, 'private-path-not-in-proof', f.file, async () => 'b'.repeat(64), undefined, () => {
+    const [[key, value]] = proofEntries(f);
+    assert.ok(key.endsWith(operation.id));
+    assert.equal(JSON.parse(value).completed, false);
+    assert.equal(JSON.parse(value).sha256, 'b'.repeat(64));
+    assert.doesNotMatch(value, /private-path-not-in-proof|synthetic-pro-key/);
+  }), /lost response/);
+  const calls = f.calls.length;
+  assert.equal(await f.client.readSubmittedOriginalDigest(operation), undefined);
+  assert.equal(f.calls.length, calls);
+  f.state.phase = 'COMPLETED';
+  assert.equal(await f.client.readSubmittedOriginalDigest(operation), undefined);
+  await f.client.read(operation, 'private-path-not-in-proof');
+  await f.client.cleanup(operation, 'private-path-not-in-proof');
+  const before = f.calls.length;
+  assert.equal(await f.client.readSubmittedOriginalDigest(operation), 'b'.repeat(64));
+  assert.equal(await f.client.readSubmittedOriginalDigest({...operation, sourceBytes:operation.sourceBytes+1}), undefined);
+  assert.equal(await f.client.readSubmittedOriginalDigest({...operation, accountScope:'d'.repeat(64)}), undefined);
+  assert.equal(await f.client.readSubmittedOriginalDigest({...operation, voiceIdentification:undefined}), undefined);
+  assert.equal(f.calls.length, before);
+  assert.equal(f.state.uploads, 1);
+});
+
+test('changed digest and failed local persistence fail closed before any repeat native transfer', async () => {
+  const f = proofFixture();
+  await f.client.configure('synthetic-pro-key');
+  const operation = opted(f);
+  const write = f.store.setItemAsync;
+  f.store.setItemAsync = (key, value) => key.includes('submitted-original')
+    ? Promise.reject(new Error('secure storage unavailable')) : write(key, value);
+  await assert.rejects(f.client.upload(operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64)), /secure storage/);
+  assert.equal(f.state.uploads, 0);
+  f.store.setItemAsync = write;
+  f.state.loseUploadResponse = true;
+  await assert.rejects(f.client.upload(operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64)), /lost response/);
+  f.state.phase = 'RESERVED';
+  await assert.rejects(f.client.upload(operation, 'synthetic.m4a', f.file, async () => 'd'.repeat(64)), /original recording/);
+  assert.equal(f.state.uploads, 1);
+  assert.equal(JSON.parse(proofEntries(f)[0][1]).sha256, 'b'.repeat(64));
+});
+
+test('default, non-stage and unopted completed transcriptions never create upload proof', async () => {
+  for (const [f, operation] of [fixture(), fixture(undefined, true)].map(f => [f, opted(f)]).concat((() => {
+    const f = proofFixture();
+    return [[f, f.operation]];
+  })())) {
+    await f.client.configure('synthetic-pro-key');
+    await f.client.upload(operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64));
+    f.state.phase = 'COMPLETED';
+    await f.client.read(operation, 'synthetic.m4a');
+    assert.deepEqual(proofEntries(f), []);
+    assert.equal(await f.client.readSubmittedOriginalDigest(operation), undefined);
+  }
 });

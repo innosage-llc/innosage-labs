@@ -16,7 +16,8 @@ export function clientForService(id: InnoSageServiceId) {
   if (!client) {
     const config = services[id];
     client = new ProClient(config.workerURL, config.routerURL,
-      (url, init) => fetch(url, init), SecureStore, uploadRecording);
+      (url, init) => fetch(url, init), SecureStore, uploadRecording, undefined,
+      supportsProUpload && voiceProfileStageEnabled(id));
     clients.set(id, client);
   }
   return client;

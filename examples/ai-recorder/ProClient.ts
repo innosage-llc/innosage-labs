@@ -75,6 +75,11 @@ export class ProServiceError extends Error {
     super(message);
   }
 }
+type SubmittedOriginal = { sessionId: string; sha256: string; completed: boolean };
+const stageWorker = "https://api-staging.draft.innosage.co";
+const originalHash = /^[a-f0-9]{64}$/;
+const proofOperation = /^recorder-transcription-v2-[0-9]{10}-[a-f0-9-]{36}$/;
+const proofSession = /^tx_[A-Za-z0-9_-]{1,64}$/;
 export const PRO_SOURCE_LIMIT = 512 * 1024 * 1024;
 const VOICE_CONTRACT = "recorder-voice-profile/v1";
 const VOICE_CLIP_LIMIT = 10 * 1024 * 1024;
@@ -197,6 +202,7 @@ function hasVoiceAcknowledgement(value: unknown) {
 
 export class ProClient {
   private readonly profileKey: string;
+  private readonly proofWrites = new Map<string, Promise<unknown>>();
   private readonly recoveries = new Map<string, { binding: string; promise: Promise<Session> }>();
 
   constructor(
@@ -208,6 +214,7 @@ export class ProClient {
     // Must bind original Recorder-owned recordingRef and exact decoded frame
     // interval. No confirmed-segment upload without this trusted local seam.
     private readonly clipVoiceSample?: VoiceClipper,
+    private readonly trackSubmittedOriginal = false,
   ) {
     for (const url of [workerURL, routerURL]) {
       const parsed = new URL(url);
@@ -423,6 +430,71 @@ export class ProClient {
     return "pro.session." + recording + "." + operation.id;
   }
 
+  private originalProofKey(operation: ProOperation) {
+    if (!this.trackSubmittedOriginal || this.workerURL !== stageWorker ||
+        operation.workerURL !== this.workerURL || operation.lane !== "pro" ||
+        !voiceOptions(operation)) return;
+    if (!proofOperation.test(operation.id) || !originalHash.test(operation.accountScope) ||
+        !Number.isSafeInteger(operation.sourceBytes) || operation.sourceBytes < 1 ||
+        operation.sourceBytes > PRO_SOURCE_LIMIT)
+      throw new Error("Invalid submitted recording binding.");
+    return "recorder.submitted-original.v1." + operation.id;
+  }
+
+  private originalProofBinding(operation: ProOperation) {
+    return JSON.stringify([operation.id, operation.workerURL, operation.accountScope,
+      operation.sourceBytes, voiceOptions(operation)]);
+  }
+
+  private async loadOriginalProof(key: string, operation: ProOperation): Promise<SubmittedOriginal | undefined> {
+    const raw = await this.store.getItemAsync(key);
+    if (raw === null) return;
+    if (raw.length > 8192) throw new Error("Invalid submitted recording proof.");
+    const value = JSON.parse(raw);
+    if (!value || Object.keys(value).length !== 4 ||
+        value.binding !== this.originalProofBinding(operation) ||
+        typeof value.sha256 !== "string" || !originalHash.test(value.sha256) ||
+        typeof value.sessionId !== "string" || !proofSession.test(value.sessionId) ||
+        typeof value.completed !== "boolean")
+      throw new Error("Invalid submitted recording proof.");
+    return { sessionId: value.sessionId, sha256: value.sha256, completed: value.completed };
+  }
+
+  private async writeOriginalProof(operation: ProOperation, sessionId: string, newDigest?: string) {
+    const key = this.originalProofKey(operation);
+    if (!key) return;
+    if (!proofSession.test(sessionId) || (newDigest !== undefined && !originalHash.test(newDigest)))
+      throw new Error("Invalid submitted recording proof.");
+    const work = (this.proofWrites.get(key) ?? Promise.resolve()).then(async () => {
+      const current = await this.loadOriginalProof(key, operation);
+      if (current && (current.sessionId !== sessionId ||
+          (newDigest !== undefined && current.sha256 !== newDigest)))
+        throw new Error("This operation must keep its original recording.");
+      if (newDigest === undefined ? (!current || current.completed) : !!current) return;
+      const receipt = { binding: this.originalProofBinding(operation), sessionId,
+        sha256: newDigest ?? current!.sha256, completed: newDigest === undefined };
+      await this.store.setItemAsync(key, JSON.stringify(receipt));
+    });
+    const settled = work.catch(() => undefined);
+    this.proofWrites.set(key, settled);
+    try { await work; } finally {
+      if (this.proofWrites.get(key) === settled) this.proofWrites.delete(key);
+    }
+  }
+
+  /** Recorded transfer evidence only; never hashes a current file or contacts the service. */
+  async readSubmittedOriginalDigest(operation: ProOperation): Promise<string | undefined> {
+    const key = this.originalProofKey(operation);
+    if (!key || (await this.profile())?.accountScope !== operation.accountScope) return;
+    try {
+      await this.proofWrites.get(key);
+      const saved = await this.loadOriginalProof(key, operation);
+      return saved?.completed ? saved.sha256 : undefined;
+    } catch {
+      return;
+    }
+  }
+
   private async reserve(
     operation: ProOperation,
     recording: string,
@@ -628,6 +700,8 @@ export class ProClient {
         })
         .join("\n");
     }
+    // Optional local proof must not prevent recovering a usable transcript.
+    await this.writeOriginalProof(operation, session.sessionId).catch(() => undefined);
     return { state: "COMPLETED", transcript, speakerLabeling: speakers };
   }
 
@@ -693,6 +767,12 @@ export class ProClient {
       const sha256 = await hash();
       if (session.uploadExpiresAt * 1000 <= Date.now() + 5000)
         session = await this.reserve(operation, recording, signal);
+      if (this.originalProofKey(operation)) {
+        signal?.throwIfAborted();
+        // No transfer, even when the reply may later be lost, until persisted.
+        await this.writeOriginalProof(operation, session.sessionId, sha256);
+        signal?.throwIfAborted();
+      }
       onTransfer?.();
       await this.uploadFile(
         this.path(session) + "/upload",
