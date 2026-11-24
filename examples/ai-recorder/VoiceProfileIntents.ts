@@ -4,7 +4,11 @@ type Store = {
   setItemAsync(key: string, value: string): Promise<void>;
 };
 type Scope = { workerURL: string; accountScope: string };
-type Sample = { clipDigest: string; nameDigest: string; mime: 'audio/mp4' | 'audio/wav' };
+export type ConfirmedSourceProof = {
+  operationId: string; sourceSha256: string; segmentId: string; speakerId: string;
+  startMs: number; endMs: number;
+};
+type Sample = { clipDigest: string; nameDigest: string; mime: 'audio/mp4' | 'audio/wav'; confirmed?: ConfirmedSourceProof };
 type Enrollment = Sample & { mutationKey: string };
 type Deletion = { profileId: string; mutationKey: string };
 type Pending = { enrollment?: Enrollment; deletions: Deletion[] };
@@ -25,10 +29,25 @@ function has(record: Record<string, unknown>, keys: string[]) {
 function match(value: unknown, pattern: RegExp): value is string {
   return typeof value === 'string' && pattern.test(value);
 }
+export function parseConfirmedSourceProof(value: unknown): ConfirmedSourceProof {
+  if (!object(value) || !has(value, ['operationId','sourceSha256','segmentId','speakerId','startMs','endMs']) ||
+      !match(value.operationId, /^[A-Za-z0-9_-]{1,128}$/) ||
+      !match(value.sourceSha256, digest) || !match(value.segmentId, /^[A-Za-z0-9_-]{1,128}$/) ||
+      !match(value.speakerId, /^SPEAKER_0[1-8]$/) ||
+      typeof value.startMs !== 'number' || typeof value.endMs !== 'number' ||
+      !Number.isSafeInteger(value.startMs) || !Number.isSafeInteger(value.endMs) ||
+      value.startMs < 0 || value.endMs > 4 * 60 * 60 * 1000 ||
+      value.endMs - value.startMs < 2000 || value.endMs - value.startMs > 30_000) throw invalid();
+  return { operationId:value.operationId, sourceSha256:value.sourceSha256, segmentId:value.segmentId,
+    speakerId:value.speakerId, startMs:value.startMs, endMs:value.endMs };
+}
 function sample(value: Record<string, unknown>): Sample {
   if (!match(value.clipDigest, digest) || !match(value.nameDigest, digest)
       || (value.mime !== 'audio/mp4' && value.mime !== 'audio/wav')) throw invalid();
-  return { clipDigest: value.clipDigest, nameDigest: value.nameDigest, mime: value.mime };
+  const confirmed = Object.hasOwn(value, 'confirmed') ? parseConfirmedSourceProof(value.confirmed) : undefined;
+  if (confirmed && value.mime !== 'audio/wav') throw invalid();
+  return { clipDigest: value.clipDigest, nameDigest: value.nameDigest, mime: value.mime,
+    ...(confirmed ? { confirmed } : {}) };
 }
 
 export class VoiceProfileIntents {
@@ -68,7 +87,7 @@ export class VoiceProfileIntents {
     let enrollment: Enrollment | undefined;
     if (record.enrollment !== null) {
       const item = record.enrollment;
-      if (!object(item) || !has(item, ['clipDigest', 'nameDigest', 'mime', 'mutationKey'])
+      if (!object(item) || !has(item, ['clipDigest', 'nameDigest', 'mime', 'mutationKey', ...(Object.hasOwn(item, 'confirmed') ? ['confirmed'] : [])])
           || !match(item.mutationKey, key)) throw invalid();
       enrollment = { ...sample(item), mutationKey: item.mutationKey };
       keys.add(item.mutationKey);
@@ -103,13 +122,15 @@ export class VoiceProfileIntents {
     return this.run(() => this.read());
   }
 
-  beginEnrollment(input: Sample): Promise<string> {
+  beginEnrollment(input: Sample, existingKey?: string): Promise<string> {
     const request = sample(input);
     return this.run(async () => {
       const value = await this.read();
       const current = value.enrollment;
+      if (existingKey !== undefined && current?.mutationKey !== existingKey)
+        throw new Error('Could not verify the pending confirmed upload.');
       if (current) {
-        if (current.clipDigest !== request.clipDigest || current.nameDigest !== request.nameDigest
+        if (JSON.stringify(current.confirmed) !== JSON.stringify(request.confirmed) || current.clipDigest !== request.clipDigest || current.nameDigest !== request.nameDigest
             || current.mime !== request.mime) {
           throw new Error('An earlier voice profile upload needs to be verified first.');
         }

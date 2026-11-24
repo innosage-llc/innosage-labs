@@ -1,5 +1,7 @@
 import type { ProOperation, VoiceIdentification, VoiceProfileClip } from './ProClient';
 
+import type { ConfirmedSourceProof } from './VoiceProfileIntents';
+
 type ReadyResult = Extract<VoiceIdentification, { status: 'completed' | 'failed' }>;
 type Scope = Readonly<{ workerURL: string; accountScope: string }>;
 type Original = Readonly<{ uri: string; size: number; sha256: string }>;
@@ -45,12 +47,13 @@ const exactSpan = (a: ConfirmedRecordingSpan, b: ConfirmedRecordingSpan) =>
 
 /** No filesystem, network, service activation, or account discovery. Use only from trusted Recorder controller. */
 export async function prepareConfirmedRecordingSpan({
-  stageEnabled, operation, original, observed, confirmation, localNamespace, hash, readCurrentOriginal, nativeClip,
+  stageEnabled, operation, original, observed, confirmation, localNamespace, hash, readCurrentOriginal, nativeClip, pendingSource,
 }: {
   stageEnabled: boolean;
   operation: Readonly<ProOperation>;
   original: Original;
-  observed: Observed;
+  observed?: Observed;
+  pendingSource?: ConfirmedSourceProof;
   confirmation: Confirmation;
   /** Stable, private install-local 256-bit value. Never include this on the wire. */
   localNamespace: string;
@@ -62,24 +65,29 @@ export async function prepareConfirmedRecordingSpan({
   if (stageEnabled !== true || operation.lane !== 'pro' || operation.identifySpeakers !== true ||
       operation.voiceIdentification === undefined || confirmation?.participantConfirmed !== true ||
       !SHORT_ID.test(operation.id) || !SHORT_ID.test(confirmation.segmentId) ||
-      confirmation.operationId !== operation.id || observed.operationId !== operation.id ||
-      !sameScope(operation, observed.scope) || !sameScope(operation, confirmation.scope) ||
+      confirmation.operationId !== operation.id || !sameScope(operation, confirmation.scope) ||
       !DIGEST.test(localNamespace) || !originalValid(original) ||
-      original.size !== operation.sourceBytes || original.sha256 !== observed.sourceSha256)
+      original.size !== operation.sourceBytes || !!observed === !!pendingSource ||
+      (observed ? observed.operationId !== operation.id || !sameScope(operation, observed.scope) ||
+        original.sha256 !== observed.sourceSha256
+        : pendingSource?.operationId !== operation.id || pendingSource.segmentId !== confirmation.segmentId ||
+          original.sha256 !== pendingSource.sourceSha256))
     throw invalid();
-  const result = observed.result;
-  if (result?.contract !== 'recorder-voice-profile/v1' ||
+  const result = observed?.result;
+  if (observed && (result?.contract !== 'recorder-voice-profile/v1' ||
       !['completed', 'failed'].includes(result.status) || !Array.isArray(result.segments) ||
-      result.segments.length > 100_000) throw invalid();
-  const selectedRows = result.segments.filter(row => row?.segmentId === confirmation.segmentId);
+      result.segments.length > 100_000)) throw invalid();
+  const selectedRows = pendingSource ? [pendingSource] : result!.segments.filter(row => row?.segmentId === confirmation.segmentId);
   if (selectedRows.length !== 1) throw invalid();
   const { segmentId, startMs, endMs, speakerId } = selectedRows[0]!;
   if (!Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs) || startMs < 0 ||
       endMs > MAX_WINDOW_END || endMs - startMs < 2000 || endMs - startMs > 30_000 ||
       typeof speakerId !== 'string' || !SPEAKER.test(speakerId) ||
-      result.segments.some(row => row !== selectedRows[0] && row.startMs < endMs &&
+      result?.segments.some(row => row !== selectedRows[0] && row.startMs < endMs &&
         row.endMs > startMs && row.endMs > row.startMs && row.speakerId !== speakerId))
     throw invalid();
+  const proof = Object.freeze({ operationId: operation.id, sourceSha256: original.sha256,
+    segmentId, startMs, endMs, speakerId });
 
   // Snapshot before async work; never retain reference to a mutable result or caller file object.
   const owner = Object.freeze({ ...original });
@@ -92,7 +100,7 @@ export async function prepareConfirmedRecordingSpan({
   });
   let used = false;
   return Object.freeze({
-    span,
+    span, proof,
     async clipper(requested: ConfirmedRecordingSpan, signal?: AbortSignal): Promise<VoiceProfileClip> {
       signal?.throwIfAborted();
       if (used || !exactSpan(requested, span)) throw invalid();

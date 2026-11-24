@@ -15,7 +15,7 @@ const exactSpan = (a: ConfirmedRecordingSpan, b: ConfirmedRecordingSpan) =>
 
 /** The caller must supply the actual persisted upload SHA, exact observed result and a per-attempt Pro client. */
 export async function enrollConfirmedVoiceProfile({
-  provenance, displayName, journalFor, clientFor, digest, signal,
+  provenance, displayName, journalFor, clientFor, digest, signal, existingKey,
 }: {
   provenance: Provenance;
   displayName: string;
@@ -23,6 +23,7 @@ export async function enrollConfirmedVoiceProfile({
   clientFor: (scope: VoiceProfileScope, clipper: Clipper) => Sender;
   digest: (bytes: Uint8Array) => string;
   signal?: AbortSignal;
+  existingKey?: string;
 }) {
   signal?.throwIfAborted();
   const name = displayName.trim();
@@ -32,7 +33,9 @@ export async function enrollConfirmedVoiceProfile({
     workerURL: provenance.operation.workerURL, accountScope: provenance.operation.accountScope,
   });
   const operationId = provenance.operation.id;
-  const uploadSha256 = provenance.observed.sourceSha256;
+  if (!!provenance.pendingSource !== (existingKey !== undefined))
+    throw new Error('Could not verify the pending confirmed upload.');
+  const uploadSha256 = provenance.original.sha256;
   const prepared = await prepareConfirmedRecordingSpan(provenance);
   signal?.throwIfAborted();
   const clip = await prepared.clipper(prepared.span, signal);
@@ -47,13 +50,13 @@ export async function enrollConfirmedVoiceProfile({
   const { span } = prepared;
   const clipDigest = digest(encode(JSON.stringify([
     'recorder-confirmed-enrollment/v1', rawDigest, uploadSha256, operationId, scope.workerURL,
-    scope.accountScope, span.recordingRef, span.segmentId, span.startMs, span.endMs,
+    scope.accountScope, span.recordingRef, span.segmentId, prepared.proof.speakerId, span.startMs, span.endMs,
   ])));
   if (!sha256.test(clipDigest)) throw new Error('The confirmed upload could not be pinned.');
   signal?.throwIfAborted();
 
   const journal = journalFor(scope);
-  const mutationKey = await journal.beginEnrollment({ clipDigest, nameDigest, mime: 'audio/wav' });
+  const mutationKey = await journal.beginEnrollment({ clipDigest, nameDigest, mime: 'audio/wav', confirmed: prepared.proof }, existingKey);
   let delivered = false;
   let closed = false;
   const clipper: Clipper = async (requested, clipSignal) => {

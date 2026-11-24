@@ -77,7 +77,7 @@ function fixture() {
 test('retry keeps the same exact journal entry; direct-equal bytes and different provenance cannot retry it', async () => {
   const f = fixture();
   await assert.rejects(enrollConfirmedVoiceProfile(f.options), /lost response/);
-  assert.doesNotMatch(f.persisted(), /file:|Example|seg_example|original_operation|aaaaaaaa/);
+  assert.doesNotMatch(f.persisted(), /file:|Example|Synthetic|vp_[A-Za-z0-9_]/);
   const sameBytes = digest(makeWav());
   await assert.rejects(f.journalFor(scope).beginEnrollment({ clipDigest:sameBytes, nameDigest:digest('Example'),mime:'audio/wav' }), /verified first/);
   const next = structuredClone({ operation:f.options.provenance.operation, observed:f.options.provenance.observed, confirmation:f.options.provenance.confirmation });
@@ -145,4 +145,30 @@ test('only exact concrete 422 refusal consumes the pending intent', async () => 
   f.refuse({error:'invalid_sample'});
   await assert.rejects(enrollConfirmedVoiceProfile(f.options), {code:'voice_sample_rejected'});
   assert.equal((await f.journalFor(scope).restore()).enrollment,undefined);
+});
+
+test('fresh explicit cold recovery after result cleanup replays exact consented clip or fails closed', async () => {
+  const f = fixture();
+  await assert.rejects(enrollConfirmedVoiceProfile(f.options), /lost response/);
+  const pending = (await f.journalFor(scope).restore()).enrollment;
+  assert.deepEqual(pending.confirmed,{operationId:operation.id,sourceSha256:original.sha256,
+    segmentId:segment.segmentId,speakerId:segment.speakerId,startMs:segment.startMs,endMs:segment.endMs});
+  const { observed: _gone, ...rest } = f.options.provenance;
+  const provenance = {...rest, pendingSource:pending.confirmed};
+  const retry = {...f.options, provenance, existingKey:pending.mutationKey};
+  await assert.rejects(enrollConfirmedVoiceProfile({...retry, provenance:{...provenance, confirmation:{
+    ...provenance.confirmation, participantConfirmed:false,
+  }}}), /bound/);
+  await assert.rejects(enrollConfirmedVoiceProfile({...retry, provenance:{...provenance,
+    readCurrentOriginal:async () => ({...original,sha256:'e'.repeat(64)}),
+  }}), /bound/);
+  await assert.rejects(enrollConfirmedVoiceProfile({...retry, provenance:{...provenance, confirmation:{
+    ...provenance.confirmation, scope:{...scope,accountScope:'4'.repeat(64)},
+  }}}), /bound/);
+  assert.equal(f.keys.length,1);
+  assert.equal((await f.journalFor(scope).restore()).enrollment.mutationKey, pending.mutationKey);
+  assert.deepEqual(await enrollConfirmedVoiceProfile(retry),profile);
+  assert.deepEqual(f.keys,['fixture-key-1','fixture-key-1']);
+  await assert.rejects(enrollConfirmedVoiceProfile(retry), /pending confirmed upload/);
+  assert.equal(f.keys.length,2);
 });

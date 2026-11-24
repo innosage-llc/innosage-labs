@@ -5,7 +5,7 @@ import { File, FileMode } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProClient, type ProOperation, type VoiceIdentification } from "./ProClient";
 import { enrollConfirmedVoiceProfile } from "./VoiceProfileConfirmedEnrollment";
-import { VoiceProfileIntents } from "./VoiceProfileIntents";
+import { VoiceProfileIntents, type ConfirmedSourceProof } from "./VoiceProfileIntents";
 import { voiceProfileManagement } from "./VoiceProfileManagement";
 import { voiceProfileStageEnabled } from "./VoiceProfileFlow";
 import { clipConfirmedRecording, supportsProUpload, uploadRecording } from "./NativeUpload";
@@ -111,30 +111,30 @@ async function readConfirmedOriginal(uri: string, expectedSize: number, signal?:
   }
 }
 
-/** Call from the owning Recorder, using the exact result from its staged job. */
-export async function enrollConfirmedStageClip(
-  operation: ProOperation,
-  recording: File,
-  exactObservedResult: Exclude<VoiceIdentification, { status: 'pending' }>,
-  confirmation: Readonly<{ segmentId: string; displayName: string; participantConfirmed: true }>,
-  signal?: AbortSignal,
-) {
+type ConfirmedSelection = Readonly<{ segmentId: string; displayName: string; participantConfirmed: true }>;
+type ObservedVoiceResult = Exclude<VoiceIdentification, { status: 'pending' }>;
+
+function confirmedContext(operation: ProOperation) {
   if (!supportsProUpload || !voiceProfileStageEnabled('staging') ||
       operation.workerURL !== services.staging.workerURL || operation.lane !== 'pro' ||
-      operation.identifySpeakers !== true || operation.voiceIdentification === undefined ||
-      confirmation.participantConfirmed !== true)
-    throw new Error('Confirmed voice clips are unavailable.');
-  const consent = Object.freeze({ ...confirmation });
+      operation.identifySpeakers !== true || operation.voiceIdentification === undefined)
+    return;
   const candidateProfileIds = operation.voiceIdentification.candidateProfileIds;
   const boundOperation = Object.freeze({ ...operation, voiceIdentification: Object.freeze(
     candidateProfileIds === undefined ? {} : { candidateProfileIds: Object.freeze([...candidateProfileIds]) },
   ) });
   const scope = Object.freeze({ workerURL: boundOperation.workerURL, accountScope: boundOperation.accountScope });
-  const uri = recording.uri;
-  const client = clientForService('staging');
-  signal?.throwIfAborted();
-  const uploadSha256 = await client.submittedDigestForVoiceObservation(boundOperation, exactObservedResult);
-  if (!uploadSha256) throw new Error('Could not verify the completed recording and selected result.');
+  return { boundOperation, scope, client:clientForService('staging'),
+    journal:new VoiceProfileIntents(SecureStore, scope, randomUUID) };
+}
+type ConfirmedContext = NonNullable<ReturnType<typeof confirmedContext>>;
+
+async function sendConfirmed(
+  context: ConfirmedContext, uri: string, uploadSha256: string, consent: ConfirmedSelection,
+  source: { result: ObservedVoiceResult } | { pendingSource: ConfirmedSourceProof; existingKey: string },
+  signal?: AbortSignal,
+) {
+  const { boundOperation, scope, journal } = context;
   const localNamespace = await originalNamespace();
   signal?.throwIfAborted();
   const digest = (bytes: Uint8Array) => hex(sha256(bytes));
@@ -142,14 +142,17 @@ export async function enrollConfirmedStageClip(
     provenance: {
       stageEnabled: true, operation: boundOperation, localNamespace,
       original: { uri, size: boundOperation.sourceBytes, sha256: uploadSha256 },
-      observed: { operationId: boundOperation.id, scope, sourceSha256: uploadSha256, result: exactObservedResult },
+      ...('result' in source
+        ? { observed: { operationId: boundOperation.id, scope, sourceSha256: uploadSha256, result:source.result } }
+        : { pendingSource: source.pendingSource }),
       confirmation: { operationId: boundOperation.id, segmentId: consent.segmentId, scope, participantConfirmed: true },
       hash: value => digest(new TextEncoder().encode(value)),
       readCurrentOriginal: clipSignal => readConfirmedOriginal(uri, boundOperation.sourceBytes, clipSignal),
       nativeClip: clipConfirmedRecording,
     },
+    ...('existingKey' in source ? { existingKey: source.existingKey } : {}),
     displayName: consent.displayName,
-    journalFor: boundScope => new VoiceProfileIntents(SecureStore, boundScope, randomUUID),
+    journalFor: () => journal,
     clientFor: (boundScope, clipper) => {
       if (boundScope.workerURL !== services.staging.workerURL)
         throw new Error('Confirmed voice clips are unavailable.');
@@ -158,4 +161,59 @@ export async function enrollConfirmedStageClip(
     },
     digest, signal,
   });
+}
+
+/** Call from the owning Recorder, using the exact result from its staged job. */
+export async function enrollConfirmedStageClip(
+  operation: ProOperation,
+  recording: File,
+  exactObservedResult: ObservedVoiceResult,
+  confirmation: ConfirmedSelection,
+  signal?: AbortSignal,
+) {
+  const context = confirmedContext(operation);
+  if (!context || confirmation.participantConfirmed !== true)
+    throw new Error('Confirmed voice clips are unavailable.');
+  const consent = Object.freeze({ ...confirmation });
+  const uri = recording.uri;
+  signal?.throwIfAborted();
+  const uploadSha256 = await context.client.submittedDigestForVoiceObservation(context.boundOperation, exactObservedResult);
+  if (!uploadSha256) throw new Error('Could not verify the completed recording and selected result.');
+  return sendConfirmed(context, uri, uploadSha256, consent, {result:exactObservedResult}, signal);
+}
+
+async function pendingForContext(context: ConfirmedContext) {
+  const { boundOperation, client, journal } = context;
+  const sha = await client.readSubmittedOriginalDigest(boundOperation);
+  if (!sha) return;
+  const saved = (await journal.restore()).enrollment;
+  const proof = saved?.confirmed;
+  if (!proof || proof.operationId !== boundOperation.id || proof.sourceSha256 !== sha) return;
+  return { proof, key:saved.mutationKey, sha };
+}
+
+/** Local metadata only. No reservation, result lookup, clip read, or network. */
+export async function readPendingConfirmedStageClip(operation: ProOperation) {
+  const context = confirmedContext(operation);
+  const pending = context && await pendingForContext(context);
+  if (!pending) return;
+  const { segmentId, startMs, endMs, speakerId } = pending.proof;
+  return { segmentId, startMs, endMs, speakerId };
+}
+
+/** Reconfirm the already-journaled slice; never create a new intent on this path. */
+export async function resumeConfirmedStageClip(
+  operation: ProOperation, recording: File, confirmation: ConfirmedSelection, signal?: AbortSignal,
+) {
+  const context = confirmedContext(operation);
+  if (!context || confirmation.participantConfirmed !== true)
+    throw new Error('Confirmed voice clips are unavailable.');
+  const consent = Object.freeze({ ...confirmation });
+  const uri = recording.uri;
+  signal?.throwIfAborted();
+  const pending = await pendingForContext(context);
+  if (!pending || pending.proof.segmentId !== consent.segmentId)
+    throw new Error('Could not verify the pending confirmed upload.');
+  return sendConfirmed(context, uri, pending.sha, consent,
+    { pendingSource:pending.proof, existingKey:pending.key }, signal);
 }

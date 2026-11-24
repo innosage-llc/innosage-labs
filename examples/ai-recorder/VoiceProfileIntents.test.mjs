@@ -84,3 +84,25 @@ test('malformed or oversized state never gets replaced; storage failure blocks i
     assert.equal(f.data.get(storageKey), invalid);
   }
 });
+
+test('the atomic confirmed source record forbids extra, invalid or direct-equal metadata on recovery', async () => {
+  const f = fixture();
+  const confirmed = {operationId:'operation-a',sourceSha256:'f'.repeat(64),segmentId:'seg-1',
+    speakerId:'SPEAKER_01', startMs:1000,endMs:3000};
+  const k = await f.journal().beginEnrollment({...sample, confirmed});
+  assert.deepEqual((await f.journal().restore()).enrollment.confirmed,confirmed);
+  await assert.rejects(f.journal().beginEnrollment(sample), /verified first/);
+  const [storageKey] = [...f.data.keys()];
+  const snapshot = f.data.get(storageKey);
+  for (const changes of [{sourceText:'private'}, {endMs:1500}, {sourceSha256:'A'.repeat(64)},
+    {speakerId:'private-label'}, {segmentId:'a b'}]) {
+    const modified = JSON.parse(snapshot);
+    Object.assign(modified.enrollment.confirmed,changes);
+    f.data.set(storageKey,JSON.stringify(modified));
+    await assert.rejects(f.journal().restore(), /invalid/);
+  }
+  f.data.set(storageKey,snapshot);
+  assert.equal(await f.journal().beginEnrollment({...sample,confirmed},k),k);
+  assert.equal(await f.journal().finalizeEnrollment(k),true);
+  await assert.rejects(f.journal().beginEnrollment({...sample,confirmed},k), /pending confirmed upload/);
+});
