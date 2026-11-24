@@ -1,5 +1,5 @@
 import { prepareConfirmedRecordingSpan, type ConfirmedRecordingSpan } from './VoiceProfileConfirmedSegment';
-import type { ProClient, VoiceProfileClip, VoiceProfileScope } from './ProClient';
+import { consumeConfirmedEnrollmentReceipt, type ProClient, type VoiceProfileClip, type VoiceProfileScope } from './ProClient';
 import type { VoiceProfileIntents } from './VoiceProfileIntents';
 
 type Provenance = Parameters<typeof prepareConfirmedRecordingSpan>[0];
@@ -55,28 +55,33 @@ export async function enrollConfirmedVoiceProfile({
   const journal = journalFor(scope);
   const mutationKey = await journal.beginEnrollment({ clipDigest, nameDigest, mime: 'audio/wav' });
   let delivered = false;
+  let closed = false;
   const clipper: Clipper = async (requested, clipSignal) => {
     signal?.throwIfAborted();
     clipSignal?.throwIfAborted();
-    if (delivered || !exactSpan(requested, span))
+    if (closed || delivered || !exactSpan(requested, span))
       throw new Error('The confirmed upload cannot use a different or repeated clip request.');
     delivered = true;
     return { bytes, mimeType: 'audio/wav' };
   };
+  let client: Sender | undefined;
   try {
     signal?.throwIfAborted();
-    const client = clientFor(scope, clipper);
+    client = clientFor(scope, clipper);
     const profile = await client.enrollVoiceProfile({
       ...scope, participantConfirmed: true, source: span, mutationKey,
     }, name, signal);
-    if (!delivered || !await journal.finalizeEnrollment(mutationKey))
+    if (!delivered || !consumeConfirmedEnrollmentReceipt(client, profile, scope, mutationKey, span, "accepted") ||
+        !await journal.finalizeEnrollment(mutationKey))
       throw new Error('Could not verify the exact confirmed enrollment receipt.');
     return profile;
   } catch (error) {
-    const code = typeof error === 'object' && error && 'code' in error ? error.code : undefined;
-    // An exact service rejection is authoritative only after its requested
-    // clip was supplied. A lost response, cancel or wrong scope stays pending.
-    if (delivered && code === 'voice_sample_rejected') await journal.finalizeEnrollment(mutationKey);
+    if (delivered && client &&
+        consumeConfirmedEnrollmentReceipt(client, error, scope, mutationKey, span, "refused"))
+      await journal.finalizeEnrollment(mutationKey);
     throw error;
+  } finally {
+    closed = true;
+    bytes.fill(0);
   }
 }

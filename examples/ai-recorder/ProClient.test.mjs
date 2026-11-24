@@ -477,3 +477,21 @@ test('default, non-stage and unopted completed transcriptions never create uploa
     assert.equal(await f.client.readSubmittedOriginalDigest(operation), undefined);
   }
 });
+
+test('confirmed clip proof requires the exact frozen stage sidecar and same completed session', async () => {
+  const f = proofFixture();
+  await f.client.configure('synthetic-pro-key');
+  const operation = opted(f);
+  await f.client.upload(operation,'synthetic.m4a',f.file,async ()=>'b'.repeat(64));
+  f.state.phase = 'COMPLETED';
+  f.state.voiceResult = {contract:'recorder-voice-profile/v1',status:'completed',segments:[
+    {segmentId:'segment_1',startMs:3000,endMs:5000,speakerId:'SPEAKER_01',disposition:'unknown',text:'Fixture'},
+  ]};
+  const observed = await f.client.readVoiceIdentification(operation,'synthetic.m4a');
+  assert.equal(await f.client.submittedDigestForVoiceObservation(operation,observed.result),undefined);
+  await f.client.read(operation,'synthetic.m4a');
+  assert.equal(await f.client.submittedDigestForVoiceObservation(operation,observed.result),'b'.repeat(64));
+  assert.equal(await f.client.submittedDigestForVoiceObservation(operation,structuredClone(observed.result)),undefined);
+  assert.equal(await f.client.submittedDigestForVoiceObservation({...operation,sourceBytes:operation.sourceBytes+1},observed.result),undefined);
+  assert.throws(() => { observed.result.segments[0].startMs=0; },TypeError);
+});

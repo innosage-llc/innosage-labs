@@ -23,7 +23,7 @@ export type VoiceProfileEnrollment = VoiceProfileScope & {
   | { source: { source: "direct" }; audio: Blob | VoiceProfileClip }
   | { source: ConfirmedVoiceSegment; audio?: never }
 );
-type VoiceClipper = (segment: ConfirmedVoiceSegment, signal?: AbortSignal) => Promise<Blob>;
+type VoiceClipper = (segment: ConfirmedVoiceSegment, signal?: AbortSignal) => Promise<Blob | VoiceProfileClip>;
 export type VoiceProfileSummary = {
   profileId: string;
   displayName: string;
@@ -80,6 +80,7 @@ const stageWorker = "https://api-staging.draft.innosage.co";
 const originalHash = /^[a-f0-9]{64}$/;
 const proofOperation = /^recorder-transcription-v2-[0-9]{10}-[a-f0-9-]{36}$/;
 const proofSession = /^tx_[A-Za-z0-9_-]{1,64}$/;
+const exactVoiceSampleRefusals = new WeakSet<object>();
 export const PRO_SOURCE_LIMIT = 512 * 1024 * 1024;
 const VOICE_CONTRACT = "recorder-voice-profile/v1";
 const VOICE_CLIP_LIMIT = 10 * 1024 * 1024;
@@ -200,8 +201,30 @@ function hasVoiceAcknowledgement(value: unknown) {
 }
 
 
+const confirmedEnrollmentReceipts = new WeakMap<object, { client: ProClient; binding: string; kind: "accepted" | "refused" }>();
+
+function confirmedEnrollmentBinding(scope: VoiceProfileScope, mutationKey: string, span: ConfirmedVoiceSegment) {
+  return JSON.stringify([scope.workerURL, scope.accountScope, mutationKey, span.source,
+    span.recordingRef, span.segmentId, span.startMs, span.endMs]);
+}
+
+/** Consume only a strict, exact receipt issued by the concrete bound client. */
+export function consumeConfirmedEnrollmentReceipt(
+  client: Pick<ProClient, "enrollVoiceProfile">,
+  receipt: unknown, scope: VoiceProfileScope, mutationKey: string, span: ConfirmedVoiceSegment,
+  kind: "accepted" | "refused",
+) {
+  if (!receipt || typeof receipt !== "object") return false;
+  const source = confirmedEnrollmentReceipts.get(receipt);
+  if (source?.client !== client || source.kind !== kind ||
+      source.binding !== confirmedEnrollmentBinding(scope, mutationKey, span)) return false;
+  confirmedEnrollmentReceipts.delete(receipt);
+  return true;
+}
+
 export class ProClient {
   private readonly profileKey: string;
+  private readonly voiceObservations = new WeakMap<VoiceIdentification, { binding: string; sessionId: string }>();
   private readonly proofWrites = new Map<string, Promise<unknown>>();
   private readonly recoveries = new Map<string, { binding: string; promise: Promise<Session> }>();
 
@@ -239,8 +262,11 @@ export class ProClient {
     if (!response.ok) {
       if (voiceEnrollment && response.status === 422) {
         const detail = await response.json().catch(() => null);
-        if (detail && Object.keys(detail).length === 1 && detail.error === "invalid_sample")
-          throw new ProServiceError("Use a clear 2–30 second clip of just one speaker.", "voice_sample_rejected");
+        if (detail && Object.keys(detail).length === 1 && detail.error === "invalid_sample") {
+          const rejection = new ProServiceError("Use a clear 2–30 second clip of just one speaker.", "voice_sample_rejected");
+          exactVoiceSampleRefusals.add(rejection);
+          throw rejection;
+        }
         throw new ProServiceError("Could not verify the voice upload. Retry the same clip.", "voice_unavailable");
       }
       if (response.status === 401 || response.status === 403)
@@ -341,9 +367,18 @@ export class ProClient {
     if (input.workerURL !== this.workerURL)
       throw new ProServiceError("This operation belongs to another environment.", "authorization");
     const multipart = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
-    const response = await this.voiceProfileRequest(input, "", {
-      method: "POST", ...multipart, signal,
-    }, input.mutationKey, true);
+    const boundReceipt = input.source.source === "confirmed_segment"
+      ? confirmedEnrollmentBinding(input, input.mutationKey, input.source) : undefined;
+    let response: Response;
+    try {
+      response = await this.voiceProfileRequest(input, "", {
+        method: "POST", ...multipart, signal,
+      }, input.mutationKey, true);
+    } catch (error) {
+      if (boundReceipt && error instanceof ProServiceError && exactVoiceSampleRefusals.delete(error))
+        confirmedEnrollmentReceipts.set(error, { client: this, binding: boundReceipt, kind: "refused" });
+      throw error;
+    }
     if (response.status !== 200 && response.status !== 201) {
       void response.body?.cancel().catch(() => undefined);
       throw new ProServiceError("Could not verify the enrollment receipt.", "voice_unavailable");
@@ -354,7 +389,12 @@ export class ProClient {
         !Object.hasOwn(data, "profile") || !("contract" in data) ||
         data.contract !== VOICE_CONTRACT || !("profile" in data))
       throw new ProServiceError("Could not verify the enrollment receipt.", "voice_unavailable");
-    return profileSummary(data.profile);
+    const profile = profileSummary(data.profile);
+    if (boundReceipt) {
+      Object.freeze(profile);
+      confirmedEnrollmentReceipts.set(profile, { client: this, binding: boundReceipt, kind: "accepted" });
+    }
+    return profile;
   }
 
   async updateVoiceProfileSample(
@@ -490,6 +530,24 @@ export class ProClient {
       if (this.proofWrites.has(key)) return;
       const saved = await this.loadOriginalProof(key, operation);
       return saved?.completed ? saved.sha256 : undefined;
+    } catch {
+      return;
+    }
+  }
+
+  /** A projection or reconstructed sidecar is not enrollment authority. */
+  async submittedDigestForVoiceObservation(
+    operation: ProOperation,
+    result: Exclude<VoiceIdentification, { status: "pending" }>,
+  ): Promise<string | undefined> {
+    const key = this.originalProofKey(operation);
+    if (!key || (await this.profile())?.accountScope !== operation.accountScope) return;
+    const observed = this.voiceObservations.get(result);
+    if (!observed || observed.binding !== this.originalProofBinding(operation)) return;
+    try {
+      await this.proofWrites.get(key);
+      const proof = await this.loadOriginalProof(key, operation);
+      if (proof?.completed && proof.sessionId === observed.sessionId) return proof.sha256;
     } catch {
       return;
     }
@@ -734,8 +792,15 @@ export class ProClient {
     if (response.status === 202 && parsed?.status === "pending" &&
         response.headers.get("Retry-After") === "2")
       return { result: parsed, retryAfterSeconds: 2 };
-    if (response.status === 200 && parsed && parsed.status !== "pending")
+    if (response.status === 200 && parsed && parsed.status !== "pending") {
+      if (this.originalProofKey(operation)) {
+        for (const row of parsed.segments) Object.freeze(row);
+        Object.freeze(parsed.segments);
+        Object.freeze(parsed);
+        this.voiceObservations.set(parsed, { binding: this.originalProofBinding(operation), sessionId: session.sessionId });
+      }
       return { result: parsed };
+    }
     throw new ProServiceError("Voice matching response is unavailable.", "voice_unavailable");
   }
 

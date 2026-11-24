@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { registerHooks } from 'node:module';
+import { ProClient, ProServiceError } from './ProClient.ts';
 import { VoiceProfileIntents } from './VoiceProfileIntents.ts';
 const owner = new URL('./VoiceProfileConfirmedEnrollment.ts', import.meta.url).href;
 // Match Expo's extensionless TS resolution only for the exact test import.
 const hook = registerHooks({ resolve(specifier, context, next) {
-  return next(context.parentURL === owner && specifier === './VoiceProfileConfirmedSegment'
+  return next(context.parentURL === owner && ['./VoiceProfileConfirmedSegment','./ProClient'].includes(specifier)
     ? specifier + '.ts' : specifier, context);
 } });
 const { enrollConfirmedVoiceProfile } = await import(owner);
@@ -31,6 +32,7 @@ function fixture() {
   let storage;
   let seq = 0;
   let authorizedSubmissions = 0;
+  let refusal;
   let nativeCalls = 0;
   const keys = [];
   const store = { getItemAsync:async () => storage ?? null, setItemAsync:async (_,value) => { storage = value; } };
@@ -45,26 +47,31 @@ function fixture() {
       nativeClip:async () => { nativeCalls++; return { bytes:makeWav(), mimeType:'audio/wav' }; },
     },
     displayName:'  Example ', journalFor, digest,
-    clientFor: (actualScope, clipper) => ({
-      async enrollVoiceProfile(input, name) {
-        assert.deepEqual(actualScope,scope);
-        assert.equal(input.accountScope,scope.accountScope);
-        assert.equal(input.workerURL,scope.workerURL);
-        assert.equal(input.audio,undefined);
-        assert.equal(name,'Example');
-        assert.equal(input.participantConfirmed,true);
-        assert.doesNotMatch(JSON.stringify(input.source), /file:|original_operation|aaaaaaaa|synthetic/);
-        assert.equal((await journalFor(scope).restore()).enrollment.mutationKey,input.mutationKey);
-        keys.push(input.mutationKey);
-        await assert.rejects(clipper({ ...input.source, endMs:3200 }), /different/);
-        assert.equal((await clipper(input.source)).bytes[100],12);
-        await assert.rejects(clipper(input.source), /repeated/);
+    clientFor: (actualScope, clipper) => {
+      assert.deepEqual(actualScope,scope);
+      const clientStore = {
+        getItemAsync: async () => JSON.stringify({key:'synthetic-only', accountScope:scope.accountScope}),
+      };
+      return new ProClient(scope.workerURL, 'https://router.test', async (url, init) => {
+        assert.equal(init.headers.Authorization,'Bearer synthetic-only');
+        if (url.endsWith('/identity')) return Response.json({success:true, accountScope:scope.accountScope});
+        assert.equal(url,scope.workerURL+'/api/voice-profiles/v1');
+        const wire = await new Request(url, {method:'POST', headers:init.headers, body:init.body}).formData();
+        const metadata = JSON.parse(wire.get('metadata'));
+        const key = init.headers['Idempotency-Key'];
+        assert.equal(metadata.displayName,'Example');
+        assert.equal(metadata.consent.participantConfirmed,true);
+        assert.doesNotMatch(JSON.stringify(metadata.sample), /file:|original_operation|aaaaaaaa|synthetic/);
+        assert.equal((await journalFor(scope).restore()).enrollment.mutationKey,key);
+        keys.push(key);
+        assert.equal(new Uint8Array(await wire.get('audio').arrayBuffer())[100], 12);
+        if (refusal) return Response.json(refusal, {status:422});
         if (++authorizedSubmissions === 1) throw new Error('lost response');
-        return profile;
-      },
-    }),
+        return Response.json({contract:'recorder-voice-profile/v1', profile}, {status:200});
+      }, clientStore, async () => { throw new Error('Must not upload original'); }, clipper);
+    },
   };
-  return { options, journalFor, keys, persisted:()=>storage, nativeCalls:()=>nativeCalls };
+  return { options, journalFor, keys, refuse: payload => { refusal = payload; }, persisted:()=>storage, nativeCalls:()=>nativeCalls };
 }
 
 test('retry keeps the same exact journal entry; direct-equal bytes and different provenance cannot retry it', async () => {
@@ -104,12 +111,38 @@ test('native bytes are isolated before journal/backend awaits, and an unconsumed
     return { beginEnrollment:async sample => { nativeBytes[100] = 99; return journal.beginEnrollment(sample); },
       finalizeEnrollment:key => journal.finalizeEnrollment(key) };
   };
-  f.options.clientFor = (_, clipper) => ({ enrollVoiceProfile: async input => {
-    assert.equal((await clipper(input.source)).bytes[100],12);
-    return profile;
-  } });
+  await assert.rejects(enrollConfirmedVoiceProfile(f.options), /lost response/);
+  nativeBytes[100] = 12;
   assert.deepEqual(await enrollConfirmedVoiceProfile(f.options),profile);
   f.options.clientFor = () => ({ enrollVoiceProfile:async () => profile });
   await assert.rejects(enrollConfirmedVoiceProfile(f.options), /verify/);
   assert.ok((await f.journalFor(scope).restore()).enrollment);
+});
+
+test('consuming the clip does not authorize fabricated acceptance or refusal; clip capability expires', async () => {
+  for (const pretendRefused of [false,true]) {
+    const f = fixture();
+    let saved, input, bytes;
+    f.options.clientFor = (_, clipper) => ({ async enrollVoiceProfile(value) {
+      saved = clipper;
+      input = value.source;
+      bytes = (await clipper(input)).bytes;
+      if (pretendRefused) throw new ProServiceError('fabricated', 'voice_sample_rejected');
+      return profile;
+    } });
+    await assert.rejects(enrollConfirmedVoiceProfile(f.options), pretendRefused ? /fabricated/ : /verify/);
+    assert.equal(bytes[100],0);
+    assert.ok((await f.journalFor(scope).restore()).enrollment);
+    await assert.rejects(saved(input),/repeated/);
+  }
+});
+
+test('only exact concrete 422 refusal consumes the pending intent', async () => {
+  const f = fixture();
+  f.refuse({error:'invalid_sample', extra:true});
+  await assert.rejects(enrollConfirmedVoiceProfile(f.options), {code:'voice_unavailable'});
+  assert.ok((await f.journalFor(scope).restore()).enrollment);
+  f.refuse({error:'invalid_sample'});
+  await assert.rejects(enrollConfirmedVoiceProfile(f.options), {code:'voice_sample_rejected'});
+  assert.equal((await f.journalFor(scope).restore()).enrollment,undefined);
 });
