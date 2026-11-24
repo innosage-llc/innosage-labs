@@ -47,7 +47,7 @@
     {
       "scope": "stagingA",
       "reserve": {
-        "idempotencyKey": "recorder-transcription-v2-1999999999-example-recording-one",
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789001",
         "diarization": { "enabled": true },
         "voiceIdentification": { "contract": "recorder-voice-profile/v1" }
       },
@@ -67,7 +67,7 @@
     {
       "scope": "stagingA",
       "reserve": {
-        "idempotencyKey": "recorder-transcription-v2-1999999999-example-recording-two",
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789002",
         "diarization": { "enabled": true },
         "voiceIdentification": { "contract": "recorder-voice-profile/v1", "candidateProfileIds": ["vp_example_B", "vp_example_A"] }
       },
@@ -103,7 +103,7 @@
     {
       "scope": "stagingA",
       "reserve": {
-        "idempotencyKey": "recorder-transcription-v2-1999999999-example-recording-failure",
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789003",
         "diarization": { "enabled": true },
         "voiceIdentification": { "contract": "recorder-voice-profile/v1" }
       },
