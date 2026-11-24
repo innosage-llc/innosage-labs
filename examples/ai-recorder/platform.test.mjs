@@ -102,7 +102,9 @@ test('Pro upload cannot reserve an operation on unsupported platforms', () => {
   const submit = transcript.slice(transcript.indexOf('async function submit()'));
   assert.match(submit, /if \(\(!supportsProUpload && \(usePro \|\| service === 'production'\)\)/);
   const request = transcript.slice(transcript.indexOf('async function request('), transcript.indexOf('async function submit()'));
-  assert.match(request, /if \(upload && !supportsProUpload\) throw new Error/);
+  assert.match(request, /const saved = cleanupOnly \? await committedResult\(\) : undefined/);
+  assert.match(request, /if \(!saved && upload && !supportsProUpload\) throw new Error/);
+  assert.match(request, /const result = saved \?\? \(upload\s+\? await operationClient\.upload/);
   assert.match(transcript, /supportsPro=\{supportsProUpload\}/);
 });
 
