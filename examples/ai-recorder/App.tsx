@@ -142,9 +142,17 @@ function RecorderScreen() {
   const detailRecording = summaries.find(recording => recording.uri === detailUri);
   const detailFile = files.find(file => file.uri === detailUri);
   const [playingFile, setPlayingFile] = useState<string>();
+  const androidPlayRequested = useRef(false);
+  const [androidPlayPending, setAndroidPlayPending] = useState(false);
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
   const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
+  useEffect(() => {
+    if (playback.playing || playback.didJustFinish) {
+      androidPlayRequested.current = false;
+      setAndroidPlayPending(false);
+    }
+  }, [playback.playing, playback.didJustFinish]);
   const recorder = session.recorder;
   useEffect(() => {
     if (!capture.savedUri) return;
@@ -190,7 +198,7 @@ function RecorderScreen() {
 
   function closeRecording() {
     ++playRequest.current;
-    player.pause();
+    pausePlayback();
     pendingSeek.current = undefined;
     setSeekPosition(undefined);
     setDetailUri(undefined);
@@ -200,7 +208,7 @@ function RecorderScreen() {
   function openTranscript(file: File, destination: RecordingDocumentDestination = 'transcript') {
     if (session.getSnapshot().phase !== 'idle') return;
     ++playRequest.current;
-    player.pause();
+    pausePlayback();
     setMessage('');
     setTranscriptRoute({ file, destination });
   }
@@ -303,6 +311,7 @@ function RecorderScreen() {
     if (session.getSnapshot().phase !== 'idle') return;
     dispatchHandoff({ type: 'reset' });
     ++playRequest.current;
+    cancelAndroidPlayRequest();
     await session.start();
   }
 
@@ -310,8 +319,18 @@ function RecorderScreen() {
     await session.stop();
   }
 
-  function preparePlayback(file: File) {
+  function cancelAndroidPlayRequest() {
+    androidPlayRequested.current = false;
+    setAndroidPlayPending(false);
+  }
+
+  function pausePlayback() {
+    cancelAndroidPlayRequest();
     player.pause();
+  }
+
+  function preparePlayback(file: File) {
+    pausePlayback();
     pendingSeek.current = undefined;
     setSeekPosition(undefined);
     player.replace(file.uri);
@@ -323,18 +342,27 @@ function RecorderScreen() {
     const request = ++playRequest.current;
     try {
       if (playingFile === file.uri) {
-        if (player.playing) {
-          player.pause();
+        const shouldPause = Platform.OS === 'android'
+          ? androidPlayRequested.current || playback.playing : player.playing;
+        if (shouldPause) {
+          pausePlayback();
           return;
-        }
-        if (player.duration > 0 && player.currentTime >= player.duration) {
-          await player.seekTo(0);
         }
       } else {
         preparePlayback(file);
       }
-      if (request === playRequest.current && session.getSnapshot().phase === 'idle') player.play();
+      if (Platform.OS === 'android') {
+        // Native can defer Play until focus is granted. A second tap cancels that request.
+        androidPlayRequested.current = true;
+        setAndroidPlayPending(true);
+      }
+      if (playingFile === file.uri && player.duration > 0 && player.currentTime >= player.duration) {
+        await player.seekTo(0);
+      }
+      if (request !== playRequest.current || session.getSnapshot().phase !== 'idle') return;
+      player.play();
     } catch {
+      cancelAndroidPlayRequest();
       setMessage('Could not play the recording.');
     }
   }
@@ -373,7 +401,7 @@ function RecorderScreen() {
         key={detailUri}
         recording={detailRecording}
         file={detailFile}
-        playing={detailOwnsPlayer && playback.playing}
+        playing={detailOwnsPlayer && (playback.playing || androidPlayPending)}
         disabled={phase !== 'idle'}
         shareDisabled={sharePending}
         message={message}

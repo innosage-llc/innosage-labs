@@ -19,25 +19,40 @@ export function savedSummaryFiles(output: File) {
 }
 
 export async function readLegacyRecordingSummary(output: File) {
-  const latest = savedSummaryFiles(output)[0] ?? output;
-  if (!latest.exists) return undefined;
-  return { id: 'legacy', data: JSON.parse(await latest.text()) as unknown };
+  let readError: unknown;
+  for (const file of [...savedSummaryFiles(output), output]) {
+    if (!file.exists) continue;
+    try {
+      const data: unknown = JSON.parse(await file.text());
+      if (!readSummaryGeneration(data, 'legacy')) throw new Error('Could not read the previous summary.');
+      return { id: 'legacy', data };
+    } catch (error) {
+      readError = error;
+    }
+  }
+  if (readError) throw readError;
 }
 
 export async function readSavedRecordingSummary(recording: File) {
-  if (draftEditorIsBundled()) {
-    const committed = await committedSummary(await createDraftDocument(recording, 'summary'));
-    const generation = committed?.snapshot.generation;
-    if (committed && generation) return {
-      ...generation,
-      text: committed.text,
-      citations: editedSummaryCitations(committed.text, generation)
-        .filter((citation): citation is SummarySourceCitation => citation.end !== undefined),
-    };
+  let draftError: unknown;
+  try {
+    if (draftEditorIsBundled()) {
+      const committed = await committedSummary(await createDraftDocument(recording, 'summary'));
+      const generation = committed?.snapshot.generation;
+      if (committed && generation) return {
+        ...generation,
+        text: committed.text,
+        citations: editedSummaryCitations(committed.text, generation)
+          .filter((citation): citation is SummarySourceCitation => citation.end !== undefined),
+      };
+    }
+  } catch (error) {
+    draftError = error;
   }
   const output = new File(recording.parentDirectory, recording.name + '.summary.json');
   const legacy = await readLegacyRecordingSummary(output);
-  return legacy && readSummaryGeneration(legacy.data, legacy.id);
+  if (legacy) return readSummaryGeneration(legacy.data, legacy.id);
+  if (draftError) throw draftError;
 }
 
 export async function readRecordingDocumentActions(recording: File): Promise<RecordingDocumentActions> {
