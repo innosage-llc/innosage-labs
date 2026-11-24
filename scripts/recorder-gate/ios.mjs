@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { artifact, BUNDLE, requireThat } from './core.mjs';
@@ -14,7 +15,24 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
   const now = () => performance.now();
   try {
     await log.waitFor('Filtering the log data');
-    const testRun = command('python3', ['-c', 'import pathlib,sys;print(next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun")))', derived]).trim();
+    const launchSignal = `com.innosage.labs85.startup.${randomBytes(16).toString('hex')}`;
+    const testRun = command('python3', ['-c', `import plistlib,pathlib,sys
+p=next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun"))
+d=plistlib.loads(p.read_bytes())
+count=0
+def update(v):
+ global count
+ if isinstance(v,dict):
+  if v.get("BlueprintName")=="StartupGateUITests" or "StartupGateUITests" in str(v.get("TestBundlePath","")):
+   v.setdefault("EnvironmentVariables",{})["LABS85_LAUNCH_NOTIFICATION"]=sys.argv[2]
+   count+=1
+  for item in v.values(): update(item)
+ elif isinstance(v,list):
+  for item in v:update(item)
+update(d)
+if count == 0: raise SystemExit("observer environment is unbound")
+p.write_bytes(plistlib.dumps(d))
+print(p)`, derived, launchSignal]).trim();
     child = spawn('xcodebuild', ['test-without-building', '-xctestrun', testRun, '-destination', `id=${uuid}`, '-only-testing:StartupGateUITests/StartupGateTests/testRecordHome', '-resultBundlePath', join(output, 'startup.xcresult')], { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NSUnbufferedIO: 'YES' } });
     let termination; let done = false; let resolveArmed;
     const armed = new Promise(resolve => { resolveArmed = resolve; });
@@ -39,6 +57,7 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
     requireThat(Number.isFinite(launchUptimeMs) && launchUptimeMs > 0, 'host launch clock unavailable');
     const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
     firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
+    sim('spawn', uuid, '/usr/bin/notifyutil', '-p', launchSignal);
     timer = setInterval(() => {
       try {
         const listing = sim('spawn', uuid, 'launchctl', 'list');

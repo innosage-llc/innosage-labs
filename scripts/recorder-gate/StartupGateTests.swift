@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 
 // Attach to the normal launch; never launch/activate, capture or request input.
@@ -5,16 +6,27 @@ final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
         let armedAt = ProcessInfo.processInfo.systemUptime
-        // The host cold-launches only after the observer process is ready.
-        // Absolute clock samples let the host enforce the original readiness
-        // deadline independently of harness initialization.
+        let signal = try XCTUnwrap(ProcessInfo.processInfo.environment["LABS85_LAUNCH_NOTIFICATION"])
+        var token: Int32 = 0
+        XCTAssertEqual(notify_register_check(signal, &token), NOTIFY_STATUS_OK)
+        defer { notify_cancel(token) }
+        var changed: Int32 = 0
+        // Drain the initial check before reporting armed. Only the randomized
+        // post-launch notification can now authorize attaching the UI proxy.
+        XCTAssertEqual(notify_check(token, &changed), NOTIFY_STATUS_OK)
         FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED\n".utf8))
-        // Avoid acquiring the UI-automation application proxy before it exists.
-        // The host already verifies no product PID and owns the launch timestamp.
-        Thread.sleep(forTimeInterval: 3.0)
+        changed = 0
+        while changed == 0 {
+            guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
+                throw StabilityWindow.Invalid.readiness
+            }
+            XCTAssertEqual(notify_check(token, &changed), NOTIFY_STATUS_OK)
+            if changed == 0 { Thread.sleep(forTimeInterval: 0.1) }
+        }
+        // Time in XCTest setup does not replace the host's actual start clock.
         var attached: XCUIApplication?
         var previous: XCUIApplication.State?
-        while ProcessInfo.processInfo.systemUptime - armedAt <= 35 {
+        while ProcessInfo.processInfo.systemUptime - armedAt <= 45 {
             let candidate = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
             let state = candidate.state
             if state != previous {
