@@ -18,8 +18,8 @@ export function RecordControl({ phase, onPress }: { phase: CapturePhase; onPress
       contentPadding={{ start: spacing.md, end: spacing.md, top: spacing.sm, bottom: spacing.sm }}
       colors={{ contentColor: palette.text, disabledContentColor: palette.muted }}>
       <Column horizontalAlignment="center" verticalArrangement={{ spacedBy: spacing.md }}>
-        <Box contentAlignment="center" modifiers={[size(144, 144), clip(Shapes.Circle), background(disabled ? palette.surface : palette.accent)]}>
-          <Icon source={recording || phase === 'saving' ? StopIcon : MicrophoneIcon} size={56}
+        <Box contentAlignment="center" modifiers={[size(108, 108), clip(Shapes.Circle), background(disabled ? palette.surface : palette.accent)]}>
+          <Icon source={recording || phase === 'saving' ? StopIcon : MicrophoneIcon} size={40}
             tint={disabled ? palette.muted : palette.onAccent} />
         </Box>
         <Text style={{ ...typography.heading, textAlign: 'center' }}>{label}</Text>

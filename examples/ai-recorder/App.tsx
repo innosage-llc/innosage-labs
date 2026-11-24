@@ -26,6 +26,8 @@ import { services } from './ServiceConfig';
 import { Directory, File, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
+import { Host, Icon, ListItem, Text as NativeText } from '@expo/ui';
+import ChevronIcon from '@expo/material-symbols/chevron_right.xml';
 import { getCaptureSession } from './captureOwner';
 
 // Web launch/navigation is supported; native filesystem capture/import is not.
@@ -82,7 +84,7 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
 }
 
 function RecorderScreen() {
-  const { palette, spacing, typography } = useTheme();
+  const { mode, palette, spacing, typography } = useTheme();
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
@@ -93,16 +95,21 @@ function RecorderScreen() {
     const durationSeconds = recordingDurations.get(summary.uri);
     return durationSeconds === undefined ? summary : { ...summary, durationSeconds };
   }), [fileSummaries, recordingDurations]);
+  const session = getCaptureSession();
+  const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const latestCapture = capture.savedUri;
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
+    const latest = pending.find(file => file.uri === latestCapture);
+    const ordered = latest ? [latest, ...pending.filter(file => file !== latest)] : pending;
     const requests = durationRequests.current;
     let current = true;
     async function readDurations() {
       // Use the local metadata reader so opening Library leaves playback idle.
       const resolved = new Map(recordingDurations);
-      for (const file of pending) {
+      for (const file of ordered) {
         let request = requests.get(file.uri);
         if (!request) {
           request = recordingDurationMillis(file).catch(() => undefined);
@@ -111,14 +118,17 @@ function RecorderScreen() {
         const millis = await request;
         if (!current) return;
         resolved.set(file.uri, millis === undefined ? undefined : millis / 1000);
+        if (file === latest && ordered.length > 1) {
+          // Show saved feedback promptly even during an initial scan of a large Library.
+          setRecordingDurations(resolved);
+          return;
+        }
       }
       setRecordingDurations(resolved);
     }
     void readDurations();
     return () => { current = false; };
-  }, [files, recordingDurations]);
-  const session = getCaptureSession();
-  const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  }, [files, recordingDurations, latestCapture]);
   useEffect(() => {
     let current = true;
     void session.ready.then(() => { if (current) setFiles(listRecordings()); });
@@ -447,6 +457,7 @@ function RecorderScreen() {
       /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRoute ? <Transcript recording={transcriptRoute.file} recordingTitle={recordingLabel(transcriptRoute.file)}
+        recordingSummary={summaries.find(item => item.uri === transcriptRoute.file.uri)}
         initialDocument={transcriptRoute.destination}
         backLabel="Back to recording details" onClose={() => setTranscriptRoute(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={[styles.recordingBanner, { backgroundColor: palette.surface }]}>
@@ -465,9 +476,21 @@ function RecorderScreen() {
         message={message}
         durationMillis={durationMillis}
         savedUri={handoff.savedUri}
+        savedRecording={summaries.find(item => item.uri === handoff.savedUri)}
         onPressRecord={phase === 'recording' ? stop : start}
         onViewInLibrary={viewSavedRecording}
-      /> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+      /> : destination === 'settings' ? Platform.OS === 'android' ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.sm, paddingTop: spacing.md }}>
+          <Host matchContents={{ vertical: true }} colorScheme={mode}>
+            <ListItem onPress={phase === 'idle' ? () => setShowPro(true) : undefined}
+              colors={{ containerColor: palette.background, contentColor: palette.text, supportingContentColor: palette.muted }}
+              supportingText={serviceLabel}
+              trailing={<Icon name={ChevronIcon} size={24} color={palette.muted} />}>
+              <NativeText textStyle={{ fontWeight: '600' }}>Transcription service</NativeText>
+            </ListItem>
+          </Host>
+        </ScrollView>
+      ) : <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
         <View style={[styles.valueCard, { backgroundColor: palette.surface }]}>

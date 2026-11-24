@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { RecorderSwitch } from './RecorderSwitch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
@@ -11,6 +11,7 @@ import { ActionButton } from './ui/ActionButton';
 import { DetailShell } from './ui/DetailShell';
 import { readSummaryInput } from './summaryDraftLifecycle';
 import { readSavedRecordingSummary, savedSummaryFiles } from './savedRecordingDocuments';
+import { summaryReaderSections } from './ui/document-content';
 
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
 export type RecipeRequest = Pick<Summary, 'recipe'|'model'|'source'> & {effort:ThinkingEffort; webSearch:boolean; instructions?:string};
@@ -22,11 +23,12 @@ export type SummaryProps = {
   save: (file: File, text: string) => Promise<void>;
   onLockChange: (locked: boolean) => void;
   generateInDraft?: (request: RecipeRequest, signal: AbortSignal) => Promise<void>;
+  startOpen?: boolean;
 };
 
-export function TranscriptSummary({ original, hasRevision, readRevision, output, save, onLockChange, generateInDraft }: SummaryProps) {
+export function TranscriptSummary({ original, hasRevision, readRevision, output, save, onLockChange, generateInDraft, startOpen }: SummaryProps) {
   const { palette, spacing } = useTheme();
-  const [open, setOpen] = useState(!!generateInDraft);
+  const [open, setOpen] = useState(!!generateInDraft || !!startOpen);
   const [recipe, setRecipe] = useState<string>();
   const [effort, setEffort] = useState<ThinkingEffort>('medium');
   const [instructions, setInstructions] = useState('');
@@ -79,7 +81,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
 
   return (
     <View style={{ gap: spacing.sm }}>
-      {!generateInDraft ? <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
+      {!generateInDraft && !startOpen ? <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
         setOpen(!open);
         if (!open && !summary) void run(async () => {
           const file = savedSummaryFiles(output)[0] ?? output;
@@ -175,12 +177,14 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
   );
 }
 
-export function SavedRecordingSummary({ recording, recordingTitle, onClose }: {
+export function SavedRecordingSummary({ recording, recordingTitle, onClose, backLabel = 'Back to recording details' }: {
   recording: File;
   recordingTitle: string;
   onClose: () => void;
+  backLabel?: string;
 }) {
   const { palette, spacing, typography } = useTheme();
+  const android = Platform.OS === 'android';
   const [summary, setSummary] = useState<Summary>();
   const [message, setMessage] = useState('Opening saved summary…');
   useEffect(() => {
@@ -195,25 +199,57 @@ export function SavedRecordingSummary({ recording, recordingTitle, onClose }: {
     return () => { current = false; };
   }, [recording]);
   return <Modal onRequestClose={onClose}>
-    <DetailShell title="Summary" quietTitle backLabel="Back to recording details" onBack={onClose}>
+    <DetailShell title="Summary" quietTitle backLabel={backLabel} onBack={onClose}>
       <ScrollView contentContainerStyle={{ padding: spacing.xxl, gap: spacing.md }}>
-        <Text style={[typography.dayLabel, { color: palette.muted }]}>{recordingTitle}</Text>
+        <Text accessibilityRole={android ? 'header' : undefined}
+          style={android ? [typography.title, { color: palette.text }] : [typography.dayLabel, { color: palette.muted }]}>{recordingTitle}</Text>
         {summary ? <>
-          <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
+          {!android ? <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
             {summary.recipe === 'custom' ? 'Custom summary' : 'Meeting summary'}
-          </Text>
+          </Text> : null}
           <Text style={[typography.caption, { color: palette.muted }]}>
+            {android ? `${summary.recipe === 'custom' ? 'Custom recipe' : summary.recipe === meetingEssentials.id ? 'Meeting Essentials' : 'Summary'} · Saved on this device\n` : ''}
             {summary.model} · {summary.source === 'revision' ? 'Saved revision' : 'Original transcript'}
           </Text>
-          <CitedSummary summary={summary} />
+          {android ? <SavedSummarySections summary={summary} /> : <CitedSummary summary={summary} />}
         </> : <Text accessibilityLiveRegion="polite" style={[typography.body, { color: palette.muted }]}>{message}</Text>}
       </ScrollView>
     </DetailShell>
   </Modal>;
 }
 
+function SavedSummarySections({ summary }: { summary: Summary }) {
+  const { palette, spacing, typography } = useTheme();
+  const sections = summaryReaderSections(summary.text);
+  const citations = summary.citations ?? [];
+  const text = Array.from(summary.text);
+  const sectionContains = (section: (typeof sections)[number], citation: SummaryCitation) =>
+    (citation.start ?? citation.end) >= section.start && citation.end <= section.end;
+  if (!sections.some(section => section.heading) ||
+      citations.some(citation => !sections.some(section => sectionContains(section, citation)))) {
+    return <View style={{ marginTop: spacing.xxl }}><CitedSummary summary={summary} /></View>;
+  }
+
+  return <View style={{ gap: spacing.xxl, marginTop: spacing.xxl }}>
+    {sections.map(section => (
+      <View key={section.start} style={{ gap: spacing.sm }}>
+        {section.heading ? <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{section.heading}</Text> : null}
+        <CitedSummary summary={{
+          ...summary,
+          text: text.slice(section.start, section.end).join(''),
+          citations: citations.filter(citation => sectionContains(section, citation)).map(citation => ({
+            ...citation,
+            start: citation.start === undefined ? undefined : citation.start - section.start,
+            end: citation.end - section.start,
+          })),
+        }} />
+      </View>
+    ))}
+  </View>;
+}
+
 function CitedSummary({ summary }: { summary: Summary }) {
-  const { palette } = useTheme();
+  const { palette, typography } = useTheme();
   const characters = Array.from(summary.text);
   const citations = (summary.citations ?? []).filter(citation => Number.isInteger(citation.end) &&
     citation.end > 0 && citation.end <= characters.length && /^https?:\/\//i.test(citation.url))
@@ -230,5 +266,5 @@ function CitedSummary({ summary }: { summary: Summary }) {
       style={{ textDecorationLine: 'underline', color: palette.text }}
       onPress={() => { void Linking.openURL(citation.url).catch(() => {}); }}> [{index + 1}]</Text></Text>;
   });
-  return <Text selectable style={{ color: palette.text }}>{parts}{characters.slice(start).join('')}</Text>;
+  return <Text selectable style={[Platform.OS === 'android' && typography.body, { color: palette.text }]}>{parts}{characters.slice(start).join('')}</Text>;
 }

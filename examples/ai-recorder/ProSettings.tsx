@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, ScrollView, Text, View } from "react-native";
-import { TextInput, useNativeState } from "@expo/ui";
-import { Host } from "@expo/ui";
+import { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from "react-native";
+import { Host, ListItem, Text as NativeText, TextInput, useNativeState } from "@expo/ui";
 import { ServiceChoice } from "./ServiceChoice";
 import { gatewayAvailable } from "./GatewayConnection";
 import { supportsProUpload } from "./NativeUpload";
@@ -17,7 +16,10 @@ function accessFor(id: ServiceId) {
 }
 
 export function ProSettings({ onClose }: { onClose: () => void }) {
-  const { palette, spacing, typography } = useTheme();
+  const { mode, palette, spacing, typography } = useTheme();
+  const android = Platform.OS === 'android';
+  const [managingKeys, setManagingKeys] = useState(false);
+  const working = useRef(false);
   const key = useNativeState("");
   const [service, setService] = useState<ServiceId>("staging");
   const access = accessFor(service);
@@ -38,6 +40,8 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, []);
   async function changeService(id: ServiceId) {
+    if (busy || working.current || id === service) return;
+    working.current = true;
     setBusy(true);
     setMessage("");
     key.set("");
@@ -50,10 +54,11 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
       setMessage("Default saved for new transcriptions. Existing jobs keep their service.");
     } catch {
       setMessage("Could not change service. Previous selection retained.");
-    } finally { setBusy(false); }
+    } finally { working.current = false; setBusy(false); }
   }
   async function save() {
-    if (!canConfigureKey) return;
+    if (!canConfigureKey || busy || working.current) return;
+    working.current = true;
     setBusy(true);
     setMessage("");
     try {
@@ -69,10 +74,13 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           : "Could not validate transcription access.",
       );
     } finally {
+      working.current = false;
       setBusy(false);
     }
   }
   async function remove() {
+    if (busy || working.current) return;
+    working.current = true;
     setBusy(true);
     try {
       await access.remove();
@@ -81,23 +89,46 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     } catch {
       setMessage("Could not remove the saved key.");
     } finally {
+      working.current = false;
       setBusy(false);
     }
   }
+  function goBack() {
+    if (busy || working.current) return;
+    if (!managingKeys) {
+      onClose();
+      return;
+    }
+    key.set('');
+    setHasKey(false);
+    setMessage('');
+    setManagingKeys(false);
+  }
   return (
-    <Modal
-      onRequestClose={() => {
-        if (!busy) onClose();
-      }}
-    >
-      <DetailShell title="Transcription service" onBack={onClose} backLabel="Back to settings" backDisabled={busy}>
+    <Modal onRequestClose={goBack}>
+      <DetailShell title={android ? managingKeys ? 'Transcription service' : 'Settings' : 'Transcription service'}
+        quietTitle={android} onBack={goBack} backLabel={managingKeys ? 'Back to transcription service' : 'Back to settings'} backDisabled={busy}>
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
+          contentContainerStyle={{ padding: android ? spacing.xxl : spacing.lg, gap: spacing.md }}
         >
-          <Text style={{ color: palette.muted }}>Choose the service for new transcriptions.</Text>
-          <ServiceChoice service={service} busy={busy} onChange={id => void changeService(id)} />
+          {!managingKeys ? <>
+            {android ? <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Transcription service</Text> : null}
+            <Text style={{ color: palette.muted }}>
+              {android ? 'Applies to new transcriptions. Existing jobs keep their original service.' : 'Choose the service for new transcriptions.'}
+            </Text>
+            <ServiceChoice service={service} busy={busy} onChange={id => void changeService(id)} />
+          </> : null}
+          {android && !managingKeys ? (
+            <Host matchContents={{ vertical: true }} colorScheme={mode}>
+              <ListItem colors={{ containerColor: palette.background, contentColor: palette.text }}
+                onPress={!busy ? () => { setMessage(''); setManagingKeys(true); } : undefined}>
+                <NativeText>Manage service keys</NativeText>
+              </ListItem>
+            </Host>
+          ) : <>
+          {android ? <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Service keys</Text> : null}
           <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services[service].label}</Text>
           <Text style={{ color: palette.muted }}>
             {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.'
@@ -141,6 +172,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           {configured ? (
             <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
           ) : null}
+          </>}
           {message ? (
             <Text
               accessibilityLiveRegion="polite"

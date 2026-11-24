@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
 import { main, mergeArguments, reviewGate } from '../auto-merge-ci.mjs';
-import { captureRows, xmlControl, confirmAndroidMonitor } from './android.mjs';
+import { captureRows, xmlControl, confirmAndroidMonitor, hasSavedRecordingFeedback } from './android.mjs';
 import { aggregate } from './aggregate.mjs';
 import { run, integrationRevision, sourceIdentity } from './host.mjs';
 import { criticalHTTP } from './web.mjs';
@@ -22,6 +22,15 @@ test('Recording rows retain distinct precise titles in the Android Play and Shar
     `<node content-desc="${label}, 7 sec" bounds="[32,${100 * i}][740,${100 * i + 80}]"/>`);
   nodes.push('<node content-desc="Morning notes.m4a, 9:14 AM, 47 sec" bounds="[32,310][740,390]"/>');
   assert.deepEqual(captureRows(nodes.join('')).map(({ title }) => title), labels);
+});
+
+test('Android staging verification recognizes legacy and current successful-save UI', () => {
+  assert.ok(hasSavedRecordingFeedback('<node text="Saved on this device" bounds="[0,0][320,48]"/>'));
+  assert.ok(hasSavedRecordingFeedback('<node text="Last recording saved" bounds="[0,0][320,48]"/>'));
+  assert.ok(hasSavedRecordingFeedback('<node resource-id="last-recording-saved" content-desc="Last recording saved, 42 sec, View in Library" bounds="[0,0][320,48]"/>'));
+  assert.equal(hasSavedRecordingFeedback('<node resource-id="last-recording-saved" displayed="false" bounds="[0,0][320,48]"/>'), false);
+  assert.equal(hasSavedRecordingFeedback('<node text="Last recording saved" displayed="false" bounds="[0,0][320,48]"/>'), false);
+  assert.equal(hasSavedRecordingFeedback('<node text="Saving…" bounds="[0,0][320,48]"/>'), false);
 });
 
 test('Android pre-launch log handshake recovers a marker lost before the reader attaches', async () => {
