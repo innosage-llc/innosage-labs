@@ -14,7 +14,7 @@ import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
 import { RecordingDetail } from './ui/recording-detail';
-import { formatRecordingTime, recordingDate, type RecordingSummary } from './ui/recording-display';
+import { formatRecordingTime, recordingDate, recordingTimeLabel, type RecordingSummary } from './ui/recording-display';
 import { shareRecording } from './recordingShare';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
 import { hasSavedFeedback } from './ui/recordFeedback';
@@ -56,8 +56,8 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
     const createdAt = Number(file.name.split('-')[1]);
     const date = recordingDate(createdAt);
     if (!date || file.name.startsWith('Import-')) return { kind: 'file' as const, file, createdAt };
-    const shortTime = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    const longTime = date.toLocaleTimeString();
+    const shortTime = recordingTimeLabel(date, 'minute');
+    const longTime = recordingTimeLabel(date, 'second');
     const day = date.toDateString();
     const minuteKey = `${day} ${shortTime}`;
     const secondKey = `${day} ${longTime}`;
@@ -74,9 +74,7 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
     const { date, shortTime, longTime, minuteKey, secondKey } = recording;
     let label = (minutes.get(minuteKey) ?? 0) > 1 ? longTime : shortTime;
     if ((seconds.get(secondKey) ?? 0) > 1) {
-      label = date.toLocaleTimeString(undefined, {
-        hour: 'numeric', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, timeZoneName: 'shortOffset',
-      });
+      label = recordingTimeLabel(date, 'millisecond');
     }
     return { uri: file.uri, label, createdAt };
   });

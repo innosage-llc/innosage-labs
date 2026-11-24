@@ -34,23 +34,42 @@ export function recordingDayLabel(date: Date | undefined, today: Date) {
   return `${relativeLabel.charAt(0).toLocaleUpperCase()}${relativeLabel.slice(1)} · ${calendarLabel}`;
 }
 
+export function recordingTimeLabel(date: Date, precision: 'minute' | 'second' | 'millisecond') {
+  if (precision === 'minute') {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  if (precision === 'second') return date.toLocaleTimeString();
+
+  // Some runtimes silently omit fractions requested through Intl.
+  const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+  const timeOptions = { hour: 'numeric', minute: '2-digit', second: '2-digit' } as const;
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat(undefined, { ...timeOptions, timeZoneName: 'shortOffset' });
+  } catch {
+    formatter = new Intl.DateTimeFormat(undefined, timeOptions);
+  }
+
+  try {
+    const parts = formatter.formatToParts(date);
+    if (parts.some(part => part.type === 'second')) {
+      return parts.map(part => part.type === 'second' ? `${part.value}.${milliseconds}` : part.value).join('');
+    }
+  } catch {
+    // Keep the localized time and identify the milliseconds when parts are unavailable.
+  }
+  return `${formatter.format(date)} (${milliseconds} ms)`;
+}
+
 export function recordingRowText(label: string, date: Date | undefined): { title: string; time?: string } {
   if (!date) return { title: label };
 
-  const minuteTime = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const secondTime = date.toLocaleTimeString();
+  const minuteTime = recordingTimeLabel(date, 'minute');
+  const secondTime = recordingTimeLabel(date, 'second');
   // Older capture labels include the date already displayed in the group heading.
   if (label === date.toLocaleString()) return { title: secondTime };
-  if (label === minuteTime || label === secondTime) return { title: label };
-
-  // The capture summary adds fractions and an offset when the whole second is shared.
-  try {
-    const preciseTime = date.toLocaleTimeString(undefined, {
-      hour: 'numeric', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, timeZoneName: 'shortOffset',
-    });
-    if (label === preciseTime) return { title: label };
-  } catch {
-    // Some runtimes lack fractional-second or offset formatting.
+  if (label === minuteTime || label === secondTime || label === recordingTimeLabel(date, 'millisecond')) {
+    return { title: label };
   }
   return { title: label, time: minuteTime };
 }
