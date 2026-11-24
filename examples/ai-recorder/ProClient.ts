@@ -369,10 +369,13 @@ export class ProClient {
     const scope = { workerURL: input.workerURL, accountScope: input.accountScope,
       mutationKey: input.mutationKey, participantConfirmed: input.participantConfirmed };
     const suppliedSource = input.source;
+    const sourceTag = suppliedSource?.source;
+    if (sourceTag !== "direct" && sourceTag !== "confirmed_segment")
+      throw new ProServiceError("Choose a valid voice profile source.", "voice_options_invalid");
     const suppliedAudio = input.audio;
-    if (suppliedSource.source === "confirmed_segment" && suppliedAudio !== undefined)
+    if (sourceTag === "confirmed_segment" && suppliedAudio !== undefined)
       throw new ProServiceError("A confirmed segment must be clipped from its original recording first.", "voice_options_invalid");
-    const attempt: VoiceProfileEnrollment = suppliedSource.source === "confirmed_segment"
+    const attempt: VoiceProfileEnrollment = sourceTag === "confirmed_segment"
       ? Object.freeze({ ...scope, source: Object.freeze({
           source: "confirmed_segment" as const, recordingRef: suppliedSource.recordingRef,
           segmentId: suppliedSource.segmentId, startMs: suppliedSource.startMs, endMs: suppliedSource.endMs,

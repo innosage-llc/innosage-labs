@@ -495,3 +495,17 @@ test('confirmed clip proof requires the exact frozen stage sidecar and same comp
   assert.equal(await f.client.submittedDigestForVoiceObservation({...operation,sourceBytes:operation.sourceBytes+1},observed.result),undefined);
   assert.throws(() => { observed.result.segments[0].startMs=0; },TypeError);
 });
+
+test('missing and unknown enrollment source tags cannot reach auth or send as direct', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  const before = f.calls.length;
+  for (const source of [undefined, null, {}, {source:'unrecognized'}, {source:'Confirmed_Segment'}]) {
+    await assert.rejects(f.client.enrollVoiceProfile({
+      source, workerURL:f.operation.workerURL, accountScope:f.operation.accountScope,
+      participantConfirmed:true, mutationKey:'fixture-invalid-source',
+      audio:{bytes:Uint8Array.of(1,2,3),mimeType:'audio/wav'},
+    }, 'Fixture'), {code:'voice_options_invalid'});
+    assert.equal(f.calls.length,before);
+  }
+});
