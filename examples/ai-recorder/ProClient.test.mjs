@@ -21,8 +21,15 @@ function fixture(clipVoiceSample) {
       if (url.endsWith('/identity')) return Response.json({ success: true, accountScope: state.scope });
       if (url.includes('/api/voice-profiles/v1')) {
         if (init.method === 'POST') {
+          const form = init.body instanceof ArrayBuffer
+            ? await new Request(url, {method: 'POST', headers: init.headers, body: init.body}).formData()
+            : init.body;
+          const audio = form.get('audio');
           state.enrollment = { key: init.headers['Idempotency-Key'],
-            metadata: JSON.parse(init.body.get('metadata')), bytes: init.body.get('audio').size };
+            metadata: JSON.parse(form.get('metadata')), bytes: audio.size };
+          if (init.body instanceof ArrayBuffer)
+            state.binaryPart = {name: audio.name, mime: audio.type,
+              bytes: new Uint8Array(await audio.arrayBuffer()), wireLength: init.body.byteLength};
           return Response.json({ contract: 'recorder-voice-profile/v1', profile: state.voiceProfile }, { status: 201 });
         }
         if (init.method === 'PATCH') {
@@ -280,6 +287,43 @@ test('profile changes stay inside the original Pro worker, bind consent, and dis
     ...request, workerURL:'https://other.test', participantConfirmed:true,
   }, 'Example'), {code:'authorization'});
   assert.equal(f.calls.length, beforeWrongOrigin);
+});
+
+test('bounded native bytes round-trip as multipart, only with permitted consent and account', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  f.state.voiceProfile = { profileId: 'vp_fake', displayName: 'Fixture', revision: 1, status: 'active' };
+  const scope = { workerURL: f.operation.workerURL, accountScope: f.operation.accountScope };
+  const bytes = new Uint8Array([0, 255, 10, 13, 7, 0, 33]);
+  const request = {...scope, participantConfirmed:true, mutationKey:'fixture-clip',
+    source:{source:'direct', localPath:'/private/excluded'}, audio:{bytes, mimeType:'audio/wav'}};
+  const before = f.calls.length;
+  for (const input of [
+    {...request, participantConfirmed:false},
+    {...request, audio:{bytes, mimeType:'audio/wav\r\nX-Extra: nope'}},
+    {...request, audio:{...request.audio, bytes:new Uint8Array(10*1024*1024)}},
+    {...request, audio:{...request.audio, bytes:new TextEncoder().encode('a--RecorderVoice-fixture-clip')}},
+    {...request, mutationKey:'fixture-key with spaces'},
+  ]) await assert.rejects(f.client.enrollVoiceProfile(input, 'Fixture'), {code:'voice_options_invalid'});
+  assert.equal(f.calls.length, before);
+  f.state.authorized = false;
+  await assert.rejects(f.client.enrollVoiceProfile(request, 'Fixture'), {code:'authorization'});
+  assert.deepEqual(f.calls.slice(before).map(call => call.url), [f.operation.workerURL+'/api/transcriptions/identity']);
+  f.state.authorized = true;
+  assert.deepEqual(await f.client.enrollVoiceProfile(request, 'Fixture'), f.state.voiceProfile);
+  assert.deepEqual(f.state.enrollment, {key:'fixture-clip',bytes:bytes.length,metadata:{
+    displayName:'Fixture', sample:{source:'direct'},
+    consent:{scope:'voice_profile_enrollment',participantConfirmed:true},
+  }});
+  assert.deepEqual(f.state.binaryPart.bytes, bytes);
+  assert.equal(f.state.binaryPart.mime, 'audio/wav');
+  assert.equal(f.state.binaryPart.name, 'sample.wav');
+  assert.ok(f.state.binaryPart.wireLength <= 10*1024*1024);
+  await f.client.updateVoiceProfileSample('vp_fake',
+    {...request, mutationKey:'fixture-update', audio:{bytes,mimeType:'audio/mp4'}}, 1, 'replace');
+  assert.deepEqual(f.state.binaryPart.bytes, bytes);
+  assert.equal(f.state.binaryPart.mime, 'audio/mp4');
+  assert.equal(f.state.binaryPart.name, 'sample.m4a');
 });
 
 test('concurrent first reservation cannot reuse a different opt-in or account binding', async () => {

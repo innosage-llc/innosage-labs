@@ -12,11 +12,15 @@ type ConfirmedVoiceSegment = {
   source: "confirmed_segment"; recordingRef: string; segmentId: string; startMs: number; endMs: number;
 };
 export type VoiceProfileScope = { workerURL: string; accountScope: string };
+export type VoiceProfileClip = {
+  bytes: Uint8Array;
+  mimeType: "audio/mp4" | "audio/wav";
+};
 export type VoiceProfileEnrollment = VoiceProfileScope & {
   mutationKey: string;
   participantConfirmed: boolean;
 } & (
-  | { source: { source: "direct" }; audio: Blob }
+  | { source: { source: "direct" }; audio: Blob | VoiceProfileClip }
   | { source: ConfirmedVoiceSegment; audio?: never }
 );
 type VoiceClipper = (segment: ConfirmedVoiceSegment, signal?: AbortSignal) => Promise<Blob>;
@@ -96,6 +100,43 @@ function profileSummary(raw: any): VoiceProfileSummary {
     revision: raw.revision, status: raw.status };
 }
 
+/** Native Expo fetch accepts ArrayBuffer bodies; React Native Blob cannot wrap bytes. */
+function nativeVoiceMultipart(audio: VoiceProfileClip, metadata: string, mutationKey: string) {
+  if (!(audio.bytes instanceof Uint8Array) || audio.bytes.byteLength === 0 ||
+      audio.bytes.byteLength > VOICE_CLIP_LIMIT ||
+      (audio.mimeType !== "audio/mp4" && audio.mimeType !== "audio/wav") ||
+      !voiceIdentifier.test(mutationKey))
+    throw new ProServiceError("Choose a supported, short audio clip.", "voice_options_invalid");
+
+  const boundary = "RecorderVoice-" + mutationKey.slice(0, 64);
+  const encoder = new TextEncoder();
+  // Neither metadata (JSON escapes all line breaks) nor the chosen binary may
+  // create a multipart delimiter. Reject a collision before any transport.
+  const delimiter = encoder.encode("--" + boundary);
+  let offset = -1;
+  while ((offset = audio.bytes.indexOf(delimiter[0]!, offset + 1)) >= 0) {
+    if (offset + delimiter.length <= audio.bytes.byteLength &&
+        delimiter.every((byte, i) => audio.bytes[offset + i] === byte))
+      throw new ProServiceError("Choose a different audio clip.", "voice_options_invalid");
+  }
+  const filename = audio.mimeType === "audio/mp4" ? "sample.m4a" : "sample.wav";
+  const prefix = encoder.encode(
+    `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n` +
+    `Content-Type: application/json\r\n\r\n${metadata}\r\n` +
+    `--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="${filename}"\r\n` +
+    `Content-Type: ${audio.mimeType}\r\n\r\n`
+  );
+  const suffix = encoder.encode(`\r\n--${boundary}--\r\n`);
+  const size = prefix.byteLength + audio.bytes.byteLength + suffix.byteLength;
+  if (size > VOICE_CLIP_LIMIT)
+    throw new ProServiceError("Choose a shorter audio clip.", "voice_options_invalid");
+  const body = new Uint8Array(size);
+  body.set(prefix);
+  body.set(audio.bytes, prefix.byteLength);
+  body.set(suffix, prefix.byteLength + audio.bytes.byteLength);
+  return { body: body.buffer, headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` } };
+}
+
 async function enrollmentBody(
   input: VoiceProfileEnrollment,
   metadata: Record<string, unknown>,
@@ -119,16 +160,19 @@ async function enrollmentBody(
   if (sample.source === "confirmed_segment" && (input.audio !== undefined || !clipVoiceSample))
     throw new ProServiceError("A confirmed segment must be clipped from its original recording first.", "voice_options_invalid");
   const audio = sample.source === "direct" ? input.audio : await clipVoiceSample!(publicSample as ConfirmedVoiceSegment, signal);
-  if (!audio || audio.size <= 0 || audio.size > VOICE_CLIP_LIMIT)
+  const wireMetadata = JSON.stringify({ ...metadata, sample: publicSample, consent: {
+    scope: "voice_profile_enrollment", participantConfirmed: true,
+  } });
+  if (audio && "bytes" in audio && "mimeType" in audio)
+    return nativeVoiceMultipart(audio, wireMetadata, input.mutationKey);
+  if (!audio || !("size" in audio) || audio.size <= 0 || audio.size > VOICE_CLIP_LIMIT)
     throw new ProServiceError("Choose a supported, short audio clip.", "voice_options_invalid");
   if (!["audio/mp4", "audio/wav", "audio/x-wav"].includes(audio.type))
     throw new ProServiceError("Use an M4A or WAV clip.", "voice_options_invalid");
   const form = new FormData();
-  form.append("metadata", JSON.stringify({ ...metadata, sample: publicSample, consent: {
-    scope: "voice_profile_enrollment", participantConfirmed: true,
-  } }));
+  form.append("metadata", wireMetadata);
   form.append("audio", audio, audio.type === "audio/mp4" ? "sample.m4a" : "sample.wav");
-  return form;
+  return { body: form };
 }
 
 
@@ -281,9 +325,9 @@ export class ProClient {
   ): Promise<VoiceProfileSummary> {
     if (input.workerURL !== this.workerURL)
       throw new ProServiceError("This operation belongs to another environment.", "authorization");
-    const body = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
+    const multipart = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
     const response = await this.voiceProfileRequest(input, "", {
-      method: "POST", body, signal,
+      method: "POST", ...multipart, signal,
     }, input.mutationKey);
     const data = await response.json();
     if (data?.contract !== VOICE_CONTRACT)
@@ -303,9 +347,9 @@ export class ProClient {
       throw new ProServiceError("Invalid voice profile update.", "voice_options_invalid");
     if (input.workerURL !== this.workerURL)
       throw new ProServiceError("This operation belongs to another environment.", "authorization");
-    const body = await enrollmentBody(input, { expectedRevision, mode }, this.clipVoiceSample, signal);
+    const multipart = await enrollmentBody(input, { expectedRevision, mode }, this.clipVoiceSample, signal);
     const response = await this.voiceProfileRequest(input, `/${profileId}/samples`, {
-      method: "POST", body, signal,
+      method: "POST", ...multipart, signal,
     }, input.mutationKey);
     const data = await response.json();
     if (data?.contract !== VOICE_CONTRACT || data.profile?.profileId !== profileId)
