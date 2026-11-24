@@ -3,11 +3,13 @@ package co.innosage.recorderupload
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import expo.modules.kotlin.functions.Coroutine
+import expo.modules.kotlin.jni.NativeArrayBuffer
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.ByteBuffer
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -17,6 +19,7 @@ class RecorderUploadModule : Module() {
   private val destroyed = AtomicBoolean(false)
   private val connections = ConcurrentHashMap<String, HttpURLConnection>()
   private val cancelled = ConcurrentHashMap.newKeySet<String>()
+  private val clipping = AtomicBoolean(false)
 
   private fun localRecording(uri: String): File {
     val parsed = Uri.parse(uri)
@@ -66,6 +69,24 @@ class RecorderUploadModule : Module() {
           null // No reliable local duration. The server still validates the decoded audio.
         } finally {
           metadata.release()
+        }
+      }
+    }
+
+    AsyncFunction("clipConfirmedRecording") Coroutine { id: String, uri: String, expectedBytes: Double,
+                                                        startMs: Double, endMs: Double ->
+      withContext(Dispatchers.IO) {
+        require(Regex("^[a-f0-9-]{36}$").matches(id))
+        require(listOf(expectedBytes, startMs, endMs).all { it.isFinite() && it.toLong().toDouble() == it })
+        check(clipping.compareAndSet(false, true))
+        try {
+          val clip = ExactVoiceClip.read(requireNotNull(appContext.reactContext).filesDir, uri, expectedBytes.toLong(),
+            startMs.toLong(), endMs.toLong()) { destroyed.get() || cancelled.contains(id) }
+          NativeArrayBuffer.copyOf(ByteBuffer.wrap(clip))
+        } catch (_: Exception) {
+          throw IllegalStateException("Could not clip the selected recording interval")
+        } finally {
+          clipping.set(false)
         }
       }
     }
