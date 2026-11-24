@@ -1,10 +1,9 @@
-import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { ActionButton } from '../ActionButton';
 import { DetailShell } from '../DetailShell';
 import { useTheme } from '../theme';
-import { pickVoiceClip, VoiceClipError, type PickedVoiceClip, type VoiceProfileAudio } from './voice-profile-clip';
+import { pickVoiceClip, type VoiceProfileAudio } from './voice-profile-clip';
 
 export type VoiceProfileManagerSummary = Readonly<{
   profileId: string;
@@ -12,31 +11,17 @@ export type VoiceProfileManagerSummary = Readonly<{
   status: 'active' | 'disabled';
 }>;
 
+type Recovery = { pendingEnrollment: boolean; pendingDeletes: string[] };
+
 export type VoiceProfileManagerProps = {
-  onList: (pendingEnrollmentKey?: string) => Promise<{
-    profiles: readonly VoiceProfileManagerSummary[];
-    /** Include only when the result of this exact mutation has been verified. */
-    enrollment?: 'created' | 'not_created';
-  }>;
+  onRestore: () => Promise<Recovery>;
+  onList: () => Promise<readonly VoiceProfileManagerSummary[]>;
   onEnroll: (request: Readonly<{
     audio: VoiceProfileAudio;
     displayName: string;
     participantConfirmed: true;
-    mutationKey: string;
   }>) => Promise<VoiceProfileManagerSummary>;
-  onDelete: (request: Readonly<{ profileId: string; mutationKey: string }>) => Promise<'pending' | 'deleted'>;
-};
-
-type EnrollmentAttempt = Pick<PickedVoiceClip, 'digest' | 'filename' | 'mimeType'> & {
-  mutationKey: string;
-  displayName: string;
-  uncertain: boolean;
-};
-
-type DeletionAttempt = {
-  profile: VoiceProfileManagerSummary;
-  mutationKey: string;
-  status: 'pending' | 'unverified';
+  onDelete: (profileId: string) => Promise<'pending' | 'deleted'>;
 };
 
 const busyMessages = {
@@ -47,32 +32,26 @@ const busyMessages = {
 };
 type Operation = keyof typeof busyMessages;
 
-function matchesAttempt(clip: PickedVoiceClip, attempt: EnrollmentAttempt) {
-  return clip.digest === attempt.digest && clip.filename === attempt.filename && clip.mimeType === attempt.mimeType;
-}
-
-function displaySummary({ profileId, displayName, status }: VoiceProfileManagerSummary): VoiceProfileManagerSummary {
-  return { profileId, displayName, status };
-}
-
-export function VoiceProfileManager({ onList, onEnroll, onDelete }: VoiceProfileManagerProps) {
+export function VoiceProfileManager({ onRestore, onList, onEnroll, onDelete }: VoiceProfileManagerProps) {
   const { palette, spacing, typography } = useTheme();
   const [visible, setVisible] = useState(false);
   const [profiles, setProfiles] = useState<readonly VoiceProfileManagerSummary[]>([]);
-  const [hasListed, setHasListed] = useState(false);
-  const [clip, setClip] = useState<PickedVoiceClip>();
+  const [listState, setListState] = useState<'idle' | 'loaded' | 'unavailable'>('idle');
+  const [clip, setClip] = useState<VoiceProfileAudio>();
   const [displayName, setDisplayName] = useState('');
   const [consent, setConsent] = useState(false);
-  const [enrollment, setEnrollment] = useState<EnrollmentAttempt>();
-  const [deletions, setDeletions] = useState<ReadonlyMap<string, DeletionAttempt>>(() => new Map());
+  const [recovery, setRecovery] = useState<Recovery>();
+  const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<VoiceProfileManagerSummary>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState<Operation>();
   const busyRef = useRef(false);
 
-  const uncertain = enrollment?.uncertain === true;
+  const canMutate = !!recovery && !recoveryUnavailable;
+  const pendingEnrollment = recovery?.pendingEnrollment === true;
+  const pendingDeletes = new Set(recovery?.pendingDeletes);
   const name = displayName.trim();
-  const canEnroll = !!clip && consent && name.length > 0 && [...name].length <= 100;
+  const canEnroll = canMutate && !!clip && consent && name.length > 0 && [...name].length <= 100;
   const body = { ...typography.body, color: palette.text };
   const muted = { ...typography.body, color: palette.muted };
 
@@ -94,23 +73,27 @@ export function VoiceProfileManager({ onList, onEnroll, onDelete }: VoiceProfile
     setConsent(false);
   }
 
+  async function refreshRecovery() {
+    try {
+      const restored = await onRestore();
+      setRecovery(restored);
+      setRecoveryUnavailable(false);
+      return restored;
+    } catch {
+      setRecoveryUnavailable(true);
+    }
+  }
+
   async function refresh() {
     if (!begin('list')) return;
     setMessage('');
+    await refreshRecovery();
     try {
-      const result = await onList(enrollment?.uncertain ? enrollment.mutationKey : undefined);
-      setProfiles(result.profiles.map(displaySummary));
-      setHasListed(true);
-      if (enrollment?.uncertain && result.enrollment === 'created') {
-        setEnrollment(undefined);
-        clearDraft();
-        setMessage('Voice profile created.');
-      } else if (enrollment?.uncertain && result.enrollment === 'not_created') {
-        setEnrollment({ ...enrollment, uncertain: false });
-        setMessage('The upload did not create a profile.');
-      }
+      setProfiles(await onList());
+      setListState('loaded');
     } catch {
-      setMessage('Could not load voice profiles. Try refreshing.');
+      setProfiles([]);
+      setListState('unavailable');
     } finally {
       finish();
     }
@@ -122,96 +105,95 @@ export function VoiceProfileManager({ onList, onEnroll, onDelete }: VoiceProfile
       setConfirmDelete(undefined);
       return;
     }
-    setClip(undefined);
-    setConsent(false);
-    setDisplayName(enrollment?.uncertain ? enrollment.displayName : '');
+    clearDraft();
+    setProfiles([]);
+    setListState('idle');
+    setRecovery(undefined);
+    setRecoveryUnavailable(false);
     setMessage('');
     setVisible(false);
   }
 
   async function chooseClip() {
-    if ((uncertain && clip) || !begin('pick')) return;
+    if (!canMutate || !begin('pick')) return;
     Keyboard.dismiss();
     try {
       const picked = await pickVoiceClip();
       if (!picked) return;
-      if (enrollment?.uncertain && !matchesAttempt(picked, enrollment)) {
-        setMessage('Choose the same clip to retry, or refresh to check the upload.');
-        return;
-      }
-      setClip(picked);
+      setClip({ bytes: picked.bytes, mimeType: picked.mimeType });
       setConsent(false);
       setMessage('');
-    } catch (error) {
-      setMessage(error instanceof VoiceClipError ? error.message : 'Could not open the audio clip.');
+    } catch {
+      setMessage('Could not open this clip. Choose an available WAV or M4A clip under 10 MiB.');
     } finally {
+      await refreshRecovery();
       finish();
     }
   }
 
   async function sendEnrollment() {
-    if (!clip || !canEnroll) return;
-    const previous = enrollment && enrollment.displayName === name && matchesAttempt(clip, enrollment)
-      ? enrollment : undefined;
-    if ((uncertain && !previous) || !begin('enroll')) return;
+    if (!clip || !canEnroll || !begin('enroll')) return;
     setMessage('');
+    setConsent(false);
     Keyboard.dismiss();
-    let sent = false;
+    let failure: 'rejected' | 'unknown' | undefined;
     try {
-      // Pass a copy so the owner of the callback cannot modify the retry payload.
       const audio = { bytes: clip.bytes.slice(), mimeType: clip.mimeType };
-      const mutationKey = previous?.mutationKey ?? randomUUID();
-      setEnrollment({ mutationKey, digest: clip.digest, filename: clip.filename, mimeType: clip.mimeType,
-        displayName: name, uncertain: true });
-      sent = true;
-      const profile = displaySummary(await onEnroll({ audio, displayName: name, participantConfirmed: true, mutationKey }));
+      const profile = await onEnroll({ audio, displayName: name, participantConfirmed: true });
       setProfiles(current => [profile, ...current.filter(item => item.profileId !== profile.profileId)]);
-      setEnrollment(undefined);
       clearDraft();
       setMessage('Voice profile created.');
-    } catch {
-      if (!sent) setMessage('Could not prepare the upload.');
+    } catch (error) {
+      failure = error && typeof error === 'object' && 'code' in error && error.code === 'voice_sample_rejected'
+        ? 'rejected' : 'unknown';
     } finally {
+      const restored = await refreshRecovery();
+      if (failure === 'rejected') {
+        if (restored && !restored.pendingEnrollment) {
+          setClip(undefined);
+          setMessage('This sample was rejected. Choose a different 2–30 second clip and confirm consent again.');
+        } else {
+          setMessage('This sample was rejected. Refresh profiles to check for pending changes.');
+        }
+      } else if (failure === 'unknown') {
+        setMessage(!restored || restored.pendingEnrollment ? 'Could not verify the upload.'
+          : 'Could not complete the upload. Check the clip and profile name, then confirm consent and try again.');
+      }
       finish();
     }
   }
 
-  async function sendDeletion(profile: VoiceProfileManagerSummary) {
-    if (confirmDelete?.profileId !== profile.profileId || !begin('delete')) return;
-    const { profileId } = profile;
-    const previous = deletions.get(profileId);
+  async function sendDeletion(profileId: string) {
+    if (!canMutate || (confirmDelete?.profileId !== profileId && !pendingDeletes.has(profileId)) || !begin('delete')) return;
     setMessage('');
-    let mutationKey: string | undefined;
+    let result: 'pending' | 'deleted' | undefined;
     try {
-      mutationKey = previous?.mutationKey ?? randomUUID();
-      const attempt = { profile, mutationKey, status: previous?.status ?? 'unverified' } as const;
-      setDeletions(current => new Map(current).set(profileId, attempt));
-      const result = await onDelete({ profileId, mutationKey });
-      setDeletions(current => {
-        const next = new Map(current);
-        if (result === 'deleted') next.delete(profileId);
-        else next.set(profileId, { ...attempt, status: result });
-        return next;
-      });
+      result = await onDelete(profileId);
       if (result === 'deleted') {
         setProfiles(current => current.filter(item => item.profileId !== profileId));
-        setMessage('Voice profile deleted.');
-      } else {
-        setMessage('Deletion pending.');
+        setRecovery(current => current && {
+          ...current, pendingDeletes: current.pendingDeletes.filter(id => id !== profileId),
+        });
       }
     } catch {
-      setMessage(mutationKey ? 'Could not verify deletion.' : 'Could not prepare the deletion request.');
+      // The controller's recovery state determines whether verification is available.
     } finally {
+      const restored = await refreshRecovery();
+      const canVerify = restored?.pendingDeletes.includes(profileId);
+      if (result === 'deleted') setMessage('Voice profile deleted.');
+      else if (result === 'pending') setMessage(canVerify ? 'Deletion pending. Select Verify deletion to check again.'
+        : 'Deletion pending. Refresh profiles to check for pending changes.');
+      else setMessage(canVerify ? 'Could not verify deletion. Select Verify deletion to try again.'
+        : 'Could not verify deletion. Refresh profiles and try again.');
       setConfirmDelete(undefined);
       finish();
     }
   }
 
-  const rows = new Map(profiles.map(profile => [profile.profileId, profile] as const));
-  for (const { profile } of deletions.values()) {
-    if (!rows.has(profile.profileId)) rows.set(profile.profileId, profile);
+  const rows = new Map<string, VoiceProfileManagerSummary | undefined>(profiles.map(profile => [profile.profileId, profile] as const));
+  for (const profileId of pendingDeletes) {
+    if (!rows.has(profileId)) rows.set(profileId, undefined);
   }
-  const retryDelete = confirmDelete && deletions.has(confirmDelete.profileId);
   const status = busy ? busyMessages[busy] : message;
 
   return (
@@ -231,59 +213,68 @@ export function VoiceProfileManager({ onList, onEnroll, onDelete }: VoiceProfile
                 {confirmDelete ? (
                   <>
                     <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>
-                      {retryDelete ? 'Verify deletion' : 'Delete voice profile'}
+                      Delete voice profile
                     </Text>
                     <Text selectable style={body}>{confirmDelete.displayName}</Text>
-                    <Text style={muted}>{retryDelete
-                      ? 'Send the same deletion request again to verify the outcome.'
-                      : 'Delete this profile from voice matching?'}</Text>
-                    <ActionButton title={retryDelete ? 'Send deletion again' : 'Delete profile'} variant="outlined"
-                      disabled={!!busy} onPress={() => void sendDeletion(confirmDelete)} />
+                    <Text style={muted}>Delete this profile from voice matching?</Text>
+                    <ActionButton title="Delete profile" variant="outlined"
+                      disabled={!!busy || !canMutate} onPress={() => void sendDeletion(confirmDelete.profileId)} />
                     <ActionButton title="Cancel" variant="text" disabled={!!busy} onPress={close} />
                   </>
                 ) : (
                   <>
-                    {uncertain && busy !== 'enroll' ? (
+                    {recoveryUnavailable ? (
                       <>
-                        <Text accessibilityLiveRegion="polite" style={muted}>Upload unverified. Refresh to check before choosing a different clip.</Text>
+                        <Text accessibilityLiveRegion="polite" style={muted}>Could not check for pending changes. Refresh profiles to try again.</Text>
                         <ActionButton title="Refresh profiles" variant="outlined" disabled={!!busy} onPress={() => void refresh()} />
                       </>
+                    ) : pendingEnrollment ? (
+                      <Text accessibilityLiveRegion="polite" style={muted}>Upload pending. Use the same clip and profile name, then confirm consent to retry.</Text>
                     ) : null}
                     <Text style={muted}>Choose a separate 2–30 second WAV or M4A clip of one participant who agreed to share it. Maximum 10 MiB.</Text>
-                    <ActionButton title={uncertain ? 'Choose same clip' : clip ? 'Choose another clip' : 'Choose audio clip'}
-                      variant="outlined" disabled={!!busy || (uncertain && !!clip)} onPress={() => void chooseClip()} />
-                    {clip ? <Text selectable textBreakStrategy="simple" style={body}>{clip.filename}</Text> : null}
+                    <ActionButton title={pendingEnrollment ? 'Choose same clip' : clip ? 'Choose another clip' : 'Choose audio clip'}
+                      variant="outlined" disabled={!!busy || !canMutate} onPress={() => void chooseClip()} />
+                    {clip ? <Text accessibilityLiveRegion="polite" style={body}>Audio clip selected.</Text> : null}
                     <View style={{ gap: spacing.xs }}>
                       <Text style={body}>Profile name</Text>
                       <TextInput accessibilityLabel="Profile name" value={displayName} onChangeText={setDisplayName}
-                        editable={!busy && !uncertain} maxLength={100} returnKeyType="done"
+                        editable={!busy && canMutate} maxLength={100} returnKeyType="done"
                         style={[body, { borderColor: palette.controlBorder, borderWidth: 1, padding: spacing.sm, minHeight: 48 }]} />
                     </View>
                     <View style={{ gap: spacing.xs }}>
                       <Text style={body}>{consent ? 'Participant consent confirmed.' : 'Confirm that the participant agreed to use this clip to create a voice profile.'}</Text>
                       <ActionButton title={consent ? 'Clear consent confirmation' : 'Confirm participant consent'}
-                        variant="outlined" disabled={!!busy || !clip} onPress={() => setConsent(value => !value)} />
+                        variant="outlined" disabled={!!busy || !canMutate || !clip} onPress={() => setConsent(value => !value)} />
                     </View>
-                    <ActionButton title={uncertain ? 'Resend same clip' : 'Send clip and create profile'} variant="primary"
+                    <ActionButton title={pendingEnrollment ? 'Retry upload' : 'Send clip and create profile'} variant="primary"
                       disabled={!!busy || !canEnroll} onPress={() => void sendEnrollment()} />
                     <View style={{ gap: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: spacing.md }}>
                       <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>Saved profiles</Text>
-                      {hasListed && rows.size === 0 ? <Text style={muted}>No voice profiles yet.</Text> : null}
-                      {[...rows.values()].map(profile => {
-                        const deletion = deletions.get(profile.profileId);
-                        const label = deletion?.status === 'pending' ? 'Deletion pending'
-                          : deletion ? 'Deletion unverified' : profile.status === 'active' ? 'Ready' : 'Disabled';
+                      {listState === 'unavailable' ? (
+                        <Text accessibilityLiveRegion="polite" style={muted}>Could not load saved profiles. Try refreshing.</Text>
+                      ) : null}
+                      {listState === 'loaded' && rows.size === 0 ? <Text style={muted}>No voice profiles yet.</Text> : null}
+                      {[...rows].map(([profileId, profile]) => {
+                        const pending = pendingDeletes.has(profileId);
                         return (
-                          <View key={profile.profileId} style={{ gap: spacing.xs, borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: spacing.sm }}>
-                            <Text selectable textBreakStrategy="simple" style={body}>{profile.displayName}</Text>
-                            <Text accessibilityLiveRegion="polite" style={muted}>{label}</Text>
-                            <ActionButton title={deletion ? 'Verify deletion' : 'Delete profile'} variant="text" disabled={!!busy}
-                              accessibilityLabel={`${deletion ? 'Verify deletion of' : 'Delete'} ${profile.displayName}`}
-                              onPress={() => { Keyboard.dismiss(); setConfirmDelete(profile); }} />
+                          <View key={profileId} style={{ gap: spacing.xs, borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: spacing.sm }}>
+                            {profile ? <Text selectable textBreakStrategy="simple" style={body}>{profile.displayName}</Text> : null}
+                            <Text accessibilityLiveRegion="polite" style={muted}>{profile
+                              ? pending ? 'Deletion pending' : profile.status === 'active' ? 'Ready' : 'Disabled'
+                              : 'Profile deletion pending'}</Text>
+                            {pending ? (
+                              <ActionButton title="Verify deletion" variant="text" disabled={!!busy || !canMutate}
+                                accessibilityLabel={profile ? `Verify deletion of ${profile.displayName}` : 'Verify deletion'}
+                                onPress={() => { Keyboard.dismiss(); void sendDeletion(profileId); }} />
+                            ) : profile ? (
+                              <ActionButton title="Delete profile" variant="text" disabled={!!busy || !canMutate}
+                                accessibilityLabel={`Delete ${profile.displayName}`}
+                                onPress={() => { Keyboard.dismiss(); setConfirmDelete(profile); }} />
+                            ) : null}
                           </View>
                         );
                       })}
-                      {!uncertain ? <ActionButton title="Refresh profiles" variant="text" disabled={!!busy} onPress={() => void refresh()} /> : null}
+                      {!recoveryUnavailable ? <ActionButton title="Refresh profiles" variant="text" disabled={!!busy} onPress={() => void refresh()} /> : null}
                     </View>
                   </>
                 )}
