@@ -55,11 +55,10 @@ test("recordings retain local speaker identity and usable anonymous results if m
     });
     assert.ok(job.original.trim());
     assert.equal(new Set(job.result.segments.map(({ segmentId }) => segmentId)).size, job.result.segments.length);
-    let previousStart = 0;
     for (const item of job.result.segments) {
-      assert.ok(Number.isSafeInteger(item.startMs) && item.startMs >= previousStart);
-      assert.ok(Number.isSafeInteger(item.endMs) && item.endMs > item.startMs);
-      previousStart = item.startMs;
+      assert.ok(Number.isSafeInteger(item.startMs) && item.startMs >= 0);
+      assert.ok(Number.isSafeInteger(item.endMs) && item.endMs >= item.startMs);
+      if (item.startMs === item.endMs) assert.equal(item.disposition, "unknown");
       assert.equal(typeof item.text, "string");
       dispositions.add(item.disposition);
       assert.deepEqual(Object.keys(item).sort(), [
@@ -84,6 +83,8 @@ test("recordings retain local speaker identity and usable anonymous results if m
   assert.deepEqual(second.recovery.reorderedCandidates, second.reserve.voiceIdentification.candidateProfileIds.toSorted());
   assert.deepEqual(second.recovery.expectedSameSegmentIds, second.result.segments.map(({ segmentId }) => segmentId));
   assert.equal(second.recovery.expectedResubmissions, 0);
+  assert.deepEqual(second.result.segments.map(({ startMs }) => startMs), [200, 2400, 3600, 2300]);
+  assert.equal(second.result.segments[3].speakerId, "SPEAKER_02");
   assert.equal(second.recovery.expectedDecision, "idempotent");
   assert.deepEqual(second.pendingRead, {
     httpStatus: 202,

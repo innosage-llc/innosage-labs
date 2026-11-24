@@ -80,7 +80,8 @@
         "segments": [
           { "segmentId": "seg-1", "startMs": 200, "endMs": 2300, "text": "Mixed", "speakerId": "SPEAKER_02", "disposition": "matched", "matchedProfileId": "vp_example_A" },
           { "segmentId": "seg-2", "startMs": 2400, "endMs": 3500, "text": "agenda", "speakerId": "SPEAKER_01", "disposition": "needs_review" },
-          { "segmentId": "seg-3", "startMs": 3600, "endMs": 4100, "text": ".", "speakerId": null, "disposition": "unknown" }
+          { "segmentId": "seg-3", "startMs": 3600, "endMs": 4100, "text": ".", "speakerId": null, "disposition": "unknown" },
+          { "segmentId": "seg-4", "startMs": 2300, "endMs": 2300, "text": "—", "speakerId": "SPEAKER_02", "disposition": "unknown" }
         ]
       },
       "pendingRead": {
@@ -96,7 +97,7 @@
         "reorderedCandidates": ["vp_example_A", "vp_example_B"],
         "expectedResubmissions": 0,
         "expectedDecision": "idempotent",
-        "expectedSameSegmentIds": ["seg-1", "seg-2", "seg-3"]
+        "expectedSameSegmentIds": ["seg-1", "seg-2", "seg-3", "seg-4"]
       }
     },
     {
