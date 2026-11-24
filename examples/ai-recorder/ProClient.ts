@@ -487,7 +487,7 @@ export class ProClient {
     const key = this.originalProofKey(operation);
     if (!key || (await this.profile())?.accountScope !== operation.accountScope) return;
     try {
-      await this.proofWrites.get(key);
+      if (this.proofWrites.has(key)) return;
       const saved = await this.loadOriginalProof(key, operation);
       return saved?.completed ? saved.sha256 : undefined;
     } catch {
@@ -701,7 +701,7 @@ export class ProClient {
         .join("\n");
     }
     // Optional local proof must not prevent recovering a usable transcript.
-    await this.writeOriginalProof(operation, session.sessionId).catch(() => undefined);
+    void this.writeOriginalProof(operation, session.sessionId).catch(() => undefined);
     return { state: "COMPLETED", transcript, speakerLabeling: speakers };
   }
 

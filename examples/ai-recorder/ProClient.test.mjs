@@ -418,6 +418,34 @@ test('submitted proof is durable before transfer, and usable only after exact co
   assert.equal(f.state.uploads, 1);
 });
 
+test('a blocked optional proof completion never delays or denies the original', async () => {
+  const f = proofFixture();
+  await f.client.configure('synthetic-pro-key');
+  const operation = opted(f);
+  await f.client.upload(operation, 'synthetic.m4a', f.file, async () => 'b'.repeat(64));
+  f.state.phase = 'COMPLETED';
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const write = f.store.setItemAsync;
+  f.store.setItemAsync = async (key, value) => {
+    if (key.includes('submitted-original') && JSON.parse(value).completed) await gate;
+    return write(key, value);
+  };
+  try {
+    const state = await Promise.race([
+      f.client.read(operation, 'synthetic.m4a'),
+      new Promise((_, reject) => setTimeout(() => reject(Error('Optional proof blocked original')), 100)),
+    ]);
+    assert.equal(state.state, 'COMPLETED');
+    assert.match(state.transcript, /Synthetic original/);
+    assert.equal(await f.client.readSubmittedOriginalDigest(operation), undefined);
+  } finally {
+    release();
+  }
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(await f.client.readSubmittedOriginalDigest(operation), 'b'.repeat(64));
+});
+
 test('changed digest and failed local persistence fail closed before any repeat native transfer', async () => {
   const f = proofFixture();
   await f.client.configure('synthetic-pro-key');
