@@ -55,19 +55,32 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-async function readVoiceProfilesForReview(client: ProClient, operation: ProOperation, signal: AbortSignal) {
+async function confirmVoiceReview(client: ProClient, operation: ProOperation, recordingName: string, signal: AbortSignal) {
   const { workerURL, accountScope } = operation;
-  return readOperationWithDeadline(lookupSignal => new Promise<VoiceProfileSummary[] | undefined>(resolve => {
+  const budgetMs = 3000;
+  const deadline = performance.now() + budgetMs;
+  return readOperationWithDeadline(lookupSignal => new Promise<{
+    profiles: VoiceProfileSummary[]; segments: readonly VoiceSegment[];
+  } | undefined>(resolve => {
     if (lookupSignal.aborted) {
       resolve(undefined);
       return;
     }
     const unavailable = () => resolve(undefined);
     lookupSignal.addEventListener('abort', unavailable, { once: true });
-    void client.listVoiceProfiles({ workerURL, accountScope }, lookupSignal)
-      .then(resolve, unavailable)
+
+    async function confirm() {
+      const profiles = await client.listVoiceProfiles({ workerURL, accountScope }, lookupSignal);
+      if (lookupSignal.aborted || performance.now() >= deadline) return;
+      // Recheck matching revisions on the same job after reading the profile names.
+      const observed = await client.readVoiceIdentification(operation, recordingName, lookupSignal);
+      if (lookupSignal.aborted || performance.now() >= deadline || observed?.result.status !== 'completed') return;
+      return { profiles, segments: observed.result.segments };
+    }
+
+    void confirm().then(resolve, unavailable)
       .finally(() => lookupSignal.removeEventListener('abort', unavailable));
-  }), signal, 3000);
+  }), signal, budgetMs);
 }
 
 export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
@@ -343,20 +356,26 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         if (supportsProUpload && result.result.status === 'completed') segments = result.result.segments;
         await writeLocalVoiceReceipt(SecureStore, receiptKey, operation, originalUri, receipt);
       }
-      if (signal.aborted) return;
-      setVoiceProfileResult({ operation, review: receipt.outcome === 'completed' ? receipt.review : undefined });
-      void client.cleanup(operation, recordingName).catch(() => {
-        if (!signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
-      });
-      if (!segments) return;
+      let confirmed: Awaited<ReturnType<typeof confirmVoiceReview>>;
+      try {
+        if (signal.aborted) return;
+        setVoiceProfileResult({ operation, review: receipt.outcome === 'completed' ? receipt.review : undefined });
+        if (segments && AppState.currentState === 'active') {
+          namesLookup = new AbortController();
+          confirmed = await confirmVoiceReview(client, operation, recordingName, namesLookup.signal).catch(() => undefined);
+        }
+      } finally {
+        void client.cleanup(operation, recordingName).catch(() => {
+          if (!signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
+        });
+      }
 
-      const lookup = AppState.currentState === 'active' ? new AbortController() : undefined;
-      namesLookup = lookup;
-      const profiles = lookup ? await readVoiceProfilesForReview(client, operation, lookup.signal).catch(() => undefined) : undefined;
-      if (signal.aborted) return;
-      const namesAreCurrent = !!lookup && !lookup.signal.aborted && AppState.currentState === 'active';
-      const rows = reviewLiveVoiceSegments(segments, namesAreCurrent ? profiles ?? [] : []);
-      setLiveVoiceReview({ operation, originalUri, rows, namesUnavailable: namesAreCurrent && !profiles });
+      if (!segments || signal.aborted) return;
+      const namesAreCurrent = !!namesLookup && !namesLookup.signal.aborted && AppState.currentState === 'active';
+      const rows = namesAreCurrent && confirmed
+        ? reviewLiveVoiceSegments(confirmed.segments, confirmed.profiles)
+        : reviewLiveVoiceSegments(segments, []);
+      setLiveVoiceReview({ operation, originalUri, rows, namesUnavailable: namesAreCurrent && !confirmed });
       if (rows.some(row => row.liveName)) namesTimer = setTimeout(hideLiveNames, 30_000);
     }
     void restoreVoiceReview().catch(() => {

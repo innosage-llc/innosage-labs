@@ -1,8 +1,8 @@
-import { CryptoDigestAlgorithm, digest } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
+import { hashRecording } from '../../ProAccess';
 import {
   readManualVoiceCorrections, saveManualVoiceCorrection, type VoiceReviewRow, type VoiceSource,
 } from '../../VoiceProfileReview';
@@ -12,10 +12,9 @@ import { useTheme } from '../theme';
 type Binding = Parameters<typeof readManualVoiceCorrections>[2];
 type Corrections = Awaited<ReturnType<typeof readManualVoiceCorrections>>;
 
-async function originalBinding(originalUri: string, operationId: string): Promise<Binding> {
-  const original = await new File(originalUri).arrayBuffer();
-  const hash = await digest(CryptoDigestAlgorithm.SHA256, original);
-  const originalSha256 = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+async function originalBinding(originalUri: string, operationId: string, signal: AbortSignal): Promise<Binding> {
+  signal.throwIfAborted();
+  const originalSha256 = await hashRecording(new File(originalUri), signal);
   return { operationId, originalSha256 };
 }
 
@@ -47,36 +46,48 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const saveInProgress = useRef(false);
+  const sourceController = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    sourceController.current = controller;
+    const { signal } = controller;
     async function restoreCorrections() {
-      const binding = await originalBinding(originalUri, operationId);
+      const binding = await originalBinding(originalUri, operationId, signal);
+      signal.throwIfAborted();
       const entries = await readManualVoiceCorrections(SecureStore, correctionKey, binding);
-      if (active) setSaved({ binding, entries });
+      if (!signal.aborted) setSaved({ binding, entries });
     }
-    void restoreCorrections().catch(() => { if (active) setSaved(null); });
-    return () => { active = false; };
+    void restoreCorrections().catch(() => { if (!signal.aborted) setSaved(null); });
+    return () => {
+      controller.abort();
+      sourceController.current = null;
+    };
   }, [originalUri, operationId, correctionKey]);
 
   async function saveCorrection(row: VoiceReviewRow) {
-    if (!saved || !rows || !choice?.label.trim() || choice.segmentId !== row.segmentId || saveInProgress.current) return;
+    const signal = sourceController.current?.signal;
+    if (!signal || signal.aborted || !saved || !rows || !choice?.label.trim() ||
+        choice.segmentId !== row.segmentId || saveInProgress.current) return;
     saveInProgress.current = true;
     setSaving(true);
     setSaveFailed(false);
     try {
-      const binding = await originalBinding(originalUri, operationId);
-      if (binding.originalSha256 !== saved.binding.originalSha256) throw new Error('Original transcript changed.');
+      const binding = await originalBinding(originalUri, operationId, signal);
+      signal.throwIfAborted();
+      if (binding.operationId !== saved.binding.operationId || binding.originalSha256 !== saved.binding.originalSha256)
+        throw new Error('Original transcript changed.');
       const entries = await saveManualVoiceCorrection(SecureStore, correctionKey, binding, rows, {
         speakerId: row.speakerId, label: choice.label, confirmedLocalOnly: true,
       });
+      if (signal.aborted) return;
       setSaved({ binding, entries });
       setChoice(undefined);
     } catch {
-      setSaveFailed(true);
+      if (!signal.aborted) setSaveFailed(true);
     } finally {
       saveInProgress.current = false;
-      setSaving(false);
+      if (!signal.aborted) setSaving(false);
     }
   }
 
