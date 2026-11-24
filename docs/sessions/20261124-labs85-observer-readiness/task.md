@@ -16,3 +16,8 @@ candidate, use an exclusively created per-run file inside only that XCTest
 runner sandbox. Verify the Simulator UUID and runner app data container before
 writing the marker, and write it only after the normal launch returns its PID.
 Missing/stale acknowledgement times out without green.
+The verified container marker reached XCTest and the attached app reported
+foreground. The first real controls query then took about 2.4 s while Apple's
+accessibility session bootstrapped. Prime it with a bounded window probe under
+the same host 30 s readiness clock. Do not count that probe toward readiness,
+and keep the measured control-query 1.5 s bound and 5 s stable sampling.

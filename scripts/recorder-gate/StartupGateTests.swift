@@ -33,6 +33,11 @@ final class StartupGateTests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.15)
         }
         let app = try XCTUnwrap(attached, "No foreground product process after the normal launch")
+        // Establish the accessibility session before timing its first control
+        // sample. The host's unchanged 30s bound includes this bootstrap;
+        // the window probe itself contributes no readiness or stability sample.
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 4),
+            "Accessibility window did not become available after the real launch")
         let ready = app.buttons["Start recording"].firstMatch
         var window = StabilityWindow(launchedAt: ProcessInfo.processInfo.systemUptime)
         var announced = false
