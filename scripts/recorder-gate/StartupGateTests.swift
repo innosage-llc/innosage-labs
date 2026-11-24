@@ -1,5 +1,20 @@
-import Darwin
+import CoreFoundation
 import XCTest
+
+private final class LaunchSignal {
+    private let lock = NSLock()
+    private var ready = false
+    var received: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return ready
+    }
+    func mark() {
+        lock.lock()
+        ready = true
+        lock.unlock()
+    }
+}
 
 // Attach to the normal launch; never launch/activate, capture or request input.
 final class StartupGateTests: XCTestCase {
@@ -7,21 +22,25 @@ final class StartupGateTests: XCTestCase {
         continueAfterFailure = false
         let armedAt = ProcessInfo.processInfo.systemUptime
         let signal = try XCTUnwrap(ProcessInfo.processInfo.environment["LABS85_LAUNCH_NOTIFICATION"])
-        var token: Int32 = 0
-        XCTAssertEqual(notify_register_check(signal, &token), NOTIFY_STATUS_OK)
-        defer { notify_cancel(token) }
-        var changed: Int32 = 0
-        // Drain the initial check before reporting armed. Only the randomized
-        // post-launch notification can now authorize attaching the UI proxy.
-        XCTAssertEqual(notify_check(token, &changed), NOTIFY_STATUS_OK)
+        let name = CFNotificationName(rawValue: signal as CFString)
+        let listener = LaunchSignal()
+        let opaque = Unmanaged.passUnretained(listener).toOpaque()
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterAddObserver(center, opaque, { _, context, _, _, _ in
+            if let context {
+                Unmanaged<LaunchSignal>.fromOpaque(context).takeUnretainedValue().mark()
+            }
+        }, name.rawValue, nil, .deliverImmediately)
+        defer {
+            CFNotificationCenterRemoveObserver(center, opaque, name, nil)
+            withExtendedLifetime(listener) {}
+        }
         FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED\n".utf8))
-        changed = 0
-        while changed == 0 {
+        while !listener.received {
             guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
                 throw StabilityWindow.Invalid.readiness
             }
-            XCTAssertEqual(notify_check(token, &changed), NOTIFY_STATUS_OK)
-            if changed == 0 { Thread.sleep(forTimeInterval: 0.1) }
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
         }
         // Time in XCTest setup does not replace the host's actual start clock.
         var attached: XCUIApplication?

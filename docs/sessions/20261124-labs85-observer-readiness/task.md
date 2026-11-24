@@ -11,6 +11,6 @@ and the app reported activation, but XCTest held the prelaunch application
 proxy as not running. The new observer arms without constructing the proxy;
 the host independently verifies no existing PID, then owns normal launch.
 Use a per-run randomized Darwin notification from the same Simulator only
-after the normal launch has returned its PID; XCTest registers and drains
-the initial notification state before arming. No fixed delay estimates a
+after the normal launch has returned its PID; XCTest registers with Core Foundation before arming,
+and waits for the notification before obtaining a UI proxy. No fixed delay estimates a
 launch acknowledgement. Missing/stale acknowledgement times out without green.
