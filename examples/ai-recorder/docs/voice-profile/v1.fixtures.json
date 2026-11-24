@@ -1,0 +1,143 @@
+{
+  "version": "recorder-voice-profile/v1",
+  "scopes": {
+    "stagingA": { "environment": "staging", "account": "synthetic-A" },
+    "stagingB": { "environment": "staging", "account": "synthetic-B" },
+    "productionA": { "environment": "production", "account": "synthetic-A" }
+  },
+  "registration": {
+    "scope": "stagingA",
+    "requests": [
+      {
+        "key": "example-enroll-1",
+        "metadata": {
+          "displayName": "Example A",
+          "sample": { "source": "direct" },
+          "consent": { "scope": "voice_profile_enrollment", "participantConfirmed": true }
+        },
+        "audio": "synthetic-clip-A",
+        "response": { "profileId": "vp_example_A", "displayName": "Example A", "revision": 1, "status": "active" }
+      },
+      {
+        "key": "example-enroll-2",
+        "metadata": {
+          "displayName": "Example B",
+          "sample": { "source": "confirmed_segment", "recordingRef": "recording_example_one", "segmentId": "seg-2", "startMs": 8000, "endMs": 11000 },
+          "consent": { "scope": "voice_profile_enrollment", "participantConfirmed": true }
+        },
+        "audio": "synthetic-clip-B-only",
+        "response": { "profileId": "vp_example_B", "displayName": "Example B", "revision": 1, "status": "active" }
+      }
+    ],
+    "recovery": [
+      { "requestIndex": 0, "responseLost": true, "restart": true, "expectedStatus": 200, "expectedSameProfileId": "vp_example_A" },
+      { "requestIndex": 0, "changedAudio": "synthetic-other-clip", "expectedStatus": 409 }
+    ]
+  },
+  "profileEdits": {
+    "sampleMetadata": {
+      "mode": "replace",
+      "expectedRevision": 1,
+      "sample": { "source": "direct" },
+      "consent": { "scope": "voice_profile_enrollment", "participantConfirmed": true }
+    },
+    "patch": { "expectedRevision": 2, "status": "disabled" }
+  },
+  "transcriptions": [
+    {
+      "scope": "stagingA",
+      "reserve": {
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789001",
+        "diarization": { "enabled": true },
+        "voiceIdentification": { "contract": "recorder-voice-profile/v1" }
+      },
+      "acknowledgement": { "decision": "created", "diarization": { "enabled": true }, "speakerResultContract": "draft-speaker-attribution/v1", "voiceIdentification": { "contract": "recorder-voice-profile/v1" } },
+      "resolvedCandidateIds": ["vp_example_A", "vp_example_B"],
+      "recordingRef": "recording_example_one",
+      "original": "Example A and B introduce plans.",
+      "result": {
+        "contract": "recorder-voice-profile/v1",
+        "status": "completed",
+        "segments": [
+          { "segmentId": "seg-1", "startMs": 0, "endMs": 3000, "text": "Example A", "speakerId": "SPEAKER_01", "disposition": "matched", "matchedProfileId": "vp_example_A" },
+          { "segmentId": "seg-2", "startMs": 8000, "endMs": 11000, "text": "and B introduce plans.", "speakerId": "SPEAKER_02", "disposition": "matched", "matchedProfileId": "vp_example_B" }
+        ]
+      }
+    },
+    {
+      "scope": "stagingA",
+      "reserve": {
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789002",
+        "diarization": { "enabled": true },
+        "voiceIdentification": { "contract": "recorder-voice-profile/v1", "candidateProfileIds": ["vp_example_B", "vp_example_A"] }
+      },
+      "acknowledgement": { "decision": "created", "diarization": { "enabled": true }, "speakerResultContract": "draft-speaker-attribution/v1", "voiceIdentification": { "contract": "recorder-voice-profile/v1" } },
+      "resolvedCandidateIds": ["vp_example_A", "vp_example_B"],
+      "original": "Mixed agenda.",
+      "result": {
+        "contract": "recorder-voice-profile/v1",
+        "status": "completed",
+        "segments": [
+          { "segmentId": "seg-1", "startMs": 200, "endMs": 2300, "text": "Mixed", "speakerId": "SPEAKER_02", "disposition": "matched", "matchedProfileId": "vp_example_A" },
+          { "segmentId": "seg-2", "startMs": 2400, "endMs": 3500, "text": "agenda", "speakerId": "SPEAKER_01", "disposition": "needs_review" },
+          { "segmentId": "seg-3", "startMs": 3600, "endMs": 4100, "text": ".", "speakerId": null, "disposition": "unknown" },
+          { "segmentId": "seg-4", "startMs": 2300, "endMs": 2300, "text": "—", "speakerId": "SPEAKER_02", "disposition": "unknown" }
+        ]
+      },
+      "pendingRead": {
+        "httpStatus": 202,
+        "retryAfterSeconds": 2,
+        "body": { "contract": "recorder-voice-profile/v1", "status": "pending" },
+        "originalAlreadyAvailable": true,
+        "cleanupStarted": false
+      },
+      "recovery": {
+        "responseLost": true,
+        "restart": true,
+        "reorderedCandidates": ["vp_example_A", "vp_example_B"],
+        "expectedResubmissions": 0,
+        "expectedDecision": "idempotent",
+        "expectedSameSegmentIds": ["seg-1", "seg-2", "seg-3", "seg-4"]
+      }
+    },
+    {
+      "scope": "stagingA",
+      "reserve": {
+        "idempotencyKey": "recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789003",
+        "diarization": { "enabled": true },
+        "voiceIdentification": { "contract": "recorder-voice-profile/v1" }
+      },
+      "acknowledgement": { "decision": "created", "diarization": { "enabled": true }, "speakerResultContract": "draft-speaker-attribution/v1", "voiceIdentification": { "contract": "recorder-voice-profile/v1" } },
+      "original": "Still readable.",
+      "result": {
+        "contract": "recorder-voice-profile/v1",
+        "status": "failed",
+        "error": "recognizer_unavailable",
+        "segments": [
+          { "segmentId": "seg-1", "startMs": 10, "endMs": 2000, "text": "Still readable.", "speakerId": "SPEAKER_07", "disposition": "unknown" }
+        ]
+      }
+    }
+  ],
+  "isolation": [
+    { "scope": "stagingB", "operation": "add_sample", "profileIds": ["vp_example_A"], "expectedStatus": 404 },
+    { "scope": "productionA", "operation": "reserve", "profileIds": ["vp_example_A"], "expectedStatus": 404 },
+    { "scope": "stagingB", "operation": "reserve", "profileIds": ["vp_example_A", "vp_nonexistent"], "expectedStatus": 404 }
+  ],
+  "routerIsolation": [
+    { "sessionId": "tx_example_owner", "controlRole": "other_job", "expectedStatus": 403 },
+    { "sessionId": "tx_example_nonexistent", "controlRole": "other_job", "expectedStatus": 403 }
+  ],
+  "deletion": {
+    "scope": "stagingA",
+    "profileId": "vp_example_A",
+    "idempotencyKey": "example-delete-A",
+    "responseStatuses": [202, 204, 204],
+    "beforeCleanup": { "eligible": false, "materialDeleted": false },
+    "afterCleanup": { "eligible": false, "materialDeleted": true },
+    "restored": { "eligible": false, "materialDeleted": true },
+    "queuedJobResult": { "disposition": "unknown" },
+    "priorServerResultReplay": { "disposition": "unknown" },
+    "priorLocalRevision": "Example A (manually corrected)"
+  }
+}

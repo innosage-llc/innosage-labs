@@ -233,6 +233,10 @@ an existing result applies the presentation fix without another transcription.
 Custom saved revisions remain editable as saved. If source words do not align,
 the existing attributed text is retained rather than guessing missing words.
 
+The planned cross-meeting Pro feature is specified in the
+[VoiceProfile v1 contract](docs/voice-profile/v1.md); this is not yet an available
+Recorder feature.
+
 ## InnoSage Pro access
 
 Open **Transcription service** and choose **InnoSage · Staging** or
