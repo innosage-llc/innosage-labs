@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { realpathSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { artifact, BUNDLE, requireThat } from './core.mjs';
 import { monitor } from './host.mjs';
 
@@ -15,7 +15,7 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
   const now = () => performance.now();
   try {
     await log.waitFor('Filtering the log data');
-    const launchSignal = `com.innosage.labs85.startup.${randomBytes(16).toString('hex')}`;
+    const markerName = `labs85-launch-${randomBytes(16).toString('hex')}.ack`;
     const testRun = command('python3', ['-c', `import plistlib,pathlib,sys
 p=next(pathlib.Path(sys.argv[1]).glob("Build/Products/*.xctestrun"))
 d=plistlib.loads(p.read_bytes())
@@ -24,7 +24,7 @@ def update(v):
  global count
  if isinstance(v,dict):
   if v.get("BlueprintName")=="StartupGateUITests" or "StartupGateUITests" in str(v.get("TestBundlePath","")):
-   v.setdefault("EnvironmentVariables",{})["LABS85_LAUNCH_NOTIFICATION"]=sys.argv[2]
+   v.setdefault("EnvironmentVariables",{})["LABS85_LAUNCH_ACK_NAME"]=sys.argv[2]
    count+=1
   for item in v.values(): update(item)
  elif isinstance(v,list):
@@ -32,23 +32,30 @@ def update(v):
 update(d)
 if count == 0: raise SystemExit("observer environment is unbound")
 p.write_bytes(plistlib.dumps(d))
-print(p)`, derived, launchSignal]).trim();
+print(p)`, derived, markerName]).trim();
     child = spawn('xcodebuild', ['test-without-building', '-xctestrun', testRun, '-destination', `id=${uuid}`, '-only-testing:StartupGateUITests/StartupGateTests/testRecordHome', '-resultBundlePath', join(output, 'startup.xcresult')], { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NSUnbufferedIO: 'YES' } });
     let termination; let done = false; let resolveArmed;
     const armed = new Promise(resolve => { resolveArmed = resolve; });
     for (const stream of [child.stdout, child.stderr]) stream.on('data', data => {
       text += data.toString();
       if (text.length > 8*1024*1024) { fatal = 'XCTest output limit'; child.kill(); }
-      if (/^LABS85_XCTEST_ARMED$/m.test(text)) resolveArmed();
+      const marker = text.match(/^LABS85_XCTEST_ARMED (\/[^\r\n]+)$/m);
+      if (marker) resolveArmed(marker[1]);
       if (fault === 'terminate' && !termination && text.includes('LABS85_READY')) termination = setTimeout(() => { try { sim('terminate', uuid, BUNDLE); onFault(); } catch {} }, 1000);
     });
     const result = new Promise((ok, fail) => { child.on('error', fail); child.on('exit', code => { done = true; ok(code); }); });
-    await Promise.race([
+    const marker = await Promise.race([
       armed,
       result.then(() => { throw new Error('XCTest exited before observer armed'); }),
       new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('XCTest observer arm deadline exceeded')), 60000); }),
     ]).finally(() => clearTimeout(deadline));
     requireThat(!fatal && !done, fatal ?? 'XCTest observer not alive at launch');
+    const runner = 'co.innosage.labs.startupgate.tests.xctrunner';
+    const container = realpathSync(sim('get_app_container', uuid, runner, 'data').trim());
+    requireThat(container.includes(`/Devices/${uuid}/data/Containers/`), 'wrong Simulator observer container');
+    const containerTmp = realpathSync(join(container, 'tmp'));
+    requireThat(basename(marker) === markerName && realpathSync(dirname(marker)) === containerTmp,
+      'launch marker is outside the exact Simulator observer container');
     const before = sim('spawn', uuid, 'launchctl', 'list').split('\n')
       .find(line => line.includes(BUNDLE))?.trim().split(/\s+/)[0];
     requireThat(!/^\d+$/.test(before ?? ''), 'product already running before normal Simulator launch');
@@ -57,7 +64,7 @@ print(p)`, derived, launchSignal]).trim();
     requireThat(Number.isFinite(launchUptimeMs) && launchUptimeMs > 0, 'host launch clock unavailable');
     const launch = sim('launch', '--terminate-running-process', uuid, BUNDLE);
     firstPid = launch.trim().match(/:\s*(\d+)$/)?.[1]; requireThat(firstPid, 'normal Simulator launcher PID missing');
-    sim('spawn', uuid, '/usr/bin/notifyutil', '-p', launchSignal);
+    writeFileSync(join(containerTmp, markerName), 'launched\n', { flag: 'wx', mode: 0o600 });
     timer = setInterval(() => {
       try {
         const listing = sim('spawn', uuid, 'launchctl', 'list');

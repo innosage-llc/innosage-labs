@@ -1,42 +1,16 @@
-import CoreFoundation
 import XCTest
-
-private final class LaunchSignal {
-    private let lock = NSLock()
-    private var ready = false
-    var received: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return ready
-    }
-    func mark() {
-        lock.lock()
-        ready = true
-        lock.unlock()
-    }
-}
 
 // Attach to the normal launch; never launch/activate, capture or request input.
 final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
         let armedAt = ProcessInfo.processInfo.systemUptime
-        let signal = try XCTUnwrap(ProcessInfo.processInfo.environment["LABS85_LAUNCH_NOTIFICATION"])
-        let name = CFNotificationName(rawValue: signal as CFString)
-        let listener = LaunchSignal()
-        let opaque = Unmanaged.passUnretained(listener).toOpaque()
-        let center = CFNotificationCenterGetDarwinNotifyCenter()
-        CFNotificationCenterAddObserver(center, opaque, { _, context, _, _, _ in
-            if let context {
-                Unmanaged<LaunchSignal>.fromOpaque(context).takeUnretainedValue().mark()
-            }
-        }, name.rawValue, nil, .deliverImmediately)
-        defer {
-            CFNotificationCenterRemoveObserver(center, opaque, name, nil)
-            withExtendedLifetime(listener) {}
-        }
-        FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED\n".utf8))
-        while !listener.received {
+        let markerName = try XCTUnwrap(ProcessInfo.processInfo.environment["LABS85_LAUNCH_ACK_NAME"])
+        let marker = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent(markerName)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+        FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED \(marker.path)\n".utf8))
+        while !FileManager.default.fileExists(atPath: marker.path) {
             guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
                 throw StabilityWindow.Invalid.readiness
             }
