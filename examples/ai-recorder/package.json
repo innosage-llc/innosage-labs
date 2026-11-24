@@ -6,7 +6,7 @@
   "scripts": {
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
-    "test:transcript": "node --experimental-transform-types --test GatewayGuest.test.mjs OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs operationRecovery.test.mjs transcriptCompletion.test.mjs voiceProfileFixtures.test.mjs VoiceProfileContract.test.mjs VoiceProfileIssueIntent.test.mjs VoiceProfileFlow.test.mjs VoiceProfileIntents.test.mjs VoiceProfileManagement.test.mjs VoiceProfileReview.test.mjs VoiceProfileBuildConfig.test.mjs",
+    "test:transcript": "node --experimental-transform-types --test GatewayGuest.test.mjs OpenAIClient.test.mjs ProClient.test.mjs ServiceConfig.test.mjs speakerTranscript.test.mjs operationRecovery.test.mjs transcriptCompletion.test.mjs voiceProfileFixtures.test.mjs VoiceProfileContract.test.mjs VoiceProfileIssueIntent.test.mjs VoiceProfileFlow.test.mjs VoiceProfileIntents.test.mjs VoiceProfileManagement.test.mjs VoiceProfileReview.test.mjs VoiceProfileBuildConfig.test.mjs VoiceProfileConfirmedSegment.test.mjs VoiceProfileConfirmedEnrollment.test.mjs",
     "test:navigation": "node --experimental-transform-types --test ui/navigation.test.mjs ui/libraryHandoff.test.mjs",
     "test:draft": "node --experimental-transform-types --test draftDocumentModel.test.mjs recorderDraftProtocol.test.mjs summaryDraftLifecycle.test.mjs summaryPublishSnapshot.test.mjs summaryPublication.test.mjs",
     "test": "npm run test:transcript && npm run test:navigation && npm run test:capture && npm run test:platform && npm run test:draft",

@@ -34,6 +34,19 @@ The account-scoped controller owns the request:
 - `onDelete` sends only the selected profile. A pending intent remains visible
   until the same exact request confirms deletion. The UI cannot infer success.
 
+## Confirmed locally recorded segment
+
+The transcript can offer only a stable 2–30 second range from its exact
+completed Stage Pro operation. Separate profile name entry and participant
+permission confirmation are required; correcting a name never enrolls anyone.
+The local Source hash must match the original accepted by the service. Android
+decodes the chosen range through that same verified read-only descriptor and
+sends only the bounded clip, not the original meeting. If the attempt is
+interrupted, a sealed, same-account pending record can restore the same range
+after launch, but requires fresh user confirmation and the same name. A late
+cancel cannot turn a verified completion into a new write. With no verifiable
+pending key, the user checks saved profiles before making another enrollment.
+
 ## Evidence boundaries
 
 Offline fixture presentation was checked at 390 px and 1280 px using dummy
