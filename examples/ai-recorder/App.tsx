@@ -142,7 +142,7 @@ function RecorderScreen() {
   const detailRecording = summaries.find(recording => recording.uri === detailUri);
   const detailFile = files.find(file => file.uri === detailUri);
   const [playingFile, setPlayingFile] = useState<string>();
-  const androidPlayRequested = useRef(false);
+  const androidPlayRequested = useRef<{ status: typeof playback; deadline: number } | undefined>(undefined);
   const [androidPlayPending, setAndroidPlayPending] = useState(false);
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
@@ -152,30 +152,31 @@ function RecorderScreen() {
     if (Platform.OS !== 'android' || !detailUri || detailUri !== playingFile) return;
     if (playbackError) {
       ++playRequest.current;
-      androidPlayRequested.current = false;
+      androidPlayRequested.current = undefined;
       setAndroidPlayPending(false);
       player.pause();
       setPlayingFile(undefined);
       setMessage('Could not play the recording.');
       return;
     }
-    if (!androidPlayPending) return;
-    if (playback.playing || playback.didJustFinish) {
-      androidPlayRequested.current = false;
+    const pending = androidPlayRequested.current;
+    if (!androidPlayPending || !pending) return;
+    if (playback.playing || (playback.didJustFinish && playback !== pending.status)) {
+      androidPlayRequested.current = undefined;
       setAndroidPlayPending(false);
       return;
     }
     // A refused native audio-focus request can return without a status event.
     const timeout = setTimeout(() => {
-      if (!androidPlayRequested.current) return;
+      if (androidPlayRequested.current !== pending) return;
       ++playRequest.current;
-      androidPlayRequested.current = false;
+      androidPlayRequested.current = undefined;
       setAndroidPlayPending(false);
       player.pause();
       setMessage('Playback did not start. Try again.');
-    }, 5000);
+    }, Math.max(0, pending.deadline - Date.now()));
     return () => clearTimeout(timeout);
-  }, [androidPlayPending, detailUri, player, playingFile, playback.playing, playback.didJustFinish, playbackError, setMessage]);
+  }, [androidPlayPending, detailUri, player, playingFile, playback, playbackError, setMessage]);
   const recorder = session.recorder;
   useEffect(() => {
     if (!capture.savedUri) return;
@@ -343,7 +344,7 @@ function RecorderScreen() {
   }
 
   function cancelAndroidPlayRequest() {
-    androidPlayRequested.current = false;
+    androidPlayRequested.current = undefined;
     setAndroidPlayPending(false);
   }
 
@@ -376,7 +377,7 @@ function RecorderScreen() {
       }
       if (Platform.OS === 'android') {
         // Native can defer Play until focus is granted. A second tap cancels that request.
-        androidPlayRequested.current = true;
+        androidPlayRequested.current = { status: playback, deadline: Date.now() + 5000 };
         setAndroidPlayPending(true);
       }
       if (playingFile === file.uri && player.duration > 0 && player.currentTime >= player.duration) {
