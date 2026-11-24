@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
 import { main, mergeArguments, reviewGate } from '../auto-merge-ci.mjs';
-import { xmlControl, confirmAndroidMonitor } from './android.mjs';
+import { captureRows, xmlControl, confirmAndroidMonitor } from './android.mjs';
 import { aggregate } from './aggregate.mjs';
 import { run, integrationRevision, sourceIdentity } from './host.mjs';
 import { criticalHTTP } from './web.mjs';
@@ -15,6 +15,14 @@ const c = { repo: REPO, pr: 101, head: 'a'.repeat(40), base: 'b'.repeat(40), tes
 const review = { candidate: c, decision: 'PASS', role: 'independent-reviewer', model: 'gpt-6.1-sol', effort: 'high', catalog_sha256: 'e'.repeat(64), report_sha256: 'f'.repeat(64) };
 const sample = { identity: 'pid/start', alive: true, foreground: true, ready: true, fatal: false };
 const green = platform => ({ status: 'PASS', platform, candidate: c, monitor_started_before_launch: true, screenshots:Array.from({length:platform==='web'?2:1},()=>({bytes:100,sha256:'3'.repeat(64)})), artifact: { sha256: '1'.repeat(64), files: [{ path: 'embedded', bytes: 1, sha256: '2'.repeat(64) }] }, target: 'synthetic owned target', runtime: 'synthetic fixture', commands: ['fixture'], observation: { readiness_ms: 300, stable_ms: 5000, identity: sample.identity, responsive: true, samples: [{ ...sample, elapsed_ms: 300 }, { ...sample, elapsed_ms: 5300 }], final: sample } });
+
+test('Recording rows retain distinct precise titles in the Android Play and Share probe', () => {
+  const labels = ['10:06:28.870\u202fAM GMT+8', '10:06:28\u202fAM GMT+8 (210 ms)', '9:03\u202fPM'];
+  const nodes = labels.map((label, i) =>
+    `<node content-desc="${label}, 7 sec" bounds="[32,${100 * i}][740,${100 * i + 80}]"/>`);
+  nodes.push('<node content-desc="Morning notes.m4a, 9:14 AM, 47 sec" bounds="[32,310][740,390]"/>');
+  assert.deepEqual(captureRows(nodes.join('')).map(({ title }) => title), labels);
+});
 
 test('Android pre-launch log handshake recovers a marker lost before the reader attaches', async () => {
   let clock = 0; let writes = 0; let text = ''; const deadlines = [];

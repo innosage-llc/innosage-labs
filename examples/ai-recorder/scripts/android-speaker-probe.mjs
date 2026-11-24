@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { homedir } from 'node:os';
 import { BUNDLE, requireThat, sha, writeJSON } from '../../../scripts/recorder-gate/core.mjs';
 import { git, outDir, runAsync } from '../../../scripts/recorder-gate/host.mjs';
-import { xmlControl } from '../../../scripts/recorder-gate/android.mjs';
+import { captureRows, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
 
 const rate = 16_000;
 const tones = { A: [440, 587, 740, 495], B: [880, 1175, 1480, 990] };
@@ -355,14 +355,6 @@ async function startRecording(adb) {
 
 function playLabels(xml) {
   return [...xml.matchAll(/content-desc="(Play [^"]+)"/g)].map(match => match[1]);
-}
-
-function captureRows(xml) {
-  // This journey creates only new recordings. Their accessible row names start with the displayed time.
-  return [...xml.matchAll(/content-desc="((\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)(?:, [^"]+)?)"/gi)]
-    .map(([, row, title]) => ({ row, title, bounds: xmlControl(xml, row) }))
-    .filter(item => item.bounds)
-    .sort((a, b) => a.bounds.y - b.bounds.y);
 }
 
 async function journey([adbPort, serial, avd, pid, apk, output], detail = false) {
