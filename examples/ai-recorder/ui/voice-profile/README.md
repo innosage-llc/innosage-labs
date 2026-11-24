@@ -1,53 +1,44 @@
 # VoiceProfile UI boundary
 
-This area may contain scoped presentation components for optional speaker
-identification. It must not own service credentials, enrollment or GitHub writes.
-The existing transcript owner controls mutation and staging capability.
+VoiceProfile stays off by default. This UI is staged on the existing Android
+Pro recording/settings paths; it does not own account credentials, service
+authorization, or GitHub issue creation. See the
+[VoiceProfile v1 contract](../../docs/voice-profile/v1.md).
 
-`VoiceProfileStatus` takes availability, pending state, and counts of matched,
-reviewable, and unknown segments. Pending takes precedence over availability.
-The review action appears when an available result has a positive review count.
-Pressing it calls the supplied `onReview` callback.
+## Saved transcript and review
 
-## Master Issue V6 render evidence
+The existing Recorder saves and displays the original first. The optional
+per-operation status remains available if naming is unavailable. A live
+suggestion requires a same-account list and a final current capability-bound
+result within one short deadline, before normal remote cleanup. Unknown or
+conflicting cases stay anonymous. A backgrounded screen drops current suggested
+names; the device never stores recognizer-returned names or profile IDs.
 
-All counts below are synthetic and listed in matched, review, unknown order.
+A user may explicitly save or edit a private local correction bound to the
+same recording operation, immutable original hash, and source segment. It
+does not modify the original, reuse consent, change enrollment, or publish
+content. The ordinary summary and revision controls work independently.
 
-| State | `available` | `pending` | Counts | Expected presentation |
-| --- | --- | --- | --- | --- |
-| Pending | `false` | `true` | 0, 0, 0 | Matching in progress |
-| Mixed review | `true` | `false` | 1, 2, 3 | Ready to review, with the review action above the counts |
-| Service unavailable | `false` | `false` | 0, 0, 0 | Matching unavailable and transcript anonymous |
-| Unknown only | `true` | `false` | 0, 0, 3 | Transcript anonymous, with the unknown count |
+## Android Stage Pro settings
 
-- Recorder Android at 390 dp — `NOT_RUN`.
-- Recorder Web — `NOT_RUN`.
+The existing Pro settings mount a new `VoiceProfileManager` for the exact
+configured staging account; opening it is the first point that lists profiles.
+The account-scoped controller owns the request:
 
-The current Recorder entry points do not mount the component. The lead can use
-these states to verify hierarchy, wrapping, clipping, and action obstruction
-when the component is mounted for acceptance.
+- `onRestore` projects only pending intent facts. The same key survives process
+  loss and is used to verify uncertain enrollment or deletion. Absence from
+  the list does not imply successful deletion or authorize another enrollment.
+- `onEnroll` receives a separate bounded read-only Android SAF WAV/M4A clip,
+  entered name, and explicit consent. A confirmed terminal receipt, not just
+  successful transport, completes enrollment.
+- `onDelete` sends only the selected profile. A pending intent remains visible
+  until the same exact request confirms deletion. The UI cannot infer success.
 
-## VoiceProfileManager handoff
+## Evidence boundaries
 
-Mount `VoiceProfileManager` as a secondary action after the original transcript.
-Keep the manager mounted while its modal opens and closes so its in-memory
-mutation keys survive. Mount a fresh instance when the active authorization
-context changes.
-
-- `onList` returns display summaries. When the manager supplies a pending
-  enrollment mutation key, return `enrollment` only if the exact request's
-  outcome is verified. A matching name or an absent row is insufficient to
-  resolve an upload. The user can explicitly resend the same clip with the
-  same key while the result is unresolved.
-- `onEnroll` takes bounded bytes with the canonical audio MIME type, the
-  confirmed display name and consent, and the mutation key. The parent owns
-  the direct-sample request and authorization. The 2–30 second limit and
-  single-speaker requirement are shown as selection guidance.
-- `onDelete` takes a profile ID and its mutation key. A pending response keeps
-  the row and the key available for an explicitly confirmed verification.
-
-Manager screen preview at 390 px — `NOT_RUN`. For lead acceptance, use synthetic
-anonymous transcript, ready profile, and pending deletion states. Check the
-original transcript stays accessible, the consent and send controls are
-reachable, long names wrap, and pending deletion stays visible through refresh
-until confirmed. Verify the original transcript after deletion.
+Offline fixture presentation was checked at 390 px and 1280 px using dummy
+names and callbacks, including unknown/review states, long bilingual labels,
+and the Cancel → confirm → pending → verified delete flow. This is not native
+storage, paid account, or staging acceptance. The Android/iOS Simulator/Web
+startup gate runs separately on the exact PR candidate. Do not use these checks
+as evidence for real-device capture, bilingual acoustic accuracy, or deployment.
