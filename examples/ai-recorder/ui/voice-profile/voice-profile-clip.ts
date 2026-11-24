@@ -1,11 +1,14 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { getDocumentAsync, type DocumentPickerAsset } from 'expo-document-picker';
-import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import { File, FileMode } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 const MAX_CLIP_BYTES = 10 * 1024 * 1024;
+const READ_CHUNK_BYTES = 64 * 1024;
 const FORMAT_MESSAGE = 'Choose a WAV or M4A audio clip.';
+const UNAVAILABLE_MESSAGE = 'The audio clip is unavailable.';
+const READ_MESSAGE = 'The audio clip could not be read.';
 
 export type VoiceProfileAudio = Readonly<{
   bytes: Uint8Array;
@@ -47,14 +50,30 @@ function matchesContainer(bytes: Uint8Array, mimeType: VoiceProfileAudio['mimeTy
     : tag(4) === 'ftyp');
 }
 
-async function readCacheCopy(file: File) {
-  const size = checkSize(file.size);
+async function readDocument(file: File, size: number) {
+  let statSize: number | null | undefined;
+  try {
+    statSize = file.size;
+  } catch {
+    // Some document providers support reading without exposing a stat size.
+  }
+  if (statSize != null && checkSize(statSize) !== size) {
+    throw new VoiceClipError(READ_MESSAGE);
+  }
+
+  const bytes = new Uint8Array(size);
   const handle = file.open(FileMode.ReadOnly);
   try {
-    const bytes = await handle.readBytes(size);
-    if (bytes.length !== size || file.size !== size) {
-      throw new VoiceClipError('The audio clip could not be read.');
+    let offset = 0;
+    while (offset < size) {
+      const limit = Math.min(READ_CHUNK_BYTES, size - offset);
+      const chunk = await handle.readBytes(limit);
+      if (!chunk.length || chunk.length > limit) throw new VoiceClipError(READ_MESSAGE);
+      bytes.set(chunk, offset);
+      offset += chunk.length;
     }
+    // Probe for EOF without reading more than the picker size plus one byte.
+    if ((await handle.readBytes(1)).length !== 0) throw new VoiceClipError(READ_MESSAGE);
     return bytes;
   } finally {
     handle.close();
@@ -62,43 +81,21 @@ async function readCacheCopy(file: File) {
 }
 
 export async function pickVoiceClip(): Promise<PickedVoiceClip | undefined> {
-  const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, base64: false });
-  if (selection.canceled) return;
-  const asset = selection.assets[0];
-  if (!asset) throw new VoiceClipError('The audio clip is unavailable.');
-
-  const web = Platform.OS === 'web';
-  let ownedCopy: File | undefined;
-  if (!web) {
-    // The picker creates a fresh copy in its own cache directory on native.
-    // Only take ownership of a direct child of that directory.
-    const copy = new File(asset.uri);
-    const pickerCache = new Directory(Paths.cache, 'DocumentPicker');
-    if (copy.parentDirectory.uri.replace(/\/$/, '') !== pickerCache.uri.replace(/\/$/, '')) {
-      throw new VoiceClipError('The audio clip could not be copied to the cache.');
-    }
-    ownedCopy = copy;
-  }
+  if (Platform.OS !== 'android') throw new VoiceClipError(UNAVAILABLE_MESSAGE);
 
   try {
+    const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: false, base64: false });
+    if (selection.canceled) return;
+    const asset = selection.assets[0];
+    if (!asset?.uri.startsWith('content://')) throw new VoiceClipError(UNAVAILABLE_MESSAGE);
+
     const mimeType = clipMime(asset);
-    if (asset.size !== undefined) checkSize(asset.size);
-
-    let bytes: Uint8Array;
-    if (ownedCopy) {
-      bytes = await readCacheCopy(ownedCopy);
-    } else {
-      const browserFile = asset.file;
-      if (!browserFile) throw new VoiceClipError('The audio clip is unavailable.');
-      const size = checkSize(browserFile.size);
-      bytes = new Uint8Array(await browserFile.slice(0, size).arrayBuffer());
-      if (bytes.length !== size) throw new VoiceClipError('The audio clip could not be read.');
-    }
-
+    const size = checkSize(asset.size);
+    const bytes = await readDocument(new File(asset.uri), size);
     if (!matchesContainer(bytes, mimeType)) throw new VoiceClipError(FORMAT_MESSAGE);
     return { bytes, mimeType, filename: asset.name, digest: bytesToHex(sha256(bytes)) };
-  } finally {
-    if (ownedCopy?.exists) ownedCopy.delete();
-    if (web && asset.uri.startsWith('blob:')) URL.revokeObjectURL(asset.uri);
+  } catch (error) {
+    if (error instanceof VoiceClipError) throw error;
+    throw new VoiceClipError('Could not open the audio clip.');
   }
 }
