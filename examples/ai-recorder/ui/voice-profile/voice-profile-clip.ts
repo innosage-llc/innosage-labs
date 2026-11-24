@@ -71,9 +71,13 @@ async function readDocument(file: File, size: number) {
       if (!chunk.length || chunk.length > limit) throw new VoiceClipError(READ_MESSAGE);
       bytes.set(chunk, offset);
       offset += chunk.length;
+      // A provider can return a padded buffer when the underlying read is short.
+      if (handle.offset !== offset) throw new VoiceClipError(READ_MESSAGE);
     }
     // Probe for EOF without reading more than the picker size plus one byte.
-    if ((await handle.readBytes(1)).length !== 0) throw new VoiceClipError(READ_MESSAGE);
+    if ((await handle.readBytes(1)).length !== 0 || handle.size !== size) {
+      throw new VoiceClipError(READ_MESSAGE);
+    }
     return bytes;
   } finally {
     handle.close();
