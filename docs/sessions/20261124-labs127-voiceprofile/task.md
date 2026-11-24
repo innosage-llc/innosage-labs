@@ -6,3 +6,4 @@
 - M2 must qualify pinned CAM++/sherpa on isolated staging and exercise configured recovery; M3/M4 provide the actual app and acceptance evidence.
 - Preserve accepted Qwen source row order and timestamp points; never synthesize durations or named matches for point ranges.
 - M3 offline client foundation only. Exact opt-in reservation acknowledgement and candidate replay binding, post-save optional identity reads, current account verification, pending/result validator and fallback. All 46 transcript tests plus typecheck passed. No calling UI, backend enablement, deployment or staging claim.
+- Added typed Pro Worker enrollment/list/edit/replace/delete transport to the offline branch. It forwards only a consented bounded clip with scoped source metadata, rechecks actual Pro identity, binds retry keys and distinguishes pending from verified deletion. 47 transcript tests and typecheck; still uncalled by the existing app.

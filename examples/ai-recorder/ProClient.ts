@@ -8,6 +8,24 @@ export type ProOperation = {
   accountScope: string;
   sourceBytes: number;
 };
+export type VoiceProfileSample = (
+  | { source: "direct" }
+  | { source: "confirmed_segment"; recordingRef: string; segmentId: string; startMs: number; endMs: number }
+);
+export type VoiceProfileEnrollment = {
+  mutationKey: string;
+  accountScope: string;
+  source: VoiceProfileSample;
+  participantConfirmed: boolean;
+  audio: Blob;
+};
+export type VoiceProfileSummary = {
+  profileId: string;
+  displayName: string;
+  revision: number;
+  status: "active" | "disabled";
+};
+
 export type SpeakerResult = {
   requested: boolean;
   status: string;
@@ -53,6 +71,54 @@ export class ProServiceError extends Error {
 }
 export const PRO_SOURCE_LIMIT = 512 * 1024 * 1024;
 const VOICE_CONTRACT = "recorder-voice-profile/v1";
+const VOICE_CLIP_LIMIT = 10 * 1024 * 1024;
+const VOICE_PROFILES_PATH = "/api/voice-profiles/v1";
+const voiceIdentifier = /^[A-Za-z0-9_-]{1,128}$/;
+
+function validVoiceName(name: string) {
+  const normalized = name.trim();
+  const length = [...normalized].length;
+  if (length < 1 || length > 100)
+    throw new ProServiceError("Enter a display name up to 100 characters.", "voice_options_invalid");
+  return normalized;
+}
+
+function profileSummary(raw: any): VoiceProfileSummary {
+  if (!raw || typeof raw !== "object" || Object.keys(raw).length !== 4 ||
+      typeof raw.profileId !== "string" || !voiceIdentifier.test(raw.profileId) ||
+      typeof raw.displayName !== "string" || [...raw.displayName].length < 1 ||
+      [...raw.displayName].length > 100 || !Number.isSafeInteger(raw.revision) ||
+      raw.revision < 0 || (raw.status !== "active" && raw.status !== "disabled"))
+    throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+  return { profileId: raw.profileId, displayName: raw.displayName,
+    revision: raw.revision, status: raw.status };
+}
+
+function enrollmentBody(input: VoiceProfileEnrollment, metadata: Record<string, unknown>) {
+  if (input.participantConfirmed !== true || input.audio.size <= 0 || input.audio.size > VOICE_CLIP_LIMIT)
+    throw new ProServiceError("Confirm permission and choose a supported, short audio clip.", "voice_options_invalid");
+  if (!["audio/mp4", "audio/wav", "audio/x-wav"].includes(input.audio.type))
+    throw new ProServiceError("Use an M4A or WAV clip.", "voice_options_invalid");
+  const sample = input.source;
+  if (sample.source !== "direct" && (
+    sample.source !== "confirmed_segment" ||
+    !voiceIdentifier.test(sample.recordingRef) || !voiceIdentifier.test(sample.segmentId) ||
+    !Number.isSafeInteger(sample.startMs) || !Number.isSafeInteger(sample.endMs) ||
+    sample.startMs < 0 || sample.endMs - sample.startMs < 2000 ||
+    sample.endMs - sample.startMs > 30_000
+  )) throw new ProServiceError("Choose a confirmed 2 to 30 second speaker segment.", "voice_options_invalid");
+  const publicSample = sample.source === "direct"
+    ? { source: "direct" }
+    : { source: "confirmed_segment", recordingRef: sample.recordingRef,
+        segmentId: sample.segmentId, startMs: sample.startMs, endMs: sample.endMs };
+  const form = new FormData();
+  form.append("metadata", JSON.stringify({ ...metadata, sample: publicSample, consent: {
+    scope: "voice_profile_enrollment", participantConfirmed: true,
+  } }));
+  form.append("audio", input.audio, input.audio.type === "audio/mp4" ? "sample.m4a" : "sample.wav");
+  return form;
+}
+
 
 function voiceOptions(operation: ProOperation) {
   if (operation.voiceIdentification === undefined) return;
@@ -159,6 +225,113 @@ export class ProClient {
       this.profileKey,
       JSON.stringify({ key: normalized, accountScope }),
     );
+  }
+
+  private async voiceProfileRequest(
+    accountScope: string,
+    path: string,
+    init: RequestInit = {},
+    key?: string,
+  ) {
+    if (key !== undefined && !voiceIdentifier.test(key))
+      throw new ProServiceError("Invalid voice profile operation.", "voice_options_invalid");
+    const profile = await this.profile();
+    if (!profile || profile.accountScope !== accountScope ||
+        await this.identity(profile.key, init.signal ?? undefined) !== accountScope)
+      throw new ProServiceError("Restore the Pro key for the original account and environment.", "authorization");
+    return this.request(this.workerURL + VOICE_PROFILES_PATH + path, {
+      ...init,
+      headers: {
+        ...init.headers,
+        Authorization: `Bearer ${profile.key}`,
+        ...(key === undefined ? {} : { "Idempotency-Key": key }),
+      },
+    });
+  }
+
+  async listVoiceProfiles(accountScope: string, signal?: AbortSignal): Promise<VoiceProfileSummary[]> {
+    const response = await this.voiceProfileRequest(accountScope, "", { signal });
+    const data = await response.json();
+    if (data?.contract !== VOICE_CONTRACT || !Array.isArray(data.profiles) || data.profiles.length > 64)
+      throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+    return data.profiles.map(profileSummary);
+  }
+
+  async enrollVoiceProfile(
+    input: VoiceProfileEnrollment,
+    displayName: string,
+    signal?: AbortSignal,
+  ): Promise<VoiceProfileSummary> {
+    const body = enrollmentBody(input, { displayName: validVoiceName(displayName) });
+    const response = await this.voiceProfileRequest(input.accountScope, "", {
+      method: "POST", body, signal,
+    }, input.mutationKey);
+    const data = await response.json();
+    if (data?.contract !== VOICE_CONTRACT)
+      throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+    return profileSummary(data.profile);
+  }
+
+  async updateVoiceProfileSample(
+    profileId: string,
+    input: VoiceProfileEnrollment,
+    expectedRevision: number,
+    mode: "add" | "replace",
+    signal?: AbortSignal,
+  ): Promise<VoiceProfileSummary> {
+    if (!voiceIdentifier.test(profileId) || !Number.isSafeInteger(expectedRevision) ||
+        expectedRevision < 0 || (mode !== "add" && mode !== "replace"))
+      throw new ProServiceError("Invalid voice profile update.", "voice_options_invalid");
+    const response = await this.voiceProfileRequest(input.accountScope, `/${profileId}/samples`, {
+      method: "POST", body: enrollmentBody(input, { expectedRevision, mode }), signal,
+    }, input.mutationKey);
+    const data = await response.json();
+    if (data?.contract !== VOICE_CONTRACT || data.profile?.profileId !== profileId)
+      throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+    return profileSummary(data.profile);
+  }
+
+  async editVoiceProfile(
+    accountScope: string,
+    profileId: string,
+    mutationKey: string,
+    expectedRevision: number,
+    edit: { displayName?: string; status?: "active" | "disabled" },
+    signal?: AbortSignal,
+  ): Promise<VoiceProfileSummary> {
+    if (!voiceIdentifier.test(profileId) || !Number.isSafeInteger(expectedRevision) ||
+        expectedRevision < 0 || (edit.status === undefined && edit.displayName === undefined) ||
+        (edit.status !== undefined && edit.status !== "active" && edit.status !== "disabled"))
+      throw new ProServiceError("Invalid voice profile update.", "voice_options_invalid");
+    const response = await this.voiceProfileRequest(accountScope, `/${profileId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        expectedRevision,
+        ...(edit.status === undefined ? {} : { status: edit.status }),
+        ...(edit.displayName === undefined ? {} : { displayName: validVoiceName(edit.displayName) }),
+      }),
+      signal,
+    }, mutationKey);
+    const data = await response.json();
+    if (data?.contract !== VOICE_CONTRACT || data.profile?.profileId !== profileId)
+      throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+    return profileSummary(data.profile);
+  }
+
+  async deleteVoiceProfile(
+    accountScope: string,
+    profileId: string,
+    mutationKey: string,
+    signal?: AbortSignal,
+  ): Promise<"pending" | "deleted"> {
+    if (!voiceIdentifier.test(profileId))
+      throw new ProServiceError("Invalid voice profile.", "voice_options_invalid");
+    const response = await this.voiceProfileRequest(accountScope, `/${profileId}`, {
+      method: "DELETE", signal,
+    }, mutationKey);
+    if (response.status === 204) return "deleted";
+    if (response.status === 202) return "pending";
+    throw new ProServiceError("Voice profile deletion could not be verified.", "voice_unavailable");
   }
 
   async remove() {

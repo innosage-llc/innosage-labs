@@ -19,6 +19,22 @@ function fixture() {
       assert.equal(init.headers.Authorization, 'Bearer synthetic-pro-key');
       if (!state.authorized) return Response.json({ error: 'unauthorized' }, { status: 401 });
       if (url.endsWith('/identity')) return Response.json({ success: true, accountScope: state.scope });
+      if (url.includes('/api/voice-profiles/v1')) {
+        if (init.method === 'POST') {
+          state.enrollment = { key: init.headers['Idempotency-Key'],
+            metadata: JSON.parse(init.body.get('metadata')), bytes: init.body.get('audio').size };
+          return Response.json({ contract: 'recorder-voice-profile/v1', profile: state.voiceProfile }, { status: 201 });
+        }
+        if (init.method === 'PATCH') {
+          state.edit = { key: init.headers['Idempotency-Key'], body: JSON.parse(init.body) };
+          return Response.json({ contract: 'recorder-voice-profile/v1', profile: state.voiceProfile });
+        }
+        if (init.method === 'DELETE') {
+          (state.deleteKeys ??= []).push(init.headers['Idempotency-Key']);
+          return new Response(null, { status: state.deleteKeys.length === 1 ? 202 : 204 });
+        }
+        return Response.json({ contract: 'recorder-voice-profile/v1', profiles: [state.voiceProfile] });
+      }
       state.reservations++;
       const reserve = JSON.parse(init.body);
       state.mode = reserve.diarization.enabled;
@@ -206,4 +222,42 @@ test('selected identity profiles are never silently replaced by a plain upload',
   await assert.rejects(f.client.read({ ...optIn, voiceIdentification: { candidateProfileIds: ['vp_a','vp_a'] } }, 'synthetic.m4a'),
     { code: 'voice_options_invalid' });
   assert.equal(f.calls.length, before);
+});
+
+test('profile changes stay inside the original Pro worker, bind consent, and distinguish pending delete', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  const scope = f.operation.accountScope;
+  f.state.voiceProfile = { profileId: 'vp_fake', displayName: 'Example', revision: 1, status: 'active' };
+  const clip = new Blob(['example WAV bytes'], { type: 'audio/wav' });
+  const source = { source: 'confirmed_segment', recordingRef:'rec_a', segmentId:'seg_1', startMs:500, endMs:3500 };
+  const request = { mutationKey: 'example-enrollment', audio: clip, source, accountScope: scope };
+  const before = f.calls.length;
+  await assert.rejects(f.client.enrollVoiceProfile({ ...request, participantConfirmed:false }, 'Example'),
+    { code:'voice_options_invalid' });
+  assert.equal(f.calls.length, before);
+  assert.deepEqual(await f.client.enrollVoiceProfile({ ...request, participantConfirmed:true }, 'Example'), f.state.voiceProfile);
+  assert.deepEqual(f.state.enrollment, { key:request.mutationKey, bytes:clip.size, metadata:{
+    displayName: 'Example', sample:source, consent:{scope:'voice_profile_enrollment',participantConfirmed:true},
+  } });
+  assert.deepEqual(await f.client.listVoiceProfiles(scope), [f.state.voiceProfile]);
+  await f.client.updateVoiceProfileSample('vp_fake', {
+    ...request, mutationKey:'example-replace', participantConfirmed:true,
+    source:{ source:'direct', filePath:'/private/not-forwarded' },
+  }, 1, 'replace');
+  assert.deepEqual(f.state.enrollment.metadata, {
+    expectedRevision:1, mode:'replace', sample:{source:'direct'},
+    consent:{scope:'voice_profile_enrollment', participantConfirmed:true},
+  });
+  await f.client.editVoiceProfile(scope, 'vp_fake', 'example-name', 2, { displayName:'  Example 2  ', status:'disabled' });
+  assert.deepEqual(f.state.edit, {key:'example-name', body:{expectedRevision:2,status:'disabled',displayName:'Example 2'}});
+
+  assert.equal(await f.client.deleteVoiceProfile(scope, 'vp_fake', 'example-delete'), 'pending');
+  assert.equal(await f.client.deleteVoiceProfile(scope, 'vp_fake', 'example-delete'), 'deleted');
+  assert.deepEqual(f.state.deleteKeys, ['example-delete','example-delete']);
+  const count = f.calls.filter(c => c.url.includes('/voice-profiles/')).length;
+  f.state.scope = 'f'.repeat(64);
+  await assert.rejects(f.client.listVoiceProfiles(scope), { code:'authorization' });
+  assert.equal(f.calls.filter(c => c.url.includes('/voice-profiles/')).length, count);
+  assert.ok(f.calls.every(c => c.url.startsWith('https://worker.test')));
 });
