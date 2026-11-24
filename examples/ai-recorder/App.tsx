@@ -26,6 +26,8 @@ import { services } from './ServiceConfig';
 import { Directory, File, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
 import { randomUUID } from 'expo-crypto';
+import { Host, Icon, ListItem, Text as NativeText } from '@expo/ui';
+import ChevronIcon from '@expo/material-symbols/chevron_right.xml';
 import { getCaptureSession } from './captureOwner';
 
 // Web launch/navigation is supported; native filesystem capture/import is not.
@@ -82,7 +84,7 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
 }
 
 function RecorderScreen() {
-  const { palette, spacing, typography } = useTheme();
+  const { mode, palette, spacing, typography } = useTheme();
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
@@ -447,6 +449,7 @@ function RecorderScreen() {
       /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
       {transcriptRoute ? <Transcript recording={transcriptRoute.file} recordingTitle={recordingLabel(transcriptRoute.file)}
+        recordingSummary={summaries.find(item => item.uri === transcriptRoute.file.uri)}
         initialDocument={transcriptRoute.destination}
         backLabel="Back to recording details" onClose={() => setTranscriptRoute(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={[styles.recordingBanner, { backgroundColor: palette.surface }]}>
@@ -465,9 +468,21 @@ function RecorderScreen() {
         message={message}
         durationMillis={durationMillis}
         savedUri={handoff.savedUri}
+        savedRecording={summaries.find(item => item.uri === handoff.savedUri)}
         onPressRecord={phase === 'recording' ? stop : start}
         onViewInLibrary={viewSavedRecording}
-      /> : destination === 'settings' ? <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+      /> : destination === 'settings' ? Platform.OS === 'android' ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.sm, paddingTop: spacing.md }}>
+          <Host matchContents={{ vertical: true }} colorScheme={mode}>
+            <ListItem onPress={phase === 'idle' ? () => setShowPro(true) : undefined}
+              colors={{ containerColor: palette.background, contentColor: palette.text, supportingContentColor: palette.muted }}
+              supportingText={serviceLabel}
+              trailing={<Icon name={ChevronIcon} size={24} color={palette.muted} />}>
+              <NativeText textStyle={{ fontWeight: '600' }}>Transcription service</NativeText>
+            </ListItem>
+          </Host>
+        </ScrollView>
+      ) : <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
         <View style={[styles.valueCard, { backgroundColor: palette.surface }]}>
