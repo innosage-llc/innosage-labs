@@ -34,6 +34,7 @@ function fixture() {
   let authorizedSubmissions = 0;
   let refusal;
   let expectedName = 'Example';
+  let profileDuringRead;
   let nativeCalls = 0;
   const keys = [];
   const store = { getItemAsync:async () => storage ?? null, setItemAsync:async (_,value) => { storage = value; } };
@@ -51,7 +52,7 @@ function fixture() {
     clientFor: (actualScope, clipper) => {
       assert.deepEqual(actualScope,scope);
       const clientStore = {
-        getItemAsync: async () => JSON.stringify({key:'synthetic-only', accountScope:scope.accountScope}),
+        getItemAsync: async () => JSON.stringify({key:'synthetic-only', accountScope:await profileDuringRead?.() ?? scope.accountScope}),
       };
       return new ProClient(scope.workerURL, 'https://router.test', async (url, init) => {
         assert.equal(init.headers.Authorization,'Bearer synthetic-only');
@@ -72,7 +73,7 @@ function fixture() {
       }, clientStore, async () => { throw new Error('Must not upload original'); }, clipper);
     },
   };
-  return { options, journalFor, keys, setExpectedName: value => { expectedName = value; }, refuse: payload => { refusal = payload; }, persisted:()=>storage, nativeCalls:()=>nativeCalls };
+  return { options, journalFor, keys, duringProfile: callback => { profileDuringRead = callback; }, setExpectedName: value => { expectedName = value; }, refuse: payload => { refusal = payload; }, persisted:()=>storage, nativeCalls:()=>nativeCalls };
 }
 
 test('retry keeps the same exact journal entry; direct-equal bytes and different provenance cannot retry it', async () => {
@@ -194,4 +195,27 @@ test('a concrete client terminal result with altered label or a wrapping clipper
     await assert.rejects(enrollConfirmedVoiceProfile(f.options), /exact confirmed enrollment receipt/);
     assert.ok((await f.journalFor(scope).restore()).enrollment);
   }
+});
+
+test('mutable caller account and source during stored profile lookup cannot authorize another account', async () => {
+  const f = fixture(), factory = f.options.clientFor;
+  const replacement = 'c'.repeat(64);
+  f.options.clientFor = (scope, clipper) => {
+    const client = factory(scope,clipper);
+    const real = client.enrollVoiceProfile.bind(client);
+    client.enrollVoiceProfile = (input,name,signal) => {
+      const mutable = {...input,source:{...input.source}};
+      f.duringProfile(async () => {
+        await Promise.resolve();
+        Object.assign(mutable,{accountScope:replacement,mutationKey:'replacement',participantConfirmed:false});
+        mutable.source.segmentId = 'replacement';
+        return replacement;
+      });
+      return real(mutable,name,signal);
+    };
+    return client;
+  };
+  await assert.rejects(enrollConfirmedVoiceProfile(f.options), {code:'authorization'});
+  assert.deepEqual(f.keys,[]);
+  assert.equal((await f.journalFor(scope).restore()).enrollment.mutationKey,'fixture-key-1');
 });

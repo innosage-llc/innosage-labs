@@ -364,18 +364,30 @@ export class ProClient {
     displayName: string,
     signal?: AbortSignal,
   ): Promise<VoiceProfileSummary> {
-    if (input.workerURL !== this.workerURL)
-      throw new ProServiceError("This operation belongs to another environment.", "authorization");
     const name = validVoiceName(displayName);
     const clipper = this.clipVoiceSample;
-    const multipart = await enrollmentBody(input, { displayName: name }, clipper, signal);
-    const boundReceipt = input.source.source === "confirmed_segment"
-      ? confirmedEnrollmentBinding(input, input.mutationKey, input.source, name) : undefined;
+    const scope = { workerURL: input.workerURL, accountScope: input.accountScope,
+      mutationKey: input.mutationKey, participantConfirmed: input.participantConfirmed };
+    const suppliedSource = input.source;
+    const suppliedAudio = input.audio;
+    if (suppliedSource.source === "confirmed_segment" && suppliedAudio !== undefined)
+      throw new ProServiceError("A confirmed segment must be clipped from its original recording first.", "voice_options_invalid");
+    const attempt: VoiceProfileEnrollment = suppliedSource.source === "confirmed_segment"
+      ? Object.freeze({ ...scope, source: Object.freeze({
+          source: "confirmed_segment" as const, recordingRef: suppliedSource.recordingRef,
+          segmentId: suppliedSource.segmentId, startMs: suppliedSource.startMs, endMs: suppliedSource.endMs,
+        }) })
+      : Object.freeze({ ...scope, source: Object.freeze({ source: "direct" as const }), audio: suppliedAudio! });
+    if (attempt.workerURL !== this.workerURL)
+      throw new ProServiceError("This operation belongs to another environment.", "authorization");
+    const boundReceipt = attempt.source.source === "confirmed_segment"
+      ? confirmedEnrollmentBinding(attempt, attempt.mutationKey, attempt.source, name) : undefined;
+    const multipart = await enrollmentBody(attempt, { displayName: name }, clipper, signal);
     let response: Response;
     try {
-      response = await this.voiceProfileRequest(input, "", {
+      response = await this.voiceProfileRequest(attempt, "", {
         method: "POST", ...multipart, signal,
-      }, input.mutationKey, true);
+      }, attempt.mutationKey, true);
     } catch (error) {
       if (boundReceipt && clipper && error instanceof ProServiceError && exactVoiceSampleRefusals.delete(error))
         confirmedEnrollmentReceipts.set(error, { client: this, binding: boundReceipt, clipper, kind: "refused" });
