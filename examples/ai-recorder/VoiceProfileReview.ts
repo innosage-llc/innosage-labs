@@ -118,3 +118,26 @@ export async function saveManualVoiceCorrection(
     return entries;
   });
 }
+
+/** Edits only an annotation the owner explicitly saved for the same immutable original. */
+export async function editSavedVoiceCorrection(
+  store: AnnotationStore, key: string, binding: { operationId: string; originalSha256: string },
+  choice: { source: VoiceSource; label: string; confirmedLocalOnly: true },
+) {
+  if (choice.confirmedLocalOnly !== true || !exactSource(choice.source))
+    throw new Error('Confirm the local-only correction first.');
+  const label = name(choice.label);
+  const source = { ...choice.source };
+  return serializeCorrection(key, async () => {
+    const prior = await readManualVoiceCorrections(store, key, binding);
+    const position = prior.findIndex(item => ['speakerId', 'segmentId', 'startMs', 'endMs'].every(
+      field => item.source[field as keyof VoiceSource] === source[field as keyof VoiceSource]));
+    if (position === -1) throw new Error('This saved correction is no longer available.');
+    const entries = prior.map((item, index) => index === position ? { source: item.source, label } : item);
+    const content = JSON.stringify({ contract:'recorder-local-voice-corrections/v1',
+      binding:binding.operationId + ':' + binding.originalSha256, entries });
+    if (content.length > 4096) throw new Error('The local speaker annotation is too large.');
+    await store.setItemAsync(key, content);
+    return entries;
+  });
+}
