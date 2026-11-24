@@ -94,7 +94,7 @@ export function ConfirmedVoiceClip({ operation, sources, onSubmit }: Props) {
     let saved = false;
     try {
       await onSubmit({ kind: form.kind, source: form.source, displayName: name, participantConfirmed: true }, controller.signal);
-      saved = !controller.signal.aborted;
+      saved = true;
     } catch {
       // Check the local journal after the attempt settles so an interrupted send can only resume its saved slice.
     } finally {
@@ -114,20 +114,35 @@ export function ConfirmedVoiceClip({ operation, sources, onSubmit }: Props) {
   const sourceStyle: TextStyle = { ...typography.caption, color: palette.muted, fontVariant: ['tabular-nums'] };
   if (!sending && !outcome && !pendingClip && !sources.length && pending !== 'unavailable') return null;
 
+  let outcomeMessage: string | undefined;
+  if (outcome === 'saved') {
+    outcomeMessage = 'Voice profile created from the confirmed clip.';
+  } else if (outcome === 'unverified') {
+    if (pending === undefined) {
+      outcomeMessage = 'Could not verify the save. Checking for a pending clip…';
+    } else if (pending === 'unavailable') {
+      outcomeMessage = 'Could not verify the save or check for a pending clip.';
+    } else if (pending === null) {
+      outcomeMessage = 'Could not verify the save. Check your saved voice profiles first.';
+    } else {
+      outcomeMessage = 'Could not verify the save. Resume the pending clip with the same profile name.';
+    }
+  }
+
   return (
     <View style={{ gap: spacing.xs }}>
-      {outcome ? <Text selectable accessibilityLiveRegion="polite" style={body}>
-        {outcome === 'saved' ? 'Voice profile created from the confirmed clip.' : 'Could not confirm that the clip was saved. To retry, select the same clip, enter the same name and confirm permission again.'}
+      {outcomeMessage ? <Text selectable accessibilityLiveRegion="polite" style={body}>
+        {outcomeMessage}
       </Text> : null}
       {!form && !sending && pending === 'unavailable' ? <>
-        <Text accessibilityLiveRegion="polite" style={body}>Could not check for a pending clip.</Text>
+        {outcome !== 'unverified' ? <Text accessibilityLiveRegion="polite" style={body}>Could not check for a pending clip.</Text> : null}
         <ActionButton title="Check pending clip" onPress={refreshPending} />
       </> : null}
       {!form && !sending && pendingClip ? <>
         <Text selectable style={sourceStyle}>{`Pending clip · ${sourceRange(pendingClip)}`}</Text>
         <ActionButton title="Resume pending clip" onPress={() => chooseClip('resume', pendingClip)} />
       </> : null}
-      {!form && !sending && pending === null && sources.length > 0 ? (
+      {!form && !sending && outcome !== 'unverified' && pending === null && sources.length > 0 ? (
         choosing ? <>
           <Text style={body}>Choose one reviewed segment from the original recording.</Text>
           {sources.map(source => <ActionButton key={source.segmentId} variant="outlined"
