@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { hashRecording } from '../../ProAccess';
 import {
-  readManualVoiceCorrections, saveManualVoiceCorrection, type VoiceReviewRow, type VoiceSource,
+  editSavedVoiceCorrection, readManualVoiceCorrections, saveManualVoiceCorrection,
+  type VoiceReviewRow, type VoiceSource,
 } from '../../VoiceProfileReview';
 import { ActionButton } from '../ActionButton';
 import { useTheme } from '../theme';
 
 type Binding = Parameters<typeof readManualVoiceCorrections>[2];
 type Corrections = Awaited<ReturnType<typeof readManualVoiceCorrections>>;
+type CorrectionChoice = { kind: 'new' | 'edit'; source: VoiceSource; label: string };
 
 async function originalBinding(originalUri: string, operationId: string, signal: AbortSignal): Promise<Binding> {
   signal.throwIfAborted();
@@ -33,16 +35,23 @@ function sourceTime(milliseconds: number) {
   return `${minute}:${second}.${fraction}`;
 }
 
-export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, rows, namesUnavailable }: {
+type VoiceSpeakerReviewProps = {
   originalUri: string;
   operationId: string;
   correctionKey: string;
   rows?: readonly VoiceReviewRow[];
   namesUnavailable?: boolean;
-}) {
+};
+
+export function VoiceSpeakerReview(props: VoiceSpeakerReviewProps) {
+  const { originalUri, operationId, correctionKey } = props;
+  return <RecordingSpeakerReview key={JSON.stringify([originalUri, operationId, correctionKey])} {...props} />;
+}
+
+function RecordingSpeakerReview({ originalUri, operationId, correctionKey, rows, namesUnavailable }: VoiceSpeakerReviewProps) {
   const { palette, spacing, typography } = useTheme();
   const [saved, setSaved] = useState<{ binding: Binding; entries: Corrections } | null>();
-  const [choice, setChoice] = useState<{ segmentId: string; label: string }>();
+  const [choice, setChoice] = useState<CorrectionChoice>();
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const saveInProgress = useRef(false);
@@ -65,10 +74,12 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
     };
   }, [originalUri, operationId, correctionKey]);
 
-  async function saveCorrection(row: VoiceReviewRow) {
+  async function saveCorrection() {
     const signal = sourceController.current?.signal;
-    if (!signal || signal.aborted || !saved || !rows || !choice?.label.trim() ||
-        choice.segmentId !== row.segmentId || saveInProgress.current) return;
+    if (!signal || signal.aborted || !saved || !choice?.label.trim() || saveInProgress.current) return;
+    const { kind, source, label } = choice;
+    const verifiedRows = rows ?? [];
+    if (kind === 'new' && !verifiedRows.some(row => sameSource(row, source))) return;
     saveInProgress.current = true;
     setSaving(true);
     setSaveFailed(false);
@@ -77,9 +88,13 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
       signal.throwIfAborted();
       if (binding.operationId !== saved.binding.operationId || binding.originalSha256 !== saved.binding.originalSha256)
         throw new Error('Original transcript changed.');
-      const entries = await saveManualVoiceCorrection(SecureStore, correctionKey, binding, rows, {
-        speakerId: row.speakerId, label: choice.label, confirmedLocalOnly: true,
-      });
+      const entries = kind === 'edit'
+        ? await editSavedVoiceCorrection(SecureStore, correctionKey, binding, {
+          source, label, confirmedLocalOnly: true,
+        })
+        : await saveManualVoiceCorrection(SecureStore, correctionKey, binding, verifiedRows, {
+          speakerId: source.speakerId, label, confirmedLocalOnly: true,
+        });
       if (signal.aborted) return;
       setSaved({ binding, entries });
       setChoice(undefined);
@@ -94,10 +109,10 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
   const entries = saved?.entries ?? [];
   const items = [
     ...(rows ?? []).map(row => ({
-      source: row, live: row, correction: entries.find(entry => sameSource(entry.source, row))?.label,
+      source: row, live: row, correction: entries.find(entry => sameSource(entry.source, row)),
     })),
     ...entries.filter(entry => !rows?.some(row => sameSource(entry.source, row)))
-      .map(entry => ({ source: entry.source, live: undefined, correction: entry.label })),
+      .map(entry => ({ source: entry.source, live: undefined, correction: entry })),
   ];
   if (!items.length && !namesUnavailable && saved !== null) return null;
 
@@ -112,7 +127,7 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
       </Text> : null}
       {items.map(({ source, live, correction }) => {
         const speaker = `Speaker ${source.speakerId.slice(-1)}`;
-        const selected = !!live && choice?.segmentId === source.segmentId;
+        const selected = choice && sameSource(choice.source, source) && (choice.kind === 'edit' ? !!correction : !!live);
         return (
           <View key={`${source.speakerId}:${source.segmentId}:${source.startMs}:${source.endMs}`}
             style={{ borderTopWidth: 1, borderColor: palette.border, paddingTop: spacing.sm, gap: spacing.xs }}>
@@ -124,13 +139,17 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
               {live.liveName ? `Unconfirmed suggestion: ${live.liveName}` : live.disposition === 'needs_review' ? 'Needs review' : 'Unknown match'}
             </Text> : null}
             {correction ? <Text accessibilityLiveRegion="polite" style={{ ...typography.body, color: palette.text }}>
-              {`Saved local correction: ${correction}`}
+              {`Saved local correction: ${correction.label}`}
             </Text> : null}
-            {live && saved && !selected ? <ActionButton title={`Correct ${speaker} locally`} disabled={saving} onPress={() => {
-              setSaveFailed(false);
-              setChoice({ segmentId: source.segmentId, label: '' });
-            }} /> : null}
-            {live && selected ? <View style={{ gap: spacing.xs }}>
+            {saved && (correction || live) && !selected ? <ActionButton
+              title={correction ? 'Edit local correction' : `Correct ${speaker} locally`} disabled={saving}
+              onPress={() => {
+                setSaveFailed(false);
+                setChoice(correction
+                  ? { kind: 'edit', source: correction.source, label: correction.label }
+                  : { kind: 'new', source, label: '' });
+              }} /> : null}
+            {selected ? <View style={{ gap: spacing.xs }}>
               <Text style={{ ...typography.body, color: palette.text }}>Local speaker label</Text>
               <TextInput accessibilityLabel={`Local speaker label for ${speaker}`} value={choice?.label ?? ''}
                 editable={!saving} autoComplete="off" autoCorrect={false} importantForAutofill="no"
@@ -141,7 +160,7 @@ export function VoiceSpeakerReview({ originalUri, operationId, correctionKey, ro
                 Could not save the local correction.
               </Text> : null}
               <ActionButton title={saving ? 'Saving local correction…' : 'Save local correction'} disabled={saving || !choice?.label.trim()}
-                onPress={() => { void saveCorrection(live); }} />
+                onPress={() => { void saveCorrection(); }} />
             </View> : null}
           </View>
         );
