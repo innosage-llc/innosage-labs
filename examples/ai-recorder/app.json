@@ -10,6 +10,7 @@
     ],
     "android": {
       "package": "co.innosage.labs.airecorder",
+      "userInterfaceStyle": "automatic",
       "allowBackup": false,
       "versionCode": 10
     },

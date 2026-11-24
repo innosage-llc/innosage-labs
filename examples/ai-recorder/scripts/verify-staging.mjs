@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, copyFileSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -83,25 +83,37 @@ function bindCandidate(manifest, output, aapt2, source) {
   return { ...candidate, candidateId: sha(JSON.stringify(candidate)), tree: source.tree };
 }
 
-function evidence(directory, receipt, candidate, avd, head, apk) {
+function evidence(directory, receipt, candidate, avd, head, apk, mode) {
+  const detail = mode === 'journey-detail';
   requireThat(receipt.status === 'PASS' && receipt.stage === 'complete' && receipt.head === head && receipt.avd === avd &&
-    receipt.serial === serial && receipt.apk_sha256 === candidate.apkSha256 && digest(apk) === candidate.apkSha256,
+    receipt.serial === serial && receipt.apk_sha256 === candidate.apkSha256 && digest(apk) === candidate.apkSha256 &&
+    receipt.journey === (detail ? 'repeat-capture-detail' : 'library-inline'),
   'Journey receipt is incomplete or belongs to a different candidate or emulator');
   requireThat(/^\d+$/.test(receipt.before_pid ?? '') && /^\d+$/.test(receipt.after_pid ?? '') &&
     receipt.before_pid !== receipt.after_pid && receipt.labels?.A && receipt.labels?.B && receipt.labels.A !== receipt.labels.B,
   'Distinct Library rows and fresh-process evidence are required');
   const reopened = readFileSync(join(directory, 'reopened-library.xml'), 'utf8');
-  requireThat(['A', 'B'].every(marker => reopened.includes(`content-desc="${receipt.labels[marker]}"`) &&
+  const rowLabels = detail ? receipt.row_labels : receipt.labels;
+  requireThat(['A', 'B'].every(marker => rowLabels?.[marker] && reopened.includes(`content-desc="${rowLabels[marker]}"`) &&
     readFileSync(join(directory, `saved-${marker}.xml`), 'utf8').includes('Saved on this device')), 'Saved or reopened Library evidence missing');
-  for (const [name, marker] of [['B', 'B'], ['stale-A', 'A'], ['silence', null]]) {
+  const controls = detail
+    ? [['A', 'A'], ['B', 'B'], ['open-A', null], ['rapid-back-A', null]]
+    : [['B', 'B'], ['stale-A', 'A'], ['silence', null]];
+  for (const [name, marker] of controls) {
     const path = join(directory, name, 'speaker.pcm');
     const pcm = readFileSync(path);
     const observation = receipt.controls?.[name];
-    const scored = spawnSync(process.execPath, [probe, 'score', 'B', path], { encoding: 'utf8', timeout: 15_000 });
+    const expected = detail && marker ? marker : 'B';
+    const scored = spawnSync(process.execPath, [probe, 'score', expected, path], { encoding: 'utf8', timeout: 15_000 });
     const score = scored.stdout ? JSON.parse(scored.stdout) : {};
-    requireThat(scored.status === (name === 'B' ? 0 : 1) && score.marker === marker &&
-      observation?.marker === marker && score.samples === observation.samples && score.samples >= 8000 && pcm.length === observation.bytes &&
-      sha(pcm) === observation.sha256 && (name === 'B' || observation.rejection) && (name !== 'silence' || score.peak <= 64),
+    const sparseQuiet = detail && marker === null;
+    const enoughSamples = sparseQuiet
+      ? observation?.declared_format && observation.recorder_player_active === false &&
+        observation.window_ms >= (name === 'open-A' ? 3500 : 7500) && score.samples > 0
+      : score.samples >= 8000;
+    requireThat(scored.status === (marker === expected ? 0 : 1) && score.marker === marker &&
+      observation?.marker === marker && score.samples === observation.samples && enoughSamples && pcm.length === observation.bytes &&
+      sha(pcm) === observation.sha256 && (detail || name === 'B' || observation.rejection) && (marker !== null || score.peak <= 64),
     `Missing or invalid ${name} speaker evidence`);
   }
 }
@@ -173,12 +185,14 @@ async function main() {
     report.stage = 'journey';
     const directory = join(output, 'journey');
     const apk = join(output, 'staging.apk');
-    await runAsync(process.execPath, [probe, 'journey', adbPort, serial, avd, String(emulator.pid), apk, directory], {
+    const mode = existsSync(join(source, 'examples/ai-recorder/ui/recording-detail.tsx')) ? 'journey-detail' : 'journey';
+    if (mode === 'journey-detail') await taskAdb('shell', 'settings', 'put', 'system', 'sound_effects_enabled', '0');
+    await runAsync(process.execPath, [probe, mode, adbPort, serial, avd, String(emulator.pid), apk, directory], {
       signal, timeout: 240_000, onResult: result => writeFileSync(join(output, 'journey.log'), result.stdout + result.stderr),
     });
     const resultPath = join(directory, 'result.json');
     const journey = json(resultPath);
-    evidence(directory, journey, report.candidate, avd, report.harness.revision, apk);
+    evidence(directory, journey, report.candidate, avd, report.harness.revision, apk, mode);
     const installed = (await taskAdb('shell', 'pm', 'path', BUNDLE)).trim().match(/^package:(\/data\/app\/[A-Za-z0-9._~+=/-]+\/base\.apk)$/);
     requireThat(installed && !installed[1].split('/').some(part => part === '.' || part === '..'), 'Expected a single installed staging APK');
     const installedSha256 = (await taskAdb('shell', 'sha256sum', installed[1])).trim().split(/\s+/)[0];

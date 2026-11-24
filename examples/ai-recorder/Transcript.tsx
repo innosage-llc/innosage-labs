@@ -44,7 +44,9 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-export function Transcript({ recording, recordingTitle, onClose }: { recording: File; recordingTitle: string; onClose: () => void }) {
+export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
+  recording: File; recordingTitle: string; backLabel?: string; onClose: () => void;
+}) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
   const [freeOperation, setFreeOperation] = useState<FreeOperation | LegacyFreeOperation>();
@@ -439,12 +441,12 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
   return (
     <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-        <AppHeader title="Transcript" onBack={requestClose} backLabel="Back to library" backDisabled={!canGoBack} />
+        <AppHeader title="Transcript" onBack={requestClose} backLabel={backLabel} backDisabled={!canGoBack} />
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
           <Text style={{ color: palette.text }}>{recordingTitle}</Text>
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          {complete || isOpenAI ? <View style={styles.serviceCard}>
+          {complete || isOpenAI ? <View style={[styles.serviceCard, { backgroundColor: palette.surface }]}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
             {isOpenAI ? <>
               <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
@@ -527,5 +529,5 @@ export function Transcript({ recording, recordingTitle, onClose }: { recording: 
 }
 
 const styles = {
-  serviceCard: { padding: 16, gap: 8, backgroundColor: '#F3EDF7', borderRadius: 20 } as const,
+  serviceCard: { padding: 16, gap: 8, borderRadius: 20 } as const,
 };

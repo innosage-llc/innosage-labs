@@ -80,6 +80,11 @@ export const typography = {
     lineHeight: 18,
     fontWeight: '400' as const,
   },
+  dayLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400' as const,
+  },
 } as const;
 
 export interface ThemeContextValue {

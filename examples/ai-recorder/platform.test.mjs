@@ -50,10 +50,12 @@ test('iOS entry graph selects native SwiftUI adapters and never imports Compose 
 });
 
 test('iOS seek uses a 0-to-duration range rather than SwiftUI default 0-to-1', () => {
-  const seek = graph('ios').get(resolve(root, 'PlaybackSeek.ios.tsx'));
+  const files = graph('ios');
+  const seek = files.get(resolve(root, 'PlaybackSeek.ios.tsx'));
   assert.match(seek, /<Slider \{\.\.\.props\} min=\{0\}/);
   assert.match(seek, /enabled, label, onValueChangeFinished, \.\.\.props/);
-  assert.match(readFileSync(resolve(root, 'App.tsx'), 'utf8'), /<PlaybackSeek\s+max=\{playback\.duration\}/);
+  assert.match(files.get(resolve(root, 'App.tsx')), /<RecordingDetail\b[\s\S]*?seek=\{detailOwnsPlayer[^\n]*\{\s*max: playback\.duration/);
+  assert.match(files.get(resolve(root, 'ui/recording-detail.tsx')), /<PlaybackSeek\s+\{\.\.\.activeSeek\}/);
 });
 
 test('Android retains its Compose controls and bounded native uploader', () => {

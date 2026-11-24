@@ -13,6 +13,16 @@ export function xmlControl(xml, label) {
   const [x1,y1,x2,y2] = bounds.slice(1).map(Number);
   return x2 > x1 && y2 > y1 ? { x: Math.round((x1+x2)/2), y: Math.round((y1+y2)/2) } : null;
 }
+export function captureRows(xml) {
+  const captureTitle = /^\d{1,2}:\d{2}(?::\d{2}(?:\.\d{3})?)?(?:\s*(?:AM|PM))?(?:\s+(?:GMT|UTC)(?:[+−-]\d{1,2}(?::\d{2})?)?)?(?: \(\d{3} ms\))?$/i;
+  return [...xml.matchAll(/content-desc="([^"]+)"/g)]
+    .map(([, row]) => ({ row, title: row.split(', ', 1)[0] }))
+    .filter(({ title }) => captureTitle.test(title))
+    .map(item => ({ ...item, bounds: xmlControl(xml, item.row) }))
+    .filter(item => item.bounds)
+    .sort((a, b) => a.bounds.y - b.bounds.y);
+}
+
 // adb may not have attached logcat when the first marker is written. Repeat the
 // pre-launch handshake until the actual stream echoes it, under one deadline.
 export async function confirmAndroidMonitor({ log, marker, write, timeout = 5000, now = () => performance.now(), sleep = ms => new Promise(r => setTimeout(r, ms)) }) {

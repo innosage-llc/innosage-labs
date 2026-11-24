@@ -1,12 +1,13 @@
 // Local #101 journey and speaker diagnostic for the dedicated Android Emulator.
 import { constants, connect } from 'node:http2';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { homedir } from 'node:os';
 import { BUNDLE, requireThat, sha, writeJSON } from '../../../scripts/recorder-gate/core.mjs';
 import { git, outDir, runAsync } from '../../../scripts/recorder-gate/host.mjs';
-import { xmlControl } from '../../../scripts/recorder-gate/android.mjs';
+import { captureRows, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
 
 const rate = 16_000;
 const tones = { A: [440, 587, 740, 495], B: [880, 1175, 1480, 990] };
@@ -226,26 +227,33 @@ async function onAudio({ port, token }, use) {
   }
 }
 
-async function listen(device, output, label, xml, duration = 10_000) {
+async function listen(device, output, label, xml, duration = 10_000, tapControl) {
   const chunks = [];
   const prefix = [];
   let playing = !label;
   let count = 0;
   let declaredFormat = false;
   const pcmPath = join(output, 'speaker.pcm');
+  let observedFrom;
+  let observedUntil;
   try {
     await onAudio(device, async (session, token) => {
-      const capture = rpc(session, token, 'streamAudio', monoFormat, duration, frame => {
+      if (!label) observedFrom = performance.now();
+      // Leave time for the initial speaker pre-roll in addition to the requested window.
+      const capture = rpc(session, token, 'streamAudio', monoFormat, duration + (label ? 1000 : 0), frame => {
         const packet = pcmFromPacket(frame);
         count += packet.pcm.length;
         requireThat(count <= rate * 2 * 30, 'Speaker capture exceeded expected size');
         declaredFormat ||= packet.format;
         (playing ? chunks : prefix).push(packet.pcm);
-      });
+      }).then(() => { observedUntil = performance.now(); });
       if (label) {
         await Promise.race([capture.then(() => { throw new Error('Speaker stream ended before Play'); }), delay(300)]);
-        await press(device.adb, xml, label);
+        // Measure from dispatch, including any sound while the input command is still running.
+        observedFrom = performance.now();
         playing = true;
+        if (tapControl) await tapControl();
+        else await press(device.adb, xml, label);
       }
       await capture;
     });
@@ -256,13 +264,26 @@ async function listen(device, output, label, xml, duration = 10_000) {
   const pcm = Buffer.concat(chunks);
   const before = score(Buffer.concat(prefix));
   requireThat(before.marker === null, 'A marker appeared before Play');
-  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat,
+  return { bytes: pcm.length, sha256: sha(pcm), declared_format: declaredFormat, window_ms: Math.floor(observedUntil - observedFrom),
     before_play_samples: before.samples, ...score(pcm) };
 }
 
 function assertMarker(pcm, expected) {
   requireThat(pcm.samples >= rate / 2, 'Missing speaker PCM');
   requireThat(pcm.marker === expected, `Expected audible ${expected}, observed ${pcm.marker ?? 'no marker'}`);
+}
+
+async function assertQuietSelection(adb, pid, pcm, windowMs) {
+  // Android may suspend the emulator mixer when no player is active. Check
+  // the real time window and decoded frames, plus Recorder's guest audio state.
+  requireThat(pcm.window_ms >= windowMs && pcm.declared_format && pcm.samples > 0 && pcm.peak <= 64 && pcm.marker === null,
+    'Speaker stream did not verify quiet output');
+  const audio = await adb('shell', 'dumpsys', 'audio');
+  requireThat(audio.includes('PlaybackActivityMonitor dump time:') && audio.includes('  players:'),
+    'Guest playback state is unavailable');
+  const playing = new RegExp(`AudioPlaybackConfiguration[^\\n]*u/pid:\\d+/${pid} state:started`);
+  requireThat(!playing.test(audio), 'Recorder still has an active guest player');
+  pcm.recorder_player_active = false;
 }
 
 async function observe([adbPort, serial, avd, pid, label, expected, output]) {
@@ -336,18 +357,28 @@ function playLabels(xml) {
   return [...xml.matchAll(/content-desc="(Play [^"]+)"/g)].map(match => match[1]);
 }
 
-async function journey([adbPort, serial, avd, pid, apk, output]) {
+async function journey([adbPort, serial, avd, pid, apk, output], detail = false) {
   requireThat(apk && output, 'Explicit Release APK and new evidence directory required');
   const device = target(adbPort, serial, avd, pid);
   const { adb } = device;
   const out = outDir(output);
   const receipt = {
     head: git('rev-parse', 'HEAD'), avd, serial, emulator: device.emulator,
-    apk_sha256: sha(readFileSync(apk)), speaker_rate: rate, injection_rate: 48_000, primer_seconds: 2, status: 'FAIL', controls: {},
+    apk_sha256: sha(readFileSync(apk)), speaker_rate: rate, injection_rate: 48_000, primer_seconds: 2,
+    journey: detail ? 'repeat-capture-detail' : 'library-inline', status: 'FAIL', controls: {},
   };
   const began = performance.now();
   const forceStop = () => adb('shell', 'am', 'force-stop', BUNDLE);
   const pidof = async () => (await adb('shell', 'pidof', BUNDLE)).trim();
+  function screenshot(name) {
+    if (!detail) return;
+    const png = execFileSync('adb', ['-H', '127.0.0.1', '-P', adbPort, '-s', serial, 'exec-out', 'screencap', '-p'],
+      { timeout: 15_000, maxBuffer: 12 * 1024 * 1024 });
+    requireThat(png.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')), `Missing PNG for ${name}`);
+    writeFileSync(join(out, `${name}.png`), png);
+    receipt.screenshots ??= {};
+    receipt.screenshots[name] = sha(png);
+  }
   async function launch() {
     const result = await adb('shell', 'am', 'start', '-W', '-a', 'android.intent.action.MAIN',
       '-c', 'android.intent.category.LAUNCHER', '-n', `${BUNDLE}/.MainActivity`);
@@ -357,11 +388,12 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
     await press(adb, await tree(adb), 'Library');
     const xml = await tree(adb);
     writeFileSync(join(out, `${name}.xml`), xml);
+    screenshot(name);
     return xml;
   }
-  async function control(kind, label, xml) {
+  async function control(kind, label, xml, duration = label ? 15_000 : 2500, tapControl) {
     const directory = outDir(join(out, kind));
-    const pcm = await listen(device, directory, label, xml, label ? 15_000 : 2500);
+    const pcm = await listen(device, directory, label, xml, duration, tapControl);
     receipt.controls[kind] = pcm;
     return pcm;
   }
@@ -385,13 +417,20 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
       (await adb('shell', 'wm', 'density')).trim() === 'Physical density: 420',
     'Journey requires the task Pixel 8 display profile');
     await assertOffline(adb);
+    if (detail) {
+      const touchSounds = await adb('shell', 'settings', 'get', 'system', 'sound_effects_enabled');
+      requireThat(touchSounds.trim() === '0', 'Disable guest touch sounds before measuring recording playback silence');
+    }
     await adb('install', '-r', apk);
     await forceStop();
     await launch();
     const empty = await readLibrary('initial-library');
-    requireThat(empty.includes('Your recordings live here') && !playLabels(empty).length, 'Use an empty task-only Recorder Library');
+    requireThat(empty.includes('Your recordings live here') && !playLabels(empty).length && !captureRows(empty).length,
+      'Use an empty task-only Recorder Library');
     await press(adb, empty, 'Record');
     const labels = new Map();
+    const startControl = detail ? xmlControl(await tree(adb), 'Start recording') : { x: 540, y: 1525 };
+    requireThat(startControl, 'Start recording is missing');
     for (const marker of ['A', 'B']) {
       receipt.stage = `record-${marker}`;
       await assertOffline(adb);
@@ -406,12 +445,20 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
       await inject(marker, 8);
       // The input RPC has completed and its connection is closed before save/playback.
       receipt.stage = `stop-${marker}`;
-      // The timer can keep UIAutomator from reaching idle. This point is inside
-      // the observed Stop & save control on the required Pixel 8 display profile.
-      await adb('shell', 'input', 'tap', '540', '1525');
+      // The timer can keep UIAutomator from reaching idle. In the redesigned
+      // layout the idle center is also inside the active control's hit area.
+      await adb('shell', 'input', 'tap', String(startControl.x), String(startControl.y));
       const saved = await tree(adb);
       writeFileSync(join(out, `saved-${marker}.xml`), saved);
       requireThat(saved.includes('Saved on this device'), `Save ${marker} was not confirmed`);
+      if (detail) {
+        const nextCapture = xmlControl(saved, 'Start recording');
+        requireThat(nextCapture && Math.abs(nextCapture.x - startControl.x) <= 4 && Math.abs(nextCapture.y - startControl.y) <= 4,
+          'Start recording moved or disappeared after save');
+        receipt[`restart_control_${marker}`] = nextCapture;
+        screenshot(`saved-${marker}`);
+        continue;
+      }
       const library = await readLibrary(`library-${marker}`);
       const rows = playLabels(library);
       const added = rows.filter(label => ![...labels.values()].includes(label));
@@ -420,7 +467,7 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
       labels.set(marker, added[0]);
       if (marker === 'A') await press(adb, library, 'Record');
     }
-    receipt.labels = Object.fromEntries(labels);
+    if (!detail) receipt.labels = Object.fromEntries(labels);
     receipt.stage = 'restart';
     receipt.before_pid = await pidof();
     requireThat(/^\d+$/.test(receipt.before_pid), 'Recorder PID missing before stop');
@@ -432,19 +479,57 @@ async function journey([adbPort, serial, avd, pid, apk, output]) {
     receipt.after_pid = await pidof();
     requireThat(/^\d+$/.test(receipt.after_pid) && receipt.after_pid !== receipt.before_pid, 'New process was not observed');
     const library = await readLibrary('reopened-library');
-    requireThat(playLabels(library).length === 2 && [...labels.values()].every(label => xmlControl(library, label)),
-      'Both distinct saved rows must survive cold reopen');
-    receipt.stage = 'speaker-controls';
-    const quiet = await control('silence', null, library);
-    requireThat(quiet.samples >= rate / 2 && quiet.peak <= 64 && quiet.marker === null,
-      'Speaker silence was not observed before playback');
-    rejectB(quiet, 'silence');
-    assertMarker(await control('B', labels.get('B'), library), 'B');
-    const idle = await tree(adb);
-    requireThat(xmlControl(idle, labels.get('B')) && xmlControl(idle, labels.get('A')), 'B playback did not finish');
-    const stale = await control('stale-A', labels.get('A'), idle);
-    assertMarker(stale, 'A');
-    rejectB(stale, 'stale-A');
+    if (detail) {
+      const rows = captureRows(library);
+      requireThat(rows.length === 2 && rows[0].title !== rows[1].title, 'Both distinct saved rows must survive cold reopen');
+      requireThat(!playLabels(library).length && !library.includes('content-desc="Share audio') &&
+        !library.includes('content-desc="Transcript for '), 'Library exposes per-recording actions');
+      receipt.labels = { A: rows[1].title, B: rows[0].title };
+      receipt.row_labels = { A: rows[1].row, B: rows[0].row };
+      receipt.stage = 'open-earlier';
+      const quiet = await control('open-A', rows[1].row, library, 3500);
+      await assertQuietSelection(adb, receipt.after_pid, quiet, 3500);
+      const earlier = await tree(adb);
+      writeFileSync(join(out, 'earlier-detail.xml'), earlier);
+      screenshot('earlier-detail');
+      requireThat(xmlControl(earlier, `Share audio for ${rows[1].title}`) &&
+        xmlControl(earlier, `Transcript for ${rows[1].title}`), 'Earlier detail actions are missing');
+      const playLabel = `Play ${rows[1].title}`;
+      const play = xmlControl(earlier, playLabel);
+      requireThat(play, 'Earlier detail Play control is missing');
+      receipt.stage = 'rapid-back';
+      const cancelled = await control('rapid-back-A', playLabel, earlier, 7500,
+        () => adb('shell', `input tap ${play.x} ${play.y}; input keyevent 4`));
+      await assertQuietSelection(adb, receipt.after_pid, cancelled, 7500);
+      const afterCancel = await tree(adb);
+      requireThat(captureRows(afterCancel).length === 2, 'Rapid Back did not restore the Library');
+      await press(adb, afterCancel, rows[1].row);
+      receipt.stage = 'play-earlier';
+      assertMarker(await control('A', playLabel, await tree(adb)), 'A');
+      await press(adb, await tree(adb), 'Back to Library');
+      const returned = await tree(adb);
+      requireThat(captureRows(returned).some(item => item.title === rows[1].title), 'Top Back did not restore Library');
+      await press(adb, returned, rows[0].row);
+      const later = await tree(adb);
+      receipt.stage = 'play-later-control';
+      assertMarker(await control('B', `Play ${rows[0].title}`, later), 'B');
+      await adb('shell', 'input', 'keyevent', '4');
+      requireThat(captureRows(await tree(adb)).length === 2, 'System Back did not restore Library');
+    } else {
+      requireThat(playLabels(library).length === 2 && [...labels.values()].every(label => xmlControl(library, label)),
+        'Both distinct saved rows must survive cold reopen');
+      receipt.stage = 'speaker-controls';
+      const quiet = await control('silence', null, library);
+      requireThat(quiet.samples >= rate / 2 && quiet.peak <= 64 && quiet.marker === null,
+        'Speaker silence was not observed before playback');
+      rejectB(quiet, 'silence');
+      assertMarker(await control('B', labels.get('B'), library), 'B');
+      const idle = await tree(adb);
+      requireThat(xmlControl(idle, labels.get('B')) && xmlControl(idle, labels.get('A')), 'B playback did not finish');
+      const stale = await control('stale-A', labels.get('A'), idle);
+      assertMarker(stale, 'A');
+      rejectB(stale, 'stale-A');
+    }
     await assertOffline(adb);
     requireThat(await pidof() === receipt.after_pid, 'Recorder restarted during playback');
     receipt.stage = 'complete';
@@ -468,10 +553,10 @@ try {
     process.exitCode = result.marker === args[0] ? 0 : 1;
   } else if (mode === 'observe' && args.length === 7) {
     await observe(args);
-  } else if (mode === 'journey' && args.length === 6) {
-    await journey(args);
+  } else if (['journey', 'journey-detail'].includes(mode) && args.length === 6) {
+    await journey(args, mode === 'journey-detail');
   } else {
-    throw new Error('Use fixture <A|B|silence> <wav>, score <A|B> <pcm>, observe <adb-port> <serial> <avd> <emulator-pid> <Play label> <A|B> <new-output>, or journey <adb-port> <serial> <avd> <emulator-pid> <release-apk> <new-output>');
+    throw new Error('Use fixture <A|B|silence> <wav>, score <A|B> <pcm>, observe <adb-port> <serial> <avd> <emulator-pid> <Play label> <A|B> <new-output>, or journey/journey-detail <adb-port> <serial> <avd> <emulator-pid> <release-apk> <new-output>');
   }
 } catch (error) {
   console.error(error.message);
