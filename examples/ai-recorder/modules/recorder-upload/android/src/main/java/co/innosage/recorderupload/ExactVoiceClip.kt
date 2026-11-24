@@ -28,10 +28,15 @@ internal object ExactVoiceClip {
     require(expectedBytes in 1..MAX_SOURCE)
     val path = Uri.parse(uri)
     require(path.scheme == "file" && path.authority.isNullOrEmpty() && path.query == null && path.fragment == null)
+    val appRoot = File(filesDir, "recordings")
     val root = File(filesDir.canonicalFile, "recordings")
     require(root == root.canonicalFile && OsConstants.S_ISDIR(Os.lstat(root.path).st_mode))
-    val source = File(requireNotNull(path.path))
-    require(source.parentFile == root && recordingName.matches(source.name) && source == source.canonicalFile)
+    val requested = File(requireNotNull(path.path))
+    // Android can expose its own app directory as /data/user/0 or /data/data.
+    // Only the platform-supplied spelling and that exact canonical root qualify.
+    require((requested.parentFile == appRoot || requested.parentFile == root) && recordingName.matches(requested.name))
+    val source = File(root, requested.name)
+    require(requested.canonicalFile == source && source == source.canonicalFile)
     checkpoint()
     val fd = Os.open(source.path, OsConstants.O_RDONLY or OsConstants.O_NOFOLLOW or OsConstants.O_NONBLOCK, 0)
     try {
