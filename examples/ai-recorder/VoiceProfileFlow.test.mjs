@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { finishVoiceAfterSavingOriginal, voiceProfileStageEnabled } from './VoiceProfileFlow.ts';
+import { finishVoiceAfterSavingOriginal, readLocalVoiceReceipt, voiceProfileStageEnabled, writeLocalVoiceReceipt } from './VoiceProfileFlow.ts';
 
 const operation = Object.freeze({
   id: 'recorder-transcription-v2-1999999999-12345678-1234-4123-8123-123456789abc',
@@ -46,4 +46,22 @@ test('pending polls the same operation only, then exposes a separate result', as
   assert.deepEqual(outcome, { status: 'ready', result: finished });
   assert.equal(reads, 2);
   assert.equal(time, 2000);
+});
+
+test('the original-bound cold receipt reopens only safe anonymous counts in the same paid scope', async () => {
+  let raw;
+  const store = { getItemAsync: async () => raw, setItemAsync: async (_key, value) => { raw = value; } };
+  const path = 'file:///private/original';
+  const receipt = { outcome: 'completed', review: { matchedCount: 2, reviewCount: 1, unknownCount: 1,
+    reviewBySpeaker: new Map([['Speaker 2', 1]]), profileId: 'forbidden-private-id',
+  } };
+  await writeLocalVoiceReceipt(store, 'voice.fixture', operation, path, receipt);
+  assert.ok(!raw.includes('forbidden-private-id'));
+  const recovered = await readLocalVoiceReceipt(store, 'voice.fixture', operation, path);
+  assert.equal(recovered.outcome, 'completed');
+  assert.deepEqual([...recovered.review.reviewBySpeaker], [['Speaker 2', 1]]);
+  assert.equal(await readLocalVoiceReceipt(store, 'voice.fixture', operation, path + '-other'), undefined);
+  assert.equal(await readLocalVoiceReceipt(store, 'voice.fixture', { ...operation, accountScope: 'b'.repeat(64) }, path), undefined);
+  await writeLocalVoiceReceipt(store, 'voice.fixture', operation, path, { outcome: 'failed' });
+  assert.deepEqual(await readLocalVoiceReceipt(store, 'voice.fixture', operation, path), { outcome: 'failed' });
 });
