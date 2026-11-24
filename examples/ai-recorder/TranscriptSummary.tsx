@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Text, TextInput, View } from 'react-native';
+import { Linking, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { RecorderSwitch } from './RecorderSwitch';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
@@ -8,7 +8,9 @@ import { meetingEssentials, thinkingBudgets, type ThinkingEffort, type SummaryCi
 import { openAIAccess } from './OpenAIAccess';
 import { useTheme } from './ui/theme';
 import { ActionButton } from './ui/ActionButton';
+import { DetailShell } from './ui/DetailShell';
 import { readSummaryInput } from './summaryDraftLifecycle';
+import { readSavedRecordingSummary, savedSummaryFiles } from './savedRecordingDocuments';
 
 type Summary = { recipe: string; model: string; source: 'original' | 'revision'; text: string; citations?: SummaryCitation[]; effort?: ThinkingEffort; webSearch?: boolean };
 export type RecipeRequest = Pick<Summary, 'recipe'|'model'|'source'> & {effort:ThinkingEffort; webSearch:boolean; instructions?:string};
@@ -42,12 +44,6 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
   useEffect(() => () => active.current?.abort(), []);
   useEffect(() => { onLockChange(busy || !!unsaved); }, [busy, unsaved, onLockChange]);
 
-  function savedFiles() {
-    return output.parentDirectory.list()
-      .filter((entry): entry is File => entry instanceof File && entry.name.startsWith(output.name + '.') && entry.name.endsWith('.json'))
-      .sort((a, b) => b.name.localeCompare(a.name));
-  }
-
   async function run(action: (signal: AbortSignal) => Promise<void>) {
     if (active.current) return;
     const controller = new AbortController();
@@ -66,7 +62,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
 
   async function persist(result: Summary) {
     try {
-      const previous = savedFiles();
+      const previous = savedSummaryFiles(output);
       const next = new File(output.parentDirectory, `${output.name}.${Date.now()}-${randomUUID()}.json`);
       await save(next, JSON.stringify(result));
       for (const file of previous) {
@@ -86,7 +82,7 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
       {!generateInDraft ? <ActionButton title={open ? 'Hide summary' : 'Summarize'} disabled={busy || !!unsaved} onPress={() => {
         setOpen(!open);
         if (!open && !summary) void run(async () => {
-          const file = savedFiles()[0] ?? output;
+          const file = savedSummaryFiles(output)[0] ?? output;
           if (!file.exists) return;
           const saved = JSON.parse(await file.text()) as Summary;
           if (typeof saved.text !== 'string' || typeof saved.model !== 'string') throw new Error('Could not read the saved summary.');
@@ -177,6 +173,43 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
       </> : null}
     </View>
   );
+}
+
+export function SavedRecordingSummary({ recording, recordingTitle, onClose }: {
+  recording: File;
+  recordingTitle: string;
+  onClose: () => void;
+}) {
+  const { palette, spacing, typography } = useTheme();
+  const [summary, setSummary] = useState<Summary>();
+  const [message, setMessage] = useState('Opening saved summary…');
+  useEffect(() => {
+    let current = true;
+    void readSavedRecordingSummary(recording).then(saved => {
+      if (!current) return;
+      setSummary(saved);
+      setMessage(saved ? '' : 'No readable summary is saved on this device.');
+    }, () => {
+      if (current) setMessage('Could not read the saved summary.');
+    });
+    return () => { current = false; };
+  }, [recording]);
+  return <Modal onRequestClose={onClose}>
+    <DetailShell title="Summary" quietTitle backLabel="Back to recording details" onBack={onClose}>
+      <ScrollView contentContainerStyle={{ padding: spacing.xxl, gap: spacing.md }}>
+        <Text style={[typography.dayLabel, { color: palette.muted }]}>{recordingTitle}</Text>
+        {summary ? <>
+          <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>
+            {summary.recipe === 'custom' ? 'Custom summary' : 'Meeting summary'}
+          </Text>
+          <Text style={[typography.caption, { color: palette.muted }]}>
+            {summary.model} · {summary.source === 'revision' ? 'Saved revision' : 'Original transcript'}
+          </Text>
+          <CitedSummary summary={summary} />
+        </> : <Text accessibilityLiveRegion="polite" style={[typography.body, { color: palette.muted }]}>{message}</Text>}
+      </ScrollView>
+    </DetailShell>
+  </Modal>;
 }
 
 function CitedSummary({ summary }: { summary: Summary }) {

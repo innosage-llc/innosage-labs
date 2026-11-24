@@ -1,5 +1,5 @@
 import { DraftSummary } from './DraftSummary';
-import { TranscriptSummary } from './TranscriptSummary';
+import { SavedRecordingSummary, TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
@@ -26,6 +26,7 @@ import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuest
 import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
+import type { RecordingDocumentDestination } from './savedRecordingDocuments';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
 const stateLabels: Record<string, string> = {
@@ -44,9 +45,13 @@ async function saveText(file: File, text: string) {
   await temporary.move(file, { overwrite: true });
 }
 
-export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
-  recording: File; recordingTitle: string; backLabel?: string; onClose: () => void;
-}) {
+type TranscriptProps = { recording: File; recordingTitle: string; backLabel?: string; onClose: () => void; initialDocument?: RecordingDocumentDestination };
+
+export function Transcript({ initialDocument, ...props }: TranscriptProps) {
+  return initialDocument === 'summary' ? <SavedRecordingSummary {...props} /> : <RecordingTranscript {...props} />;
+}
+
+function RecordingTranscript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: TranscriptProps) {
   const { palette, spacing, typography } = useTheme();
   const [connecting, setConnecting] = useState(true);
   const [freeOperation, setFreeOperation] = useState<FreeOperation | LegacyFreeOperation>();

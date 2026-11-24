@@ -14,6 +14,7 @@ import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
 import { RecordingDetail } from './ui/recording-detail';
+import type { RecordingDocumentDestination } from './savedRecordingDocuments';
 import { formatRecordingTime, recordingDate, recordingTimeLabel, type RecordingSummary } from './ui/recording-display';
 import { shareRecording } from './recordingShare';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
@@ -136,7 +137,7 @@ function RecorderScreen() {
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
   useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
-  const [transcriptRecording, setTranscriptRecording] = useState<File>();
+  const [transcriptRoute, setTranscriptRoute] = useState<{ file: File; destination: RecordingDocumentDestination }>();
   const [detailUri, setDetailUri] = useState<string>();
   const detailRecording = summaries.find(recording => recording.uri === detailUri);
   const detailFile = files.find(file => file.uri === detailUri);
@@ -168,7 +169,8 @@ function RecorderScreen() {
 
   function openRecording(uri: string) {
     if (session.getSnapshot().phase !== 'idle') return;
-    if (!files.some(file => file.uri === uri && file.exists)) {
+    const file = files.find(file => file.uri === uri && file.exists);
+    if (!file) {
       setFiles(listRecordings());
       setMessage('This recording is no longer available on this device.');
       return;
@@ -176,6 +178,14 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
+    if (Platform.OS === 'android' && playingFile !== uri) {
+      ++playRequest.current;
+      try {
+        preparePlayback(file);
+      } catch {
+        setMessage('Could not load the recording.');
+      }
+    }
   }
 
   function closeRecording() {
@@ -187,12 +197,12 @@ function RecorderScreen() {
     setMessage('');
   }
 
-  function openTranscript(file: File) {
+  function openTranscript(file: File, destination: RecordingDocumentDestination = 'transcript') {
     if (session.getSnapshot().phase !== 'idle') return;
     ++playRequest.current;
     player.pause();
     setMessage('');
-    setTranscriptRecording(file);
+    setTranscriptRoute({ file, destination });
   }
 
   function viewSavedRecording() {
@@ -300,6 +310,14 @@ function RecorderScreen() {
     await session.stop();
   }
 
+  function preparePlayback(file: File) {
+    player.pause();
+    pendingSeek.current = undefined;
+    setSeekPosition(undefined);
+    player.replace(file.uri);
+    setPlayingFile(file.uri);
+  }
+
   async function togglePlayback(file: File) {
     if (session.getSnapshot().phase !== 'idle') return;
     const request = ++playRequest.current;
@@ -313,11 +331,7 @@ function RecorderScreen() {
           await player.seekTo(0);
         }
       } else {
-        player.pause();
-        pendingSeek.current = undefined;
-        setSeekPosition(undefined);
-        player.replace(file.uri);
-        setPlayingFile(file.uri);
+        preparePlayback(file);
       }
       if (request === playRequest.current && session.getSnapshot().phase === 'idle') player.play();
     } catch {
@@ -355,8 +369,10 @@ function RecorderScreen() {
   return (
     <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
       libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle' || !recordings, onPress: importAudio }}>
-      {detailRecording && detailFile && !transcriptRecording ? <RecordingDetail
+      {detailRecording && detailFile && !transcriptRoute ? <RecordingDetail
+        key={detailUri}
         recording={detailRecording}
+        file={detailFile}
         playing={detailOwnsPlayer && playback.playing}
         disabled={phase !== 'idle'}
         shareDisabled={sharePending}
@@ -365,6 +381,7 @@ function RecorderScreen() {
         onTogglePlayback={() => { void togglePlayback(detailFile); }}
         onShare={() => { void shareAudio(detailFile, recordingLabel(detailFile)); }}
         onTranscript={() => openTranscript(detailFile)}
+        onSummary={() => openTranscript(detailFile, 'summary')}
         seek={detailOwnsPlayer && playback.isLoaded && playback.duration > 0 ? {
           max: playback.duration,
           value: position,
@@ -376,8 +393,9 @@ function RecorderScreen() {
         } : undefined}
       /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
-      {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)}
-        backLabel="Back to recording details" onClose={() => setTranscriptRecording(undefined)} /> : null}
+      {transcriptRoute ? <Transcript recording={transcriptRoute.file} recordingTitle={recordingLabel(transcriptRoute.file)}
+        initialDocument={transcriptRoute.destination}
+        backLabel="Back to recording details" onClose={() => setTranscriptRoute(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={[styles.recordingBanner, { backgroundColor: palette.surface }]}>
         <View style={{ flex: 1 }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatRecordingTime(durationMillis / 1000)}</Text>
