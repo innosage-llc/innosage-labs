@@ -74,13 +74,13 @@ export async function enrollConfirmedVoiceProfile({
     const profile = await client.enrollVoiceProfile({
       ...scope, participantConfirmed: true, source: span, mutationKey,
     }, name, signal);
-    if (!delivered || !consumeConfirmedEnrollmentReceipt(client, profile, scope, mutationKey, span, "accepted") ||
+    if (!delivered || !consumeConfirmedEnrollmentReceipt(client, profile, scope, mutationKey, span, name, clipper, "accepted") ||
         !await journal.finalizeEnrollment(mutationKey))
       throw new Error('Could not verify the exact confirmed enrollment receipt.');
     return profile;
   } catch (error) {
     if (delivered && client &&
-        consumeConfirmedEnrollmentReceipt(client, error, scope, mutationKey, span, "refused"))
+        consumeConfirmedEnrollmentReceipt(client, error, scope, mutationKey, span, name, clipper, "refused"))
       await journal.finalizeEnrollment(mutationKey);
     throw error;
   } finally {

@@ -201,23 +201,23 @@ function hasVoiceAcknowledgement(value: unknown) {
 }
 
 
-const confirmedEnrollmentReceipts = new WeakMap<object, { client: ProClient; binding: string; kind: "accepted" | "refused" }>();
+const confirmedEnrollmentReceipts = new WeakMap<object, { client: ProClient; binding: string; clipper: VoiceClipper; kind: "accepted" | "refused" }>();
 
-function confirmedEnrollmentBinding(scope: VoiceProfileScope, mutationKey: string, span: ConfirmedVoiceSegment) {
+function confirmedEnrollmentBinding(scope: VoiceProfileScope, mutationKey: string, span: ConfirmedVoiceSegment, name: string) {
   return JSON.stringify([scope.workerURL, scope.accountScope, mutationKey, span.source,
-    span.recordingRef, span.segmentId, span.startMs, span.endMs]);
+    span.recordingRef, span.segmentId, span.startMs, span.endMs, name]);
 }
 
 /** Consume only a strict, exact receipt issued by the concrete bound client. */
 export function consumeConfirmedEnrollmentReceipt(
   client: Pick<ProClient, "enrollVoiceProfile">,
   receipt: unknown, scope: VoiceProfileScope, mutationKey: string, span: ConfirmedVoiceSegment,
-  kind: "accepted" | "refused",
+  name: string, clipper: VoiceClipper, kind: "accepted" | "refused",
 ) {
   if (!receipt || typeof receipt !== "object") return false;
   const source = confirmedEnrollmentReceipts.get(receipt);
-  if (source?.client !== client || source.kind !== kind ||
-      source.binding !== confirmedEnrollmentBinding(scope, mutationKey, span)) return false;
+  if (source?.client !== client || source.kind !== kind || source.clipper !== clipper ||
+      source.binding !== confirmedEnrollmentBinding(scope, mutationKey, span, name)) return false;
   confirmedEnrollmentReceipts.delete(receipt);
   return true;
 }
@@ -366,17 +366,19 @@ export class ProClient {
   ): Promise<VoiceProfileSummary> {
     if (input.workerURL !== this.workerURL)
       throw new ProServiceError("This operation belongs to another environment.", "authorization");
-    const multipart = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
+    const name = validVoiceName(displayName);
+    const clipper = this.clipVoiceSample;
+    const multipart = await enrollmentBody(input, { displayName: name }, clipper, signal);
     const boundReceipt = input.source.source === "confirmed_segment"
-      ? confirmedEnrollmentBinding(input, input.mutationKey, input.source) : undefined;
+      ? confirmedEnrollmentBinding(input, input.mutationKey, input.source, name) : undefined;
     let response: Response;
     try {
       response = await this.voiceProfileRequest(input, "", {
         method: "POST", ...multipart, signal,
       }, input.mutationKey, true);
     } catch (error) {
-      if (boundReceipt && error instanceof ProServiceError && exactVoiceSampleRefusals.delete(error))
-        confirmedEnrollmentReceipts.set(error, { client: this, binding: boundReceipt, kind: "refused" });
+      if (boundReceipt && clipper && error instanceof ProServiceError && exactVoiceSampleRefusals.delete(error))
+        confirmedEnrollmentReceipts.set(error, { client: this, binding: boundReceipt, clipper, kind: "refused" });
       throw error;
     }
     if (response.status !== 200 && response.status !== 201) {
@@ -390,9 +392,9 @@ export class ProClient {
         data.contract !== VOICE_CONTRACT || !("profile" in data))
       throw new ProServiceError("Could not verify the enrollment receipt.", "voice_unavailable");
     const profile = profileSummary(data.profile);
-    if (boundReceipt) {
+    if (boundReceipt && clipper) {
       Object.freeze(profile);
-      confirmedEnrollmentReceipts.set(profile, { client: this, binding: boundReceipt, kind: "accepted" });
+      confirmedEnrollmentReceipts.set(profile, { client: this, binding: boundReceipt, clipper, kind: "accepted" });
     }
     return profile;
   }

@@ -33,6 +33,7 @@ function fixture() {
   let seq = 0;
   let authorizedSubmissions = 0;
   let refusal;
+  let expectedName = 'Example';
   let nativeCalls = 0;
   const keys = [];
   const store = { getItemAsync:async () => storage ?? null, setItemAsync:async (_,value) => { storage = value; } };
@@ -59,7 +60,7 @@ function fixture() {
         const wire = await new Request(url, {method:'POST', headers:init.headers, body:init.body}).formData();
         const metadata = JSON.parse(wire.get('metadata'));
         const key = init.headers['Idempotency-Key'];
-        assert.equal(metadata.displayName,'Example');
+        assert.equal(metadata.displayName,expectedName);
         assert.equal(metadata.consent.participantConfirmed,true);
         assert.doesNotMatch(JSON.stringify(metadata.sample), /file:|original_operation|aaaaaaaa|synthetic/);
         assert.equal((await journalFor(scope).restore()).enrollment.mutationKey,key);
@@ -71,7 +72,7 @@ function fixture() {
       }, clientStore, async () => { throw new Error('Must not upload original'); }, clipper);
     },
   };
-  return { options, journalFor, keys, refuse: payload => { refusal = payload; }, persisted:()=>storage, nativeCalls:()=>nativeCalls };
+  return { options, journalFor, keys, setExpectedName: value => { expectedName = value; }, refuse: payload => { refusal = payload; }, persisted:()=>storage, nativeCalls:()=>nativeCalls };
 }
 
 test('retry keeps the same exact journal entry; direct-equal bytes and different provenance cannot retry it', async () => {
@@ -171,4 +172,26 @@ test('fresh explicit cold recovery after result cleanup replays exact consented 
   assert.deepEqual(f.keys,['fixture-key-1','fixture-key-1']);
   await assert.rejects(enrollConfirmedVoiceProfile(retry), /pending confirmed upload/);
   assert.equal(f.keys.length,2);
+});
+
+test('a concrete client terminal result with altered label or a wrapping clipper cannot clear', async () => {
+  for (const alter of ['name','clipper']) {
+    const f = fixture(), real = f.options.clientFor;
+    f.options.clientFor = (scope, clipper) => {
+      // The shorter alternate argument still consumes the same anonymous
+      // segment, but the wrapper identity or normalized display name differs.
+      const client = real(scope, alter === 'clipper' ? (...args) => clipper(...args) : clipper);
+      if (alter === 'name') {
+        const enroll = client.enrollVoiceProfile.bind(client);
+        client.enrollVoiceProfile = (input, _name, signal) => enroll(input, 'Another name', signal);
+      }
+      return client;
+    };
+    // Rework fake gateway only for this case: accept the same parsed wire
+    // bytes independently of which requested display name was observed.
+    f.setExpectedName(alter === 'name' ? 'Another name' : 'Example');
+    await assert.rejects(enrollConfirmedVoiceProfile(f.options), /lost response/);
+    await assert.rejects(enrollConfirmedVoiceProfile(f.options), /exact confirmed enrollment receipt/);
+    assert.ok((await f.journalFor(scope).restore()).enrollment);
+  }
 });
