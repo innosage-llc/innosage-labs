@@ -8,17 +8,18 @@ export type ProOperation = {
   accountScope: string;
   sourceBytes: number;
 };
-export type VoiceProfileSample = (
-  | { source: "direct" }
-  | { source: "confirmed_segment"; recordingRef: string; segmentId: string; startMs: number; endMs: number }
-);
-export type VoiceProfileEnrollment = {
-  mutationKey: string;
-  accountScope: string;
-  source: VoiceProfileSample;
-  participantConfirmed: boolean;
-  audio: Blob;
+type ConfirmedVoiceSegment = {
+  source: "confirmed_segment"; recordingRef: string; segmentId: string; startMs: number; endMs: number;
 };
+export type VoiceProfileScope = { workerURL: string; accountScope: string };
+export type VoiceProfileEnrollment = VoiceProfileScope & {
+  mutationKey: string;
+  participantConfirmed: boolean;
+} & (
+  | { source: { source: "direct" }; audio: Blob }
+  | { source: ConfirmedVoiceSegment; audio?: never }
+);
+type VoiceClipper = (segment: ConfirmedVoiceSegment, signal?: AbortSignal) => Promise<Blob>;
 export type VoiceProfileSummary = {
   profileId: string;
   displayName: string;
@@ -41,6 +42,7 @@ type Session = {
   operation: string;
   scope: string;
   voiceOptions?: string;
+  diarization?: { enabled: boolean };
   sessionId: string;
   routerBaseUrl: string;
   uploadCapability: string;
@@ -94,11 +96,14 @@ function profileSummary(raw: any): VoiceProfileSummary {
     revision: raw.revision, status: raw.status };
 }
 
-function enrollmentBody(input: VoiceProfileEnrollment, metadata: Record<string, unknown>) {
-  if (input.participantConfirmed !== true || input.audio.size <= 0 || input.audio.size > VOICE_CLIP_LIMIT)
-    throw new ProServiceError("Confirm permission and choose a supported, short audio clip.", "voice_options_invalid");
-  if (!["audio/mp4", "audio/wav", "audio/x-wav"].includes(input.audio.type))
-    throw new ProServiceError("Use an M4A or WAV clip.", "voice_options_invalid");
+async function enrollmentBody(
+  input: VoiceProfileEnrollment,
+  metadata: Record<string, unknown>,
+  clipVoiceSample?: VoiceClipper,
+  signal?: AbortSignal,
+) {
+  if (input.participantConfirmed !== true)
+    throw new ProServiceError("Confirm permission before sharing a voice sample.", "voice_options_invalid");
   const sample = input.source;
   if (sample.source !== "direct" && (
     sample.source !== "confirmed_segment" ||
@@ -111,11 +116,18 @@ function enrollmentBody(input: VoiceProfileEnrollment, metadata: Record<string, 
     ? { source: "direct" }
     : { source: "confirmed_segment", recordingRef: sample.recordingRef,
         segmentId: sample.segmentId, startMs: sample.startMs, endMs: sample.endMs };
+  if (sample.source === "confirmed_segment" && (input.audio !== undefined || !clipVoiceSample))
+    throw new ProServiceError("A confirmed segment must be clipped from its original recording first.", "voice_options_invalid");
+  const audio = sample.source === "direct" ? input.audio : await clipVoiceSample!(publicSample as ConfirmedVoiceSegment, signal);
+  if (!audio || audio.size <= 0 || audio.size > VOICE_CLIP_LIMIT)
+    throw new ProServiceError("Choose a supported, short audio clip.", "voice_options_invalid");
+  if (!["audio/mp4", "audio/wav", "audio/x-wav"].includes(audio.type))
+    throw new ProServiceError("Use an M4A or WAV clip.", "voice_options_invalid");
   const form = new FormData();
   form.append("metadata", JSON.stringify({ ...metadata, sample: publicSample, consent: {
     scope: "voice_profile_enrollment", participantConfirmed: true,
   } }));
-  form.append("audio", input.audio, input.audio.type === "audio/mp4" ? "sample.m4a" : "sample.wav");
+  form.append("audio", audio, audio.type === "audio/mp4" ? "sample.m4a" : "sample.wav");
   return form;
 }
 
@@ -140,7 +152,7 @@ function hasVoiceAcknowledgement(value: unknown) {
 
 export class ProClient {
   private readonly profileKey: string;
-  private readonly recoveries = new Map<string, Promise<Session>>();
+  private readonly recoveries = new Map<string, { binding: string; promise: Promise<Session> }>();
 
   constructor(
     readonly workerURL: string,
@@ -148,6 +160,9 @@ export class ProClient {
     private readonly http: Http,
     private readonly store: Store,
     private readonly uploadFile: Upload,
+    // Must bind original Recorder-owned recordingRef and exact decoded frame
+    // interval. No confirmed-segment upload without this trusted local seam.
+    private readonly clipVoiceSample?: VoiceClipper,
   ) {
     for (const url of [workerURL, routerURL]) {
       const parsed = new URL(url);
@@ -228,16 +243,18 @@ export class ProClient {
   }
 
   private async voiceProfileRequest(
-    accountScope: string,
+    scope: VoiceProfileScope,
     path: string,
     init: RequestInit = {},
     key?: string,
   ) {
+    if (scope.workerURL !== this.workerURL)
+      throw new ProServiceError("This operation belongs to another environment.", "authorization");
     if (key !== undefined && !voiceIdentifier.test(key))
       throw new ProServiceError("Invalid voice profile operation.", "voice_options_invalid");
     const profile = await this.profile();
-    if (!profile || profile.accountScope !== accountScope ||
-        await this.identity(profile.key, init.signal ?? undefined) !== accountScope)
+    if (!profile || profile.accountScope !== scope.accountScope ||
+        await this.identity(profile.key, init.signal ?? undefined) !== scope.accountScope)
       throw new ProServiceError("Restore the Pro key for the original account and environment.", "authorization");
     return this.request(this.workerURL + VOICE_PROFILES_PATH + path, {
       ...init,
@@ -249,8 +266,8 @@ export class ProClient {
     });
   }
 
-  async listVoiceProfiles(accountScope: string, signal?: AbortSignal): Promise<VoiceProfileSummary[]> {
-    const response = await this.voiceProfileRequest(accountScope, "", { signal });
+  async listVoiceProfiles(scope: VoiceProfileScope, signal?: AbortSignal): Promise<VoiceProfileSummary[]> {
+    const response = await this.voiceProfileRequest(scope, "", { signal });
     const data = await response.json();
     if (data?.contract !== VOICE_CONTRACT || !Array.isArray(data.profiles) || data.profiles.length > 64)
       throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
@@ -262,8 +279,10 @@ export class ProClient {
     displayName: string,
     signal?: AbortSignal,
   ): Promise<VoiceProfileSummary> {
-    const body = enrollmentBody(input, { displayName: validVoiceName(displayName) });
-    const response = await this.voiceProfileRequest(input.accountScope, "", {
+    if (input.workerURL !== this.workerURL)
+      throw new ProServiceError("This operation belongs to another environment.", "authorization");
+    const body = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
+    const response = await this.voiceProfileRequest(input, "", {
       method: "POST", body, signal,
     }, input.mutationKey);
     const data = await response.json();
@@ -282,8 +301,11 @@ export class ProClient {
     if (!voiceIdentifier.test(profileId) || !Number.isSafeInteger(expectedRevision) ||
         expectedRevision < 0 || (mode !== "add" && mode !== "replace"))
       throw new ProServiceError("Invalid voice profile update.", "voice_options_invalid");
-    const response = await this.voiceProfileRequest(input.accountScope, `/${profileId}/samples`, {
-      method: "POST", body: enrollmentBody(input, { expectedRevision, mode }), signal,
+    if (input.workerURL !== this.workerURL)
+      throw new ProServiceError("This operation belongs to another environment.", "authorization");
+    const body = await enrollmentBody(input, { expectedRevision, mode }, this.clipVoiceSample, signal);
+    const response = await this.voiceProfileRequest(input, `/${profileId}/samples`, {
+      method: "POST", body, signal,
     }, input.mutationKey);
     const data = await response.json();
     if (data?.contract !== VOICE_CONTRACT || data.profile?.profileId !== profileId)
@@ -292,7 +314,7 @@ export class ProClient {
   }
 
   async editVoiceProfile(
-    accountScope: string,
+    scope: VoiceProfileScope,
     profileId: string,
     mutationKey: string,
     expectedRevision: number,
@@ -303,7 +325,7 @@ export class ProClient {
         expectedRevision < 0 || (edit.status === undefined && edit.displayName === undefined) ||
         (edit.status !== undefined && edit.status !== "active" && edit.status !== "disabled"))
       throw new ProServiceError("Invalid voice profile update.", "voice_options_invalid");
-    const response = await this.voiceProfileRequest(accountScope, `/${profileId}`, {
+    const response = await this.voiceProfileRequest(scope, `/${profileId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         expectedRevision,
@@ -319,14 +341,14 @@ export class ProClient {
   }
 
   async deleteVoiceProfile(
-    accountScope: string,
+    scope: VoiceProfileScope,
     profileId: string,
     mutationKey: string,
     signal?: AbortSignal,
   ): Promise<"pending" | "deleted"> {
     if (!voiceIdentifier.test(profileId))
       throw new ProServiceError("Invalid voice profile.", "voice_options_invalid");
-    const response = await this.voiceProfileRequest(accountScope, `/${profileId}`, {
+    const response = await this.voiceProfileRequest(scope, `/${profileId}`, {
       method: "DELETE", signal,
     }, mutationKey);
     if (response.status === 204) return "deleted";
@@ -426,6 +448,7 @@ export class ProClient {
       if (
         value.operation !== operation.id ||
         value.scope !== operation.accountScope ||
+        (value.diarization?.enabled === true) !== operation.identifySpeakers ||
         value.voiceOptions !== (voice ? JSON.stringify(voice) : undefined) ||
         value.routerBaseUrl !== this.routerURL
       )
@@ -445,14 +468,18 @@ export class ProClient {
         "operation_expired",
       );
     const recoveryKey = this.sessionKey(recording, operation);
-    let recovery = this.recoveries.get(recoveryKey);
-    if (!recovery) {
-      recovery = this.reserve(operation, recording, signal).finally(() => {
-        this.recoveries.delete(recoveryKey);
-      });
-      this.recoveries.set(recoveryKey, recovery);
+    const binding = JSON.stringify([operation.workerURL, operation.accountScope, operation.identifySpeakers, voice]);
+    const existing = this.recoveries.get(recoveryKey);
+    if (existing) {
+      if (existing.binding !== binding)
+        throw new Error("This session belongs to another operation.");
+      return existing.promise;
     }
-    return recovery;
+    const promise = this.reserve(operation, recording, signal).finally(() => {
+      this.recoveries.delete(recoveryKey);
+    });
+    this.recoveries.set(recoveryKey, { binding, promise });
+    return promise;
   }
 
   private path(session: Session) {
@@ -552,7 +579,11 @@ export class ProClient {
     operation: ProOperation,
     recording: string,
     signal?: AbortSignal,
-  ): Promise<unknown> {
+  ): Promise<
+    | { result: Extract<VoiceIdentification, { status: "pending" }>; retryAfterSeconds: 2 }
+    | { result: Exclude<VoiceIdentification, { status: "pending" }> }
+    | undefined
+  > {
     if (operation.workerURL !== this.workerURL)
       throw new Error("This operation belongs to another environment.");
     if (!voiceOptions(operation)) return;
@@ -566,9 +597,13 @@ export class ProClient {
       headers: { Authorization: `Bearer ${session.controlCapability}` },
       signal,
     });
-    if (response.status !== 200 && response.status !== 202)
-      throw new ProServiceError("Voice matching response is unavailable.", "voice_unavailable");
-    return response.json();
+    const parsed = parseVoiceIdentification(await response.json());
+    if (response.status === 202 && parsed?.status === "pending" &&
+        response.headers.get("Retry-After") === "2")
+      return { result: parsed, retryAfterSeconds: 2 };
+    if (response.status === 200 && parsed && parsed.status !== "pending")
+      return { result: parsed };
+    throw new ProServiceError("Voice matching response is unavailable.", "voice_unavailable");
   }
 
   async upload(
@@ -624,6 +659,7 @@ export class ProClient {
     if (
       session.operation !== operation.id ||
       session.scope !== operation.accountScope ||
+      (session.diarization?.enabled === true) !== operation.identifySpeakers ||
       session.voiceOptions !== (voice ? JSON.stringify(voice) : undefined) ||
       session.routerBaseUrl !== this.routerURL ||
       operation.workerURL !== this.workerURL
@@ -653,4 +689,104 @@ export class ProClient {
     }
     await this.store.deleteItemAsync(key);
   }
+}
+
+/** Additive VoiceProfile result. Identity does not replace the authoritative transcript. */
+export const VOICE_PROFILE_CONTRACT = VOICE_CONTRACT;
+const dispositions = ["matched", "needs_review", "unknown"] as const;
+type Disposition = typeof dispositions[number];
+const errors = ["recognizer_unavailable", "segmentation_unavailable", "invalid_result"] as const;
+type IdentificationError = typeof errors[number];
+
+export type VoiceSegment = {
+  segmentId: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  speakerId: string | null;
+} & (
+  | { disposition: "matched"; matchedProfileId: string }
+  | { disposition: "needs_review" | "unknown"; matchedProfileId?: never }
+);
+
+export type VoiceIdentification =
+  | { contract: typeof VOICE_PROFILE_CONTRACT; status: "pending" }
+  | { contract: typeof VOICE_PROFILE_CONTRACT; status: "completed"; segments: VoiceSegment[] }
+  | { contract: typeof VOICE_PROFILE_CONTRACT; status: "failed"; error: IdentificationError; segments: VoiceSegment[] };
+
+type ObjectValue = Record<string, unknown>;
+const opaque = /^[A-Za-z0-9_-]{1,128}$/;
+const speaker = /^SPEAKER_0[1-8]$/;
+const MAX_MS = 4 * 60 * 60 * 1000;
+const MAX_SEGMENTS = 100_000;
+const MAX_TEXT_CHARS = 16 * 1024 * 1024;
+
+function object(value: unknown): value is ObjectValue {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function exactFields(value: ObjectValue, fields: string[]) {
+  const keys = Object.keys(value);
+  return keys.length === fields.length && fields.every((key) => Object.hasOwn(value, key));
+}
+
+function segment(value: unknown): VoiceSegment | undefined {
+  if (!object(value)) return;
+  const { segmentId, startMs, endMs, text, speakerId, disposition, matchedProfileId } = value;
+  if (
+    typeof segmentId !== "string" || !opaque.test(segmentId) ||
+    typeof startMs !== "number" || !Number.isSafeInteger(startMs) ||
+    typeof endMs !== "number" || !Number.isSafeInteger(endMs) ||
+    startMs < 0 || endMs < startMs || endMs > MAX_MS ||
+    typeof text !== "string" ||
+    !(speakerId === null || (typeof speakerId === "string" && speaker.test(speakerId))) ||
+    !dispositions.includes(disposition as Disposition)
+  ) return;
+  const fields = ["segmentId", "startMs", "endMs", "text", "speakerId", "disposition"];
+  const base = { segmentId, startMs, endMs, text, speakerId };
+  if (disposition === "matched") {
+    if (speakerId === null || startMs === endMs || typeof matchedProfileId !== "string" ||
+        !opaque.test(matchedProfileId) || !exactFields(value, [...fields, "matchedProfileId"])) return;
+    return { ...base, disposition, matchedProfileId };
+  }
+  if (!exactFields(value, fields)) return;
+  return { ...base, disposition: disposition as "needs_review" | "unknown" };
+}
+
+/** Return undefined for an invalid optional sidecar. The caller keeps the original. */
+export function parseVoiceIdentification(value: unknown): VoiceIdentification | undefined {
+  if (!object(value) || value.contract !== VOICE_PROFILE_CONTRACT) return;
+  const { status, error } = value;
+  if (status === "pending") {
+    if (exactFields(value, ["contract", "status"])) return { contract: VOICE_PROFILE_CONTRACT, status };
+    return;
+  }
+  if (status !== "completed" && status !== "failed") return;
+  if (!exactFields(value, ["contract", "status", "segments", ...(status === "failed" ? ["error"] : [])]) ||
+      !Array.isArray(value.segments) || value.segments.length > MAX_SEGMENTS ||
+      (status === "failed" && !errors.includes(error as IdentificationError))) return;
+  const ids = new Set<string>();
+  const names = new Map<string, string>();
+  const review = new Set<string>();
+  const result: VoiceSegment[] = [];
+  let textUnits = 0;
+  for (const row of value.segments) {
+    const parsed = segment(row);
+    if (!parsed || ids.has(parsed.segmentId) || (status === "failed" && parsed.disposition === "matched")) return;
+    textUnits += parsed.text.length;
+    if (textUnits > MAX_TEXT_CHARS) return;
+    ids.add(parsed.segmentId);
+    if (parsed.disposition === "matched" && parsed.speakerId !== null) {
+      const prior = names.get(parsed.speakerId);
+      if (review.has(parsed.speakerId) || (prior !== undefined && prior !== parsed.matchedProfileId)) return;
+      names.set(parsed.speakerId, parsed.matchedProfileId);
+    }
+    if (parsed.disposition === "needs_review" && parsed.speakerId !== null) {
+      if (names.has(parsed.speakerId)) return;
+      review.add(parsed.speakerId);
+    }
+    result.push(parsed);
+  }
+  if (status === "failed") return { contract: VOICE_PROFILE_CONTRACT, status, error: error as IdentificationError, segments: result };
+  return { contract: VOICE_PROFILE_CONTRACT, status, segments: result };
 }

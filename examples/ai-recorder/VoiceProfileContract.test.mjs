@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { parseVoiceIdentification } from "./VoiceProfileContract.ts";
+import { parseVoiceIdentification } from "./ProClient.ts";
 
 const fixtures = JSON.parse(readFileSync(new URL("./docs/voice-profile/v1.fixtures.json", import.meta.url)));
 const job = fixtures.transcriptions[1];

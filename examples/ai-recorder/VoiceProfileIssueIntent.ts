@@ -18,13 +18,13 @@ type ExplicitChoice = {
   content: IssueContent;
   assignee: GitHubIdentity;
 };
-type FrozenCreate = {
-  target: GitHubTarget;
+type FrozenCreate = Readonly<{
+  target: Readonly<GitHubTarget>;
   title: string;
   body: string;
   marker: string;
-  assignee: GitHubIdentity;
-};
+  assignee: Readonly<GitHubIdentity>;
+}>;
 type IssueObservation = {
   number: number;
   body: string | null;
@@ -70,11 +70,11 @@ export function freezeConfirmedCreate(
   const marker = `<!-- recorder-action-v1:${operation} -->`;
   // The recording/time/profile fields stay local; only the explicit content
   // plus a non-biometric correlation marker enters the request body.
-  return {
-    target: { ...draft.target }, title: draft.content.title,
+  return Object.freeze({
+    target: Object.freeze({ ...draft.target }), title: draft.content.title,
     body: `${draft.content.body}\n\n${marker}`, marker,
-    assignee: { ...draft.assignee },
-  };
+    assignee: Object.freeze({ ...draft.assignee }),
+  });
 }
 
 export function verifyCreatedIssue(

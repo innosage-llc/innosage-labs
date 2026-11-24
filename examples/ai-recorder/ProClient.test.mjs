@@ -3,7 +3,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { ProClient } from './ProClient.ts';
 
-function fixture() {
+function fixture(clipVoiceSample) {
   const values = new Map();
   const store = { getItemAsync: async key => values.get(key) ?? null,
     setItemAsync: async (key, value) => { values.set(key, value); },
@@ -36,6 +36,7 @@ function fixture() {
         return Response.json({ contract: 'recorder-voice-profile/v1', profiles: [state.voiceProfile] });
       }
       state.reservations++;
+      if (state.reserveHold) await state.reserveHold;
       const reserve = JSON.parse(init.body);
       state.mode = reserve.diarization.enabled;
       state.voiceOptions = reserve.voiceIdentification;
@@ -61,14 +62,15 @@ function fixture() {
     assert.equal(init.headers.Authorization, 'Bearer ' + 'c'.repeat(32));
     if (url.endsWith('/voice-identification')) {
       const payload = state.voiceResult ?? { contract: 'recorder-voice-profile/v1', status: 'pending' };
-      return Response.json(payload, { status: payload.status === 'pending' ? 202 : 200 });
+      const status = state.voiceHttpStatus ?? (payload.status === 'pending' ? 202 : 200);
+      return Response.json(payload, { status, ...(status === 202 ? { headers: {'Retry-After':'2'} } : {}) });
     }
     if (url.endsWith('/transcript')) return new Response('[00:00.000 - 00:01.000] Synthetic original.');
     if (url.endsWith('/cleanup')) { state.cleanup++; return Response.json({ state: 'CLEANED' }); }
     if (state.rejectStatusOnce) { state.rejectStatusOnce = false; return Response.json({ error: 'capability_denied' }, { status: 401 }); }
     return Response.json({ state: state.phase });
   }
-  const client = new ProClient(worker, router, http, store, async (url, file, headers, signal) => { await http(url, { headers, signal, body: file }); });
+  const client = new ProClient(worker, router, http, store, async (url, file, headers, signal) => { await http(url, { headers, signal, body: file }); }, clipVoiceSample);
   const operation = { id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`, lane: 'pro',
     workerURL: worker, accountScope: state.scope, sourceBytes: 60_000_000, identifySpeakers: false };
   const file = { size: operation.sourceBytes };
@@ -194,10 +196,15 @@ test('voice result is additive, uses the same reservation and never uploads a se
   assert.match(original.transcript, /Synthetic original/);
   assert.ok(!f.calls.some(call => call.url.endsWith('/voice-identification')));
   assert.deepEqual(f.state.voiceOptions, { contract: 'recorder-voice-profile/v1', candidateProfileIds: ['vp_a', 'vp_b'] });
-  assert.equal((await f.client.readVoiceIdentification(optIn, 'synthetic.m4a')).status, 'pending');
+  assert.deepEqual(await f.client.readVoiceIdentification(optIn, 'synthetic.m4a'), {
+    result: { contract: 'recorder-voice-profile/v1', status: 'pending' }, retryAfterSeconds: 2,
+  });
   const reordered = { ...optIn, voiceIdentification: { candidateProfileIds: ['vp_a', 'vp_b'] } };
   f.state.voiceResult = { contract: 'recorder-voice-profile/v1', status: 'completed', segments: [] };
-  assert.deepEqual(await f.client.readVoiceIdentification(reordered, 'synthetic.m4a'), f.state.voiceResult);
+  assert.deepEqual(await f.client.readVoiceIdentification(reordered, 'synthetic.m4a'), {result:f.state.voiceResult});
+  f.state.voiceHttpStatus = 202;
+  await assert.rejects(f.client.readVoiceIdentification(reordered, 'synthetic.m4a'), {code:'voice_unavailable'});
+  f.state.voiceHttpStatus = undefined;
   assert.equal(f.state.reservations, 1);
   assert.equal(f.state.uploads, 0);
   assert.equal(f.state.cleanup, 0);
@@ -225,24 +232,32 @@ test('selected identity profiles are never silently replaced by a plain upload',
 });
 
 test('profile changes stay inside the original Pro worker, bind consent, and distinguish pending delete', async () => {
-  const f = fixture();
-  await f.client.configure('synthetic-pro-key');
-  const scope = f.operation.accountScope;
-  f.state.voiceProfile = { profileId: 'vp_fake', displayName: 'Example', revision: 1, status: 'active' };
   const clip = new Blob(['example WAV bytes'], { type: 'audio/wav' });
+  const capture = [];
+  const f = fixture(async request => {
+    capture.push(request);
+    return clip;
+  });
+  await f.client.configure('synthetic-pro-key');
+  const scope = { workerURL:f.operation.workerURL, accountScope:f.operation.accountScope };
+  f.state.voiceProfile = { profileId: 'vp_fake', displayName: 'Example', revision: 1, status: 'active' };
   const source = { source: 'confirmed_segment', recordingRef:'rec_a', segmentId:'seg_1', startMs:500, endMs:3500 };
-  const request = { mutationKey: 'example-enrollment', audio: clip, source, accountScope: scope };
+  const request = { mutationKey: 'example-enrollment', source, ...scope };
   const before = f.calls.length;
   await assert.rejects(f.client.enrollVoiceProfile({ ...request, participantConfirmed:false }, 'Example'),
     { code:'voice_options_invalid' });
   assert.equal(f.calls.length, before);
+  await assert.rejects(f.client.enrollVoiceProfile({ ...request, audio:clip, participantConfirmed:true }, 'Example'),
+    {code:'voice_options_invalid'});
+  assert.equal(f.calls.length, before);
   assert.deepEqual(await f.client.enrollVoiceProfile({ ...request, participantConfirmed:true }, 'Example'), f.state.voiceProfile);
+  assert.deepEqual(capture, [source]);
   assert.deepEqual(f.state.enrollment, { key:request.mutationKey, bytes:clip.size, metadata:{
     displayName: 'Example', sample:source, consent:{scope:'voice_profile_enrollment',participantConfirmed:true},
   } });
   assert.deepEqual(await f.client.listVoiceProfiles(scope), [f.state.voiceProfile]);
   await f.client.updateVoiceProfileSample('vp_fake', {
-    ...request, mutationKey:'example-replace', participantConfirmed:true,
+    ...request, mutationKey:'example-replace', participantConfirmed:true, audio:clip,
     source:{ source:'direct', filePath:'/private/not-forwarded' },
   }, 1, 'replace');
   assert.deepEqual(f.state.enrollment.metadata, {
@@ -260,4 +275,28 @@ test('profile changes stay inside the original Pro worker, bind consent, and dis
   await assert.rejects(f.client.listVoiceProfiles(scope), { code:'authorization' });
   assert.equal(f.calls.filter(c => c.url.includes('/voice-profiles/')).length, count);
   assert.ok(f.calls.every(c => c.url.startsWith('https://worker.test')));
+  const beforeWrongOrigin = f.calls.length;
+  await assert.rejects(f.client.enrollVoiceProfile({
+    ...request, workerURL:'https://other.test', participantConfirmed:true,
+  }, 'Example'), {code:'authorization'});
+  assert.equal(f.calls.length, beforeWrongOrigin);
+});
+
+test('concurrent first reservation cannot reuse a different opt-in or account binding', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  let release;
+  f.state.reserveHold = new Promise(ok => { release = ok; });
+  const intended = f.client.read(f.operation, 'synthetic.m4a');
+  try {
+    await assert.rejects(f.client.upload({ ...f.operation, identifySpeakers:true, voiceIdentification:{} },
+      'synthetic.m4a', f.file, async () => 'b'.repeat(64)), /another operation/);
+    await assert.rejects(f.client.read({ ...f.operation, accountScope:'d'.repeat(64) }, 'synthetic.m4a'),
+      /another operation/);
+    assert.equal(f.state.uploads, 0);
+  } finally {
+    release();
+  }
+  assert.equal((await intended).state, 'RESERVED');
+  assert.equal(f.state.reservations, 1);
 });

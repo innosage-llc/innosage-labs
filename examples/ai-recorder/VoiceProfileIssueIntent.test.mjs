@@ -17,6 +17,9 @@ const key = "ab".repeat(16);
 test("the confirmed create payload carries a private operation marker, not speaker attributes", () => {
   const issued = freezeConfirmedCreate(draft, choice, key);
   assert.equal(issued.assignee.login, "example-user");
+  assert.throws(() => { issued.title = "Unconfirmed"; }, TypeError);
+  assert.throws(() => { issued.target.repo = "unconfirmed"; }, TypeError);
+  assert.throws(() => { issued.assignee.id = 99; }, TypeError);
   assert.match(issued.body, /recorder-action-v1/);
   assert.doesNotMatch(JSON.stringify(issued), /vp_speaker|vp_owner|private-synthetic-recording|sourceStartMs/);
   assert.throws(() => freezeConfirmedCreate(draft, { ...choice, userConfirmed: false }, key), /Confirm/);
