@@ -11,6 +11,7 @@ test('display names are ephemeral, current eligible exact IDs only, and points r
     [{speakerId:'SPEAKER_01',segmentId:'seg-1',startMs:2500,endMs:5500,disposition:'matched',liveName:'Fixture participant'}]);
   assert.equal(reviewLiveVoiceSegments([row()],[])[0].disposition, 'unknown');
   assert.equal(reviewLiveVoiceSegments([row()],[profile({status:'disabled'})])[0].disposition,'unknown');
+  assert.equal(reviewLiveVoiceSegments([row()], [profile({status:'disabled'}),profile()])[0].disposition,'unknown');
   const evidence = [row(),row({segmentId:'seg-2',matchedProfileId:'vp_b'})];
   assert.equal(reviewLiveVoiceSegments(evidence,[profile()])[0].disposition,'needs_review');
   assert.equal(reviewLiveVoiceSegments([row(),row({disposition:'unknown',matchedProfileId:undefined})],[profile()])[0].liveName,undefined);

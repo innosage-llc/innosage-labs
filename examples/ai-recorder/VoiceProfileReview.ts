@@ -23,11 +23,14 @@ export function reviewLiveVoiceSegments(
 ): VoiceReviewRow[] {
   const groups = new Map<string, Group>();
   const active = new Map<string, string>();
-  const duplicated = new Set<string>();
+  const seenProfiles = new Set<string>();
   for (const profile of verifiedActiveProfiles) {
-    if (duplicated.has(profile.profileId)) continue;
-    if (active.delete(profile.profileId)) duplicated.add(profile.profileId);
-    else if (profile.status === 'active' && profile.displayName.trim() &&
+    if (seenProfiles.has(profile.profileId)) {
+      active.delete(profile.profileId);
+      continue;
+    }
+    seenProfiles.add(profile.profileId);
+    if (profile.status === 'active' && profile.displayName.trim() &&
         [...profile.displayName].length <= 100) active.set(profile.profileId, profile.displayName);
   }
   for (const row of segments) {
@@ -54,6 +57,16 @@ type AnnotationStore = {
   setItemAsync(key: string, payload: string): Promise<void>;
 };
 type SavedCorrection = { source: VoiceSource; label: string };
+const annotationQueue = new Map<string, Promise<unknown>>();
+function serializeCorrection<T>(key: string, apply: () => Promise<T>): Promise<T> {
+  const result = (annotationQueue.get(key) ?? Promise.resolve()).then(apply);
+  const settled = result.then(() => undefined, () => undefined);
+  annotationQueue.set(key, settled);
+  void settled.then(() => {
+    if (annotationQueue.get(key) === settled) annotationQueue.delete(key);
+  });
+  return result;
+}
 
 function name(value: string) {
   const trimmed = value.trim();
@@ -95,11 +108,13 @@ export async function saveManualVoiceCorrection(
   const source = { speakerId: selected.speakerId, segmentId: selected.segmentId,
     startMs: selected.startMs, endMs: selected.endMs };
   const annotation = { source, label: name(choice.label) };
-  const prior = await readManualVoiceCorrections(store, key, binding);
-  const entries = [...prior.filter(row => row.source.speakerId !== source.speakerId), annotation];
-  const content = JSON.stringify({ contract:'recorder-local-voice-corrections/v1',
-    binding:binding.operationId + ':' + binding.originalSha256, entries });
-  if (content.length > 4096) throw new Error('The local speaker annotation is too large.');
-  await store.setItemAsync(key, content);
-  return entries;
+  return serializeCorrection(key, async () => {
+    const prior = await readManualVoiceCorrections(store, key, binding);
+    const entries = [...prior.filter(row => row.source.speakerId !== source.speakerId), annotation];
+    const content = JSON.stringify({ contract:'recorder-local-voice-corrections/v1',
+      binding:binding.operationId + ':' + binding.originalSha256, entries });
+    if (content.length > 4096) throw new Error('The local speaker annotation is too large.');
+    await store.setItemAsync(key, content);
+    return entries;
+  });
 }
