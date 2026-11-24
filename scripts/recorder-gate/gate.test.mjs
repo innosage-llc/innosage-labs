@@ -256,3 +256,16 @@ test('generated XCTest project has named products, both Swift sources, applicati
   const inspected=JSON.parse(run(ruby,['-rxcodeproj','-rjson','-e','p=Xcodeproj::Project.open(ARGV[0]);t=p.targets.find{|x|x.name=="StartupGateUITests"};puts JSON.generate({products:t.build_configurations.map{|c|c.build_settings["PRODUCT_NAME"]},sources:t.source_build_phase.files_references.map(&:display_name).sort,dependencies:t.dependencies.size,scheme:File.read(File.join(ARGV[0],"xcshareddata/xcschemes/AIRecorder.xcscheme")).include?(t.uuid)})',project]));
   assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
 });
+
+
+test('iOS readiness origin is a shared kernel uptime and refuses invalid data', async () => {
+  const { iosLaunchUptime } = await import('./ios.mjs');
+  assert.throws(() => iosLaunchUptime(() => ''), /uptime unavailable/);
+  assert.throws(() => iosLaunchUptime(() => 'NaN'), /uptime unavailable/);
+  if (process.platform === 'darwin') {
+    const clock = () => iosLaunchUptime((program, args) => run(program, args));
+    const first = clock();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.ok(clock() - first >= 0.03, 'a different Python process must share the boot clock');
+  }
+});

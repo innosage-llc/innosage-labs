@@ -46,7 +46,7 @@ test("recordings retain local speaker identity and usable anonymous results if m
     assert.equal(options.contract, fixtures.version);
     assert.equal(job.result.contract, fixtures.version);
     assert.equal(job.reserve.diarization.enabled, true);
-    assert.match(job.reserve.idempotencyKey, /^recorder-transcription-v2-\d{10}-/);
+    assert.match(job.reserve.idempotencyKey, /^recorder-transcription-v2-\d{10}-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/);
     assert.deepEqual(job.acknowledgement, {
       decision: "created",
       diarization: job.reserve.diarization,
