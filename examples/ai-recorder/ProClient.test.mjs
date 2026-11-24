@@ -20,7 +20,9 @@ function fixture() {
       if (!state.authorized) return Response.json({ error: 'unauthorized' }, { status: 401 });
       if (url.endsWith('/identity')) return Response.json({ success: true, accountScope: state.scope });
       state.reservations++;
-      state.mode = JSON.parse(init.body).diarization.enabled;
+      const reserve = JSON.parse(init.body);
+      state.mode = reserve.diarization.enabled;
+      state.voiceOptions = reserve.voiceIdentification;
       return Response.json({ decision: 'created', sessionId: 'tx_synthetic', state: state.phase,
         routerBaseUrl: state.wrongRouter ? 'https://other.test' : router,
         uploadCapability: 'u'.repeat(32), controlCapability: 'c'.repeat(32),
@@ -28,6 +30,7 @@ function fixture() {
         controlExpiresAt: Math.floor(Date.now() / 1000) + 86400, maxBytes: 4 * 1024 ** 3,
         allowedContentTypes: ['audio/mp4'],
         ...(state.mode ? { diarization: { enabled: true }, speakerResultContract: 'draft-speaker-attribution/v1' } : {}),
+        ...(state.voiceOptions && !state.omitVoiceAck ? { voiceIdentification: { contract: state.voiceOptions.contract } } : {}),
       });
     }
     assert.ok(url.startsWith(router));
@@ -40,6 +43,10 @@ function fixture() {
       return Response.json({ state: state.phase });
     }
     assert.equal(init.headers.Authorization, 'Bearer ' + 'c'.repeat(32));
+    if (url.endsWith('/voice-identification')) {
+      const payload = state.voiceResult ?? { contract: 'recorder-voice-profile/v1', status: 'pending' };
+      return Response.json(payload, { status: payload.status === 'pending' ? 202 : 200 });
+    }
     if (url.endsWith('/transcript')) return new Response('[00:00.000 - 00:01.000] Synthetic original.');
     if (url.endsWith('/cleanup')) { state.cleanup++; return Response.json({ state: 'CLEANED' }); }
     if (state.rejectStatusOnce) { state.rejectStatusOnce = false; return Response.json({ error: 'capability_denied' }, { status: 401 }); }
@@ -159,4 +166,44 @@ test('early Router capability rejection renews the same operation and surfaces t
   assert.equal(result.state, 'CLEANED');
   assert.equal(f.state.reservations, 2);
   assert.equal(f.state.uploads, 0);
+});
+
+
+test('voice result is additive, uses the same reservation and never uploads a second time', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  const optIn = { ...f.operation, identifySpeakers: true, voiceIdentification: { candidateProfileIds: ['vp_b', 'vp_a'] } };
+  f.state.phase = 'COMPLETED';
+  const original = await f.client.read(optIn, 'synthetic.m4a');
+  assert.match(original.transcript, /Synthetic original/);
+  assert.ok(!f.calls.some(call => call.url.endsWith('/voice-identification')));
+  assert.deepEqual(f.state.voiceOptions, { contract: 'recorder-voice-profile/v1', candidateProfileIds: ['vp_a', 'vp_b'] });
+  assert.equal((await f.client.readVoiceIdentification(optIn, 'synthetic.m4a')).status, 'pending');
+  const reordered = { ...optIn, voiceIdentification: { candidateProfileIds: ['vp_a', 'vp_b'] } };
+  f.state.voiceResult = { contract: 'recorder-voice-profile/v1', status: 'completed', segments: [] };
+  assert.deepEqual(await f.client.readVoiceIdentification(reordered, 'synthetic.m4a'), f.state.voiceResult);
+  assert.equal(f.state.reservations, 1);
+  assert.equal(f.state.uploads, 0);
+  assert.equal(f.state.cleanup, 0);
+  await assert.rejects(f.client.readVoiceIdentification({ ...optIn, voiceIdentification: { candidateProfileIds: [] } }, 'synthetic.m4a'), /another operation/);
+  await assert.rejects(f.client.cleanup({ ...optIn, voiceIdentification: { candidateProfileIds: [] } }, 'synthetic.m4a'), /Invalid cleanup binding/);
+  assert.equal(f.state.cleanup, 0);
+  const reads = f.calls.filter(c => c.url.endsWith('/voice-identification')).length;
+  f.state.scope = 'd'.repeat(64);
+  await assert.rejects(f.client.readVoiceIdentification(optIn, 'synthetic.m4a'), { code: 'authorization' });
+  assert.equal(f.calls.filter(c => c.url.endsWith('/voice-identification')).length, reads);
+});
+
+test('selected identity profiles are never silently replaced by a plain upload', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  const optIn = { ...f.operation, identifySpeakers: true, voiceIdentification: {} };
+  f.state.omitVoiceAck = true;
+  await assert.rejects(f.client.upload(optIn, 'synthetic.m4a', f.file, async () => 'b'.repeat(64)),
+    { code: 'voice_unavailable' });
+  assert.equal(f.state.uploads, 0);
+  const before = f.calls.length;
+  await assert.rejects(f.client.read({ ...optIn, voiceIdentification: { candidateProfileIds: ['vp_a','vp_a'] } }, 'synthetic.m4a'),
+    { code: 'voice_options_invalid' });
+  assert.equal(f.calls.length, before);
 });

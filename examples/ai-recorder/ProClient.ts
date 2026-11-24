@@ -2,6 +2,7 @@ export type ProProfile = { key: string; accountScope: string };
 export type ProOperation = {
   id: string;
   identifySpeakers: boolean;
+  voiceIdentification?: { candidateProfileIds?: readonly string[] };
   lane: "pro";
   workerURL: string;
   accountScope: string;
@@ -21,6 +22,7 @@ type Session = {
   state: string;
   operation: string;
   scope: string;
+  voiceOptions?: string;
   sessionId: string;
   routerBaseUrl: string;
   uploadCapability: string;
@@ -50,6 +52,25 @@ export class ProServiceError extends Error {
   }
 }
 export const PRO_SOURCE_LIMIT = 512 * 1024 * 1024;
+const VOICE_CONTRACT = "recorder-voice-profile/v1";
+
+function voiceOptions(operation: ProOperation) {
+  if (operation.voiceIdentification === undefined) return;
+  if (!operation.identifySpeakers)
+    throw new ProServiceError("Voice matching requires speaker labels.", "voice_options_invalid");
+  const ids = operation.voiceIdentification.candidateProfileIds;
+  if (ids === undefined) return { contract: VOICE_CONTRACT };
+  if (!Array.isArray(ids) || ids.length > 64 || new Set(ids).size !== ids.length ||
+      ids.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id)))
+    throw new ProServiceError("The selected voice profiles are invalid.", "voice_options_invalid");
+  return { contract: VOICE_CONTRACT, candidateProfileIds: [...ids].sort() };
+}
+
+function hasVoiceAcknowledgement(value: unknown) {
+  if (value === null || typeof value !== "object") return false;
+  return Object.keys(value).length === 1 && "contract" in value && value.contract === VOICE_CONTRACT;
+}
+
 
 export class ProClient {
   private readonly profileKey: string;
@@ -153,6 +174,7 @@ export class ProClient {
     recording: string,
     signal?: AbortSignal,
   ): Promise<Session> {
+    const voice = voiceOptions(operation);
     const profile = await this.profile();
     if (
       operation.workerURL !== this.workerURL ||
@@ -174,10 +196,13 @@ export class ProClient {
         body: JSON.stringify({
           idempotencyKey: operation.id,
           diarization: { enabled: operation.identifySpeakers },
+          ...(voice ? { voiceIdentification: voice } : {}),
         }),
       },
     );
     const value = await response.json();
+    if (voice ? !hasVoiceAcknowledgement(value.voiceIdentification) : value.voiceIdentification !== undefined)
+      throw new ProServiceError("Voice matching is not available for this operation.", "voice_unavailable");
     if (
       !["created", "idempotent"].includes(value.decision) ||
       value.routerBaseUrl !== this.routerURL ||
@@ -202,6 +227,7 @@ export class ProClient {
       ...value,
       operation: operation.id,
       scope: operation.accountScope,
+      voiceOptions: voice ? JSON.stringify(voice) : undefined,
     };
     await this.store.setItemAsync(
       this.sessionKey(recording, operation),
@@ -218,6 +244,7 @@ export class ProClient {
   ): Promise<Session> {
     if (operation.workerURL !== this.workerURL)
       throw new Error("This operation belongs to another environment.");
+    const voice = voiceOptions(operation);
     const saved = await this.store.getItemAsync(
       this.sessionKey(recording, operation),
     );
@@ -226,6 +253,7 @@ export class ProClient {
       if (
         value.operation !== operation.id ||
         value.scope !== operation.accountScope ||
+        value.voiceOptions !== (voice ? JSON.stringify(voice) : undefined) ||
         value.routerBaseUrl !== this.routerURL
       )
         throw new Error("This session belongs to another operation.");
@@ -344,6 +372,32 @@ export class ProClient {
     return { state: "COMPLETED", transcript, speakerLabeling: speakers };
   }
 
+  // Read only after the caller has saved the usable original. No upload or
+  // implicit retry; callers parse the optional payload and keep their transcript
+  // even on unavailable/malformed results.
+  async readVoiceIdentification(
+    operation: ProOperation,
+    recording: string,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    if (operation.workerURL !== this.workerURL)
+      throw new Error("This operation belongs to another environment.");
+    if (!voiceOptions(operation)) return;
+    const profile = await this.profile();
+    if (!profile || profile.accountScope !== operation.accountScope ||
+        (await this.identity(profile.key, signal)) !== operation.accountScope)
+      throw new ProServiceError("Restore the Pro key for this recording’s original account and environment.", "authorization");
+    const { session, status } = await this.observed(operation, recording, signal);
+    if (status.state !== "COMPLETED") return;
+    const response = await this.request(this.path(session) + "/voice-identification", {
+      headers: { Authorization: `Bearer ${session.controlCapability}` },
+      signal,
+    });
+    if (response.status !== 200 && response.status !== 202)
+      throw new ProServiceError("Voice matching response is unavailable.", "voice_unavailable");
+    return response.json();
+  }
+
   async upload(
     operation: ProOperation,
     recording: string,
@@ -389,6 +443,7 @@ export class ProClient {
   }
 
   async cleanup(operation: ProOperation, recording: string) {
+    const voice = voiceOptions(operation);
     const key = this.sessionKey(recording, operation);
     const saved = await this.store.getItemAsync(key);
     if (!saved) return;
@@ -396,6 +451,7 @@ export class ProClient {
     if (
       session.operation !== operation.id ||
       session.scope !== operation.accountScope ||
+      session.voiceOptions !== (voice ? JSON.stringify(voice) : undefined) ||
       session.routerBaseUrl !== this.routerURL ||
       operation.workerURL !== this.workerURL
     )
