@@ -16,11 +16,14 @@ import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore'
 import { draftText, transcriptSeed } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
 
-import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
+import {
+  clientForService, clientForOperation, selectedService, hashRecording,
+  enrollConfirmedStageClip, readPendingConfirmedStageClip, resumeConfirmedStageClip,
+} from './ProAccess';
 import { openAIAccess } from './OpenAIAccess';
 import { openAIMaxBytes } from './OpenAIClient';
 import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
-import { ProServiceError, type ProClient, type ProOperation, type VoiceProfileSummary, type VoiceSegment } from './ProClient';
+import { ProServiceError, type ProClient, type ProOperation, type VoiceIdentification, type VoiceProfileSummary, type VoiceSegment } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuestJob, restoreGateway } from './GatewayConnection';
@@ -28,16 +31,19 @@ import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyF
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 import { finishVoiceAfterSavingOriginal, readLocalVoiceReceipt, voiceProfileStageEnabled, writeLocalVoiceReceipt, type LocalVoiceReceipt } from './VoiceProfileFlow';
-import { reviewLiveVoiceSegments, type VoiceReviewRow } from './VoiceProfileReview';
+import { reviewLiveVoiceSegments, type VoiceReviewRow, type VoiceSource } from './VoiceProfileReview';
+import { ConfirmedVoiceClip, type ConfirmedVoiceClipSelection } from './ui/voice-profile/confirmed-voice-clip';
 import { VoiceSpeakerReview } from './ui/voice-profile/voice-speaker-review';
 import { summarizeVoiceProfileResult, VoiceProfileStatus, type VoiceProfileReview } from './ui/voice-profile/voice-profile-status';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
+type CompletedVoiceIdentification = Extract<VoiceIdentification, { status: 'completed' }>;
 type LiveVoiceReview = {
   operation: ProOperation;
   originalUri: string;
   rows: readonly VoiceReviewRow[];
   namesUnavailable: boolean;
+  exactObservedResult?: CompletedVoiceIdentification;
 };
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
@@ -60,7 +66,7 @@ async function confirmVoiceReview(client: ProClient, operation: ProOperation, re
   const budgetMs = 3000;
   const deadline = performance.now() + budgetMs;
   return readOperationWithDeadline(lookupSignal => new Promise<{
-    profiles: VoiceProfileSummary[]; segments: readonly VoiceSegment[];
+    profiles: VoiceProfileSummary[]; result: CompletedVoiceIdentification;
   } | undefined>(resolve => {
     if (lookupSignal.aborted) {
       resolve(undefined);
@@ -75,12 +81,30 @@ async function confirmVoiceReview(client: ProClient, operation: ProOperation, re
       // Recheck matching revisions on the same job after reading the profile names.
       const observed = await client.readVoiceIdentification(operation, recordingName, lookupSignal);
       if (lookupSignal.aborted || performance.now() >= deadline || observed?.result.status !== 'completed') return;
-      return { profiles, segments: observed.result.segments };
+      return { profiles, result: observed.result };
     }
 
     void confirm().then(resolve, unavailable)
       .finally(() => lookupSignal.removeEventListener('abort', unavailable));
   }), signal, budgetMs);
+}
+
+function sameVoiceSource(left: VoiceSource, right: Pick<VoiceSegment, 'segmentId' | 'startMs' | 'endMs' | 'speakerId'>) {
+  return left.segmentId === right.segmentId && left.speakerId === right.speakerId &&
+    left.startMs === right.startMs && left.endMs === right.endMs;
+}
+
+function confirmedClipSources(review: LiveVoiceReview | undefined): VoiceSource[] {
+  const segments = review?.exactObservedResult?.segments;
+  if (!review || !segments) return [];
+  return review.rows.filter(row => {
+    const duration = row.endMs - row.startMs;
+    // Reviewed bounds come from the parsed result, which caps source time at four hours.
+    return duration >= 2_000 && duration <= 30_000 &&
+      segments.some(segment => sameVoiceSource(row, segment)) &&
+      !segments.some(segment => segment.speakerId !== row.speakerId &&
+        segment.startMs < row.endMs && segment.endMs > row.startMs && segment.endMs > segment.startMs);
+  }).map(({ segmentId, speakerId, startMs, endMs }) => ({ segmentId, speakerId, startMs, endMs }));
 }
 
 export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
@@ -310,6 +334,33 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const originalUri = original.uri;
   const liveReview = liveVoiceReview?.operation === voiceProfileOperation && liveVoiceReview?.originalUri === originalUri
     ? liveVoiceReview : undefined;
+  const clipOperation = supportsProUpload && voiceProfilesEnabled && complete && !connecting && showingOriginal &&
+    !editingDraft && voiceProfileOperation?.lane === 'pro' && voiceProfileOperation.identifySpeakers === true &&
+    original.exists && recording.exists ? voiceProfileOperation : undefined;
+  const clipSources = useMemo(() => confirmedClipSources(clipOperation ? liveReview : undefined), [clipOperation, liveReview]);
+
+  async function submitConfirmedClip(selection: ConfirmedVoiceClipSelection, signal: AbortSignal) {
+    if (!clipOperation || !original.exists || !recording.exists || AppState.currentState !== 'active' ||
+        selection.participantConfirmed !== true) throw new Error('Clip confirmation is unavailable.');
+    signal.throwIfAborted();
+    const pendingClip = await readPendingConfirmedStageClip(clipOperation);
+    signal.throwIfAborted();
+    if (!original.exists || !recording.exists || AppState.currentState !== 'active')
+      throw new Error('Clip confirmation is unavailable.');
+    const confirmation = {
+      segmentId: selection.source.segmentId, displayName: selection.displayName, participantConfirmed: true as const,
+    };
+    if (selection.kind === 'resume') {
+      if (!pendingClip || !sameVoiceSource(selection.source, pendingClip)) throw new Error('Pending clip changed.');
+      await resumeConfirmedStageClip(clipOperation, recording, confirmation, signal);
+      return;
+    }
+    const exactObservedResult = liveReview?.exactObservedResult;
+    if (pendingClip || !exactObservedResult || !clipSources.some(source => sameVoiceSource(source, selection.source)))
+      throw new Error('Clip confirmation is unavailable.');
+    await enrollConfirmedStageClip(clipOperation, recording, exactObservedResult, confirmation, signal);
+  }
+
   useEffect(() => {
     if (!complete || connecting || !voiceProfilesEnabled || !voiceProfileOperation) return;
     const operation = voiceProfileOperation;
@@ -319,21 +370,22 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
     let namesLookup: AbortController | undefined;
     let namesTimer: ReturnType<typeof setTimeout> | undefined;
 
-    function hideLiveNames() {
+    function hideLiveNames(clearObservedResult = false) {
       namesLookup?.abort();
       clearTimeout(namesTimer);
       setLiveVoiceReview(current => {
         if (current?.operation !== operation || current.originalUri !== originalUri ||
-            !current.rows.some(row => row.liveName)) return current;
+            (!current.rows.some(row => row.liveName) && !(clearObservedResult && current.exactObservedResult))) return current;
         return {
           ...current,
           rows: current.rows.map(row => row.liveName ? { ...row, disposition: 'unknown', liveName: undefined } : row),
+          exactObservedResult: clearObservedResult ? undefined : current.exactObservedResult,
         };
       });
     }
 
     const appState = supportsProUpload ? AppState.addEventListener('change', state => {
-      if (state !== 'active') hideLiveNames();
+      if (state !== 'active') hideLiveNames(true);
     }) : undefined;
 
     async function restoreVoiceReview() {
@@ -372,10 +424,12 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
       if (!segments || signal.aborted) return;
       const namesAreCurrent = !!namesLookup && !namesLookup.signal.aborted && AppState.currentState === 'active';
-      const rows = namesAreCurrent && confirmed
-        ? reviewLiveVoiceSegments(confirmed.segments, confirmed.profiles)
+      const currentReview = namesAreCurrent ? confirmed : undefined;
+      const rows = currentReview
+        ? reviewLiveVoiceSegments(currentReview.result.segments, currentReview.profiles)
         : reviewLiveVoiceSegments(segments, []);
-      setLiveVoiceReview({ operation, originalUri, rows, namesUnavailable: namesAreCurrent && !confirmed });
+      setLiveVoiceReview({ operation, originalUri, rows, namesUnavailable: namesAreCurrent && !confirmed,
+        exactObservedResult: currentReview?.result });
       if (rows.some(row => row.liveName)) namesTimer = setTimeout(hideLiveNames, 30_000);
     }
     void restoreVoiceReview().catch(() => {
@@ -651,6 +705,9 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
                 unknownCount={voiceReview?.unknownCount ?? 0}
                 expandedReview={voiceLookup?.expanded ? voiceReview?.reviewBySpeaker : undefined}
                 onReview={() => setVoiceProfileResult(current => current && { ...current, expanded: !current.expanded })} /> : null}
+              {clipOperation ? <ConfirmedVoiceClip
+                key={JSON.stringify([recordingUri, originalUri, clipOperation.id, clipOperation.accountScope])}
+                operation={clipOperation} sources={clipSources} onSubmit={submitConfirmedClip} /> : null}
               {supportsProUpload && voiceProfilesEnabled && voiceProfileOperation && showingOriginal && !connecting && !editingDraft
                 ? <VoiceSpeakerReview key={`${originalUri}:${voiceProfileOperation.id}`}
                   originalUri={originalUri} operationId={voiceProfileOperation.id}
