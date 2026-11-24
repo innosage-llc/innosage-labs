@@ -1,7 +1,7 @@
 import { DraftSummary } from './DraftSummary';
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
 import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
@@ -20,7 +20,7 @@ import { clientForService, clientForOperation, selectedService, hashRecording } 
 import { openAIAccess } from './OpenAIAccess';
 import { openAIMaxBytes } from './OpenAIClient';
 import { services, serviceForWorker, type ServiceId } from './ServiceConfig';
-import { ProServiceError, type ProOperation } from './ProClient';
+import { ProServiceError, type ProClient, type ProOperation, type VoiceProfileSummary, type VoiceSegment } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuestJob, restoreGateway } from './GatewayConnection';
@@ -28,9 +28,17 @@ import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyF
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 import { finishVoiceAfterSavingOriginal, readLocalVoiceReceipt, voiceProfileStageEnabled, writeLocalVoiceReceipt, type LocalVoiceReceipt } from './VoiceProfileFlow';
+import { reviewLiveVoiceSegments, type VoiceReviewRow } from './VoiceProfileReview';
+import { VoiceSpeakerReview } from './ui/voice-profile/voice-speaker-review';
 import { summarizeVoiceProfileResult, VoiceProfileStatus, type VoiceProfileReview } from './ui/voice-profile/voice-profile-status';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
+type LiveVoiceReview = {
+  operation: ProOperation;
+  originalUri: string;
+  rows: readonly VoiceReviewRow[];
+  namesUnavailable: boolean;
+};
 const stateLabels: Record<string, string> = {
   RESERVED: 'Ready to upload', UPLOADING: 'Uploading', STAGED: 'Preparing audio',
   QUEUED: 'Queued', PROCESSING: 'Transcribing', COMPLETED: 'Complete',
@@ -45,6 +53,21 @@ async function saveText(file: File, text: string) {
   const temporary = new File(file.parentDirectory, file.name + '.pending');
   await temporary.write(text);
   await temporary.move(file, { overwrite: true });
+}
+
+async function readVoiceProfilesForReview(client: ProClient, operation: ProOperation, signal: AbortSignal) {
+  const { workerURL, accountScope } = operation;
+  return readOperationWithDeadline(lookupSignal => new Promise<VoiceProfileSummary[] | undefined>(resolve => {
+    if (lookupSignal.aborted) {
+      resolve(undefined);
+      return;
+    }
+    const unavailable = () => resolve(undefined);
+    lookupSignal.addEventListener('abort', unavailable, { once: true });
+    void client.listVoiceProfiles({ workerURL, accountScope }, lookupSignal)
+      .then(resolve, unavailable)
+      .finally(() => lookupSignal.removeEventListener('abort', unavailable));
+  }), signal, 3000);
 }
 
 export function Transcript({ recording, recordingTitle, backLabel = 'Back to library', onClose }: {
@@ -71,6 +94,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const [voiceProfileResult, setVoiceProfileResult] = useState<{
     operation: ProOperation; review?: VoiceProfileReview; expanded?: boolean;
   }>();
+  const [liveVoiceReview, setLiveVoiceReview] = useState<LiveVoiceReview>();
   const [job, setJob] = useState<Job>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -271,17 +295,39 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const voiceReview = voiceLookup?.review;
   const recordingName = recording.name;
   const originalUri = original.uri;
+  const liveReview = liveVoiceReview?.operation === voiceProfileOperation && liveVoiceReview?.originalUri === originalUri
+    ? liveVoiceReview : undefined;
   useEffect(() => {
     if (!complete || connecting || !voiceProfilesEnabled || !voiceProfileOperation) return;
     const operation = voiceProfileOperation;
     const controller = new AbortController();
     const { signal } = controller;
     const receiptKey = 'voiceprofile.receipt.' + recordingName;
+    let namesLookup: AbortController | undefined;
+    let namesTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function hideLiveNames() {
+      namesLookup?.abort();
+      clearTimeout(namesTimer);
+      setLiveVoiceReview(current => {
+        if (current?.operation !== operation || current.originalUri !== originalUri ||
+            !current.rows.some(row => row.liveName)) return current;
+        return {
+          ...current,
+          rows: current.rows.map(row => row.liveName ? { ...row, disposition: 'unknown', liveName: undefined } : row),
+        };
+      });
+    }
+
+    const appState = supportsProUpload ? AppState.addEventListener('change', state => {
+      if (state !== 'active') hideLiveNames();
+    }) : undefined;
 
     async function restoreVoiceReview() {
       let receipt: LocalVoiceReceipt | undefined = await readLocalVoiceReceipt(SecureStore, receiptKey, operation, originalUri);
       if (signal.aborted) return;
       const client = clientForOperation(operation);
+      let segments: readonly VoiceSegment[] | undefined;
       if (!receipt) {
         const result = await finishVoiceAfterSavingOriginal({
           client, operation, recording: recordingName, originalSaved: true, signal,
@@ -294,18 +340,35 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         receipt = result.result.status === 'completed'
           ? { outcome: 'completed', review: summarizeVoiceProfileResult(result.result.segments) }
           : { outcome: 'failed' };
+        if (supportsProUpload && result.result.status === 'completed') segments = result.result.segments;
         await writeLocalVoiceReceipt(SecureStore, receiptKey, operation, originalUri, receipt);
       }
       if (signal.aborted) return;
       setVoiceProfileResult({ operation, review: receipt.outcome === 'completed' ? receipt.review : undefined });
-      await client.cleanup(operation, recordingName).catch(() => {
+      void client.cleanup(operation, recordingName).catch(() => {
         if (!signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
       });
+      if (!segments) return;
+
+      const lookup = AppState.currentState === 'active' ? new AbortController() : undefined;
+      namesLookup = lookup;
+      const profiles = lookup ? await readVoiceProfilesForReview(client, operation, lookup.signal).catch(() => undefined) : undefined;
+      if (signal.aborted) return;
+      const namesAreCurrent = !!lookup && !lookup.signal.aborted && AppState.currentState === 'active';
+      const rows = reviewLiveVoiceSegments(segments, namesAreCurrent ? profiles ?? [] : []);
+      setLiveVoiceReview({ operation, originalUri, rows, namesUnavailable: namesAreCurrent && !profiles });
+      if (rows.some(row => row.liveName)) namesTimer = setTimeout(hideLiveNames, 30_000);
     }
     void restoreVoiceReview().catch(() => {
       if (!signal.aborted) setVoiceProfileResult({ operation });
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      appState?.remove();
+      namesLookup?.abort();
+      clearTimeout(namesTimer);
+      setLiveVoiceReview(current => current?.operation === operation && current.originalUri === originalUri ? undefined : current);
+    };
   }, [complete, connecting, originalUri, recordingName, voiceProfileOperation, voiceProfilesEnabled]);
   useEffect(() => {
     if (complete && !connecting && !voiceProfileOperation && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
@@ -569,6 +632,11 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
                 unknownCount={voiceReview?.unknownCount ?? 0}
                 expandedReview={voiceLookup?.expanded ? voiceReview?.reviewBySpeaker : undefined}
                 onReview={() => setVoiceProfileResult(current => current && { ...current, expanded: !current.expanded })} /> : null}
+              {supportsProUpload && voiceProfilesEnabled && voiceProfileOperation && showingOriginal && !connecting && !editingDraft
+                ? <VoiceSpeakerReview key={`${originalUri}:${voiceProfileOperation.id}`}
+                  originalUri={originalUri} operationId={voiceProfileOperation.id}
+                  correctionKey={`voiceprofile.corrections.${recordingName}.${voiceProfileOperation.id}`}
+                  rows={liveReview?.rows} namesUnavailable={liveReview?.namesUnavailable} /> : null}
               {!showingOriginal && hasDraftEditor ? <ActionButton
                 title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument || revisionReadFailed}
                 onPress={() => setEditingDraft(true)} /> : null}
