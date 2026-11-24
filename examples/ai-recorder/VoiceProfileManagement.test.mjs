@@ -76,3 +76,30 @@ test('only a definite sample refusal releases the same enrollment intent', async
   await assert.rejects(f.open().enroll(enrollment), /verify/);
   assert.equal((await f.open().restore()).pendingEnrollment, true);
 });
+
+test('caller mutation during the journal write cannot alter hashed or uploaded audio', async () => {
+  const bytes = Uint8Array.of(3, 5, 7);
+  const original = bytes.slice();
+  let unblock;
+  const release = new Promise(resolve => { unblock = resolve; });
+  const journal = {
+    async beginEnrollment(input) {
+      assert.equal(input.clipDigest, digest(original));
+      await release;
+      return 'synthetic-enrollment-id';
+    },
+    async finalizeEnrollment() { return true; },
+  };
+  const client = {
+    async enrollVoiceProfile({ audio }) {
+      assert.notEqual(audio.bytes, bytes);
+      assert.deepEqual(audio.bytes, original);
+      return profile;
+    },
+  };
+  const opened = voiceProfileManagement(client, scope, journal, digest);
+  const pending = opened.enroll({...enrollment, audio:{...audio, bytes}});
+  bytes.fill(77);
+  unblock();
+  assert.deepEqual(await pending, profile);
+});

@@ -108,7 +108,8 @@ function nativeVoiceMultipart(audio: VoiceProfileClip, metadata: string, mutatio
       !voiceIdentifier.test(mutationKey))
     throw new ProServiceError("Choose a supported, short audio clip.", "voice_options_invalid");
 
-  const boundary = "RecorderVoice-" + mutationKey.slice(0, 64);
+  const boundaryPrefix = "RecorderVoice-";
+  const boundary = boundaryPrefix + mutationKey.slice(0, 70 - boundaryPrefix.length);
   const encoder = new TextEncoder();
   // Neither metadata (JSON escapes all line breaks) nor the chosen binary may
   // create a multipart delimiter. Reject a collision before any transport.
@@ -336,9 +337,16 @@ export class ProClient {
     const response = await this.voiceProfileRequest(input, "", {
       method: "POST", ...multipart, signal,
     }, input.mutationKey, true);
-    const data = await response.json();
-    if (data?.contract !== VOICE_CONTRACT)
-      throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
+    if (response.status !== 200 && response.status !== 201) {
+      void response.body?.cancel().catch(() => undefined);
+      throw new ProServiceError("Could not verify the enrollment receipt.", "voice_unavailable");
+    }
+    const data: unknown = await response.json().catch(() => undefined);
+    if (!data || typeof data !== "object" || Array.isArray(data) ||
+        Object.keys(data).length !== 2 || !Object.hasOwn(data, "contract") ||
+        !Object.hasOwn(data, "profile") || !("contract" in data) ||
+        data.contract !== VOICE_CONTRACT || !("profile" in data))
+      throw new ProServiceError("Could not verify the enrollment receipt.", "voice_unavailable");
     return profileSummary(data.profile);
   }
 

@@ -20,9 +20,11 @@ export function voiceProfileManagement(
       const displayName = value.displayName.trim();
       if (![...displayName].length || [...displayName].length > 100)
         throw new Error('Enter a profile name up to 100 characters.');
-      const audio = { bytes: value.audio.bytes, mimeType: value.audio.mimeType };
-      if (!audio.bytes.byteLength || audio.bytes.byteLength > 10 * 1024 * 1024 - 4096)
+      const { bytes, mimeType } = value.audio;
+      if (!(bytes instanceof Uint8Array) || !bytes.byteLength || bytes.byteLength > 10 * 1024 * 1024 - 4096)
         throw new Error('Choose a shorter audio clip.');
+      // Persist and send the exact same privately held bytes after any awaits.
+      const audio = { bytes: bytes.slice(), mimeType };
       const mutationKey = await journal.beginEnrollment({
         clipDigest: digest(audio.bytes), mime: audio.mimeType,
         nameDigest: digest(new TextEncoder().encode(displayName)),

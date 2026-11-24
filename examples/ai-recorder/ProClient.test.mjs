@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { ProClient } from './ProClient.ts';
+import { VoiceProfileIntents } from './VoiceProfileIntents.ts';
+import { voiceProfileManagement } from './VoiceProfileManagement.ts';
 
 function fixture(clipVoiceSample) {
   const values = new Map();
@@ -29,8 +31,10 @@ function fixture(clipVoiceSample) {
             metadata: JSON.parse(form.get('metadata')), bytes: audio.size };
           if (init.body instanceof ArrayBuffer)
             state.binaryPart = {name: audio.name, mime: audio.type,
-              bytes: new Uint8Array(await audio.arrayBuffer()), wireLength: init.body.byteLength};
-          return Response.json({ contract: 'recorder-voice-profile/v1', profile: state.voiceProfile }, { status: 201 });
+              bytes: new Uint8Array(await audio.arrayBuffer()), wireLength: init.body.byteLength,
+              boundary: init.headers['Content-Type'].split('boundary=')[1]};
+          return Response.json({ contract: 'recorder-voice-profile/v1', profile: state.voiceProfile,
+            ...state.extraEnrollmentReceipt }, { status: state.enrollmentStatus ?? 201 });
         }
         if (init.method === 'PATCH') {
           state.edit = { key: init.headers['Idempotency-Key'], body: JSON.parse(init.body) };
@@ -324,6 +328,16 @@ test('bounded native bytes round-trip as multipart, only with permitted consent 
   assert.deepEqual(f.state.binaryPart.bytes, bytes);
   assert.equal(f.state.binaryPart.mime, 'audio/mp4');
   assert.equal(f.state.binaryPart.name, 'sample.m4a');
+  const longKey = 'k'.repeat(128);
+  await f.client.enrollVoiceProfile({...request, mutationKey:longKey}, 'Fixture');
+  assert.equal(f.state.enrollment.key, longKey);
+  assert.equal(f.state.binaryPart.boundary.length, 70);
+  const beforeCollision = f.calls.length;
+  const clash = new TextEncoder().encode('--' + f.state.binaryPart.boundary);
+  await assert.rejects(f.client.enrollVoiceProfile(
+    {...request, mutationKey:longKey, audio:{bytes:clash, mimeType:'audio/wav'}}, 'Fixture'),
+    {code:'voice_options_invalid'});
+  assert.equal(f.calls.length, beforeCollision);
 });
 
 test('concurrent first reservation cannot reuse a different opt-in or account binding', async () => {
@@ -343,4 +357,32 @@ test('concurrent first reservation cannot reuse a different opt-in or account bi
   }
   assert.equal((await intended).state, 'RESERVED');
   assert.equal(f.state.reservations, 1);
+});
+
+test('202 and malformed terminal receipts cannot clear the persisted enrollment intent', async () => {
+  const f = fixture();
+  await f.client.configure('synthetic-pro-key');
+  f.state.voiceProfile = { profileId:'vp_' + 'q'.repeat(20), displayName:'Example', revision:1, status:'active' };
+  const scope = { workerURL:f.operation.workerURL, accountScope:f.operation.accountScope };
+  const entries = new Map();
+  const store = { getItemAsync:async key => entries.get(key) ?? null,
+    setItemAsync:async (key, value) => { entries.set(key, value); } };
+  const journal = () => new VoiceProfileIntents(store, scope, randomUUID);
+  const open = () => voiceProfileManagement(f.client, scope, journal(), bytes =>
+    createHash('sha256').update(bytes).digest('hex'));
+  const input = { participantConfirmed:true, displayName:'Example',
+    audio:{bytes:Uint8Array.of(1, 2, 3), mimeType:'audio/wav'} };
+  f.state.enrollmentStatus = 202;
+  await assert.rejects(open().enroll(input), {code:'voice_unavailable'});
+  assert.equal((await open().restore()).pendingEnrollment, true);
+  const key = (await journal().restore()).enrollment.mutationKey;
+  f.state.enrollmentStatus = 201;
+  f.state.extraEnrollmentReceipt = {unexpected:true};
+  await assert.rejects(open().enroll(input), {code:'voice_unavailable'});
+  assert.equal((await journal().restore()).enrollment.mutationKey, key);
+  f.state.extraEnrollmentReceipt = undefined;
+  f.state.enrollmentStatus = 200;
+  assert.deepEqual(await open().enroll(input), f.state.voiceProfile);
+  assert.equal(f.state.enrollment.key, key);
+  assert.equal((await open().restore()).pendingEnrollment, false);
 });
