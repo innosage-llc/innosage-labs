@@ -1,9 +1,13 @@
 import { fetch } from "expo/fetch";
+import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { File, FileMode } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProClient } from "./ProClient";
-import { uploadRecording } from "./NativeUpload";
+import { VoiceProfileIntents } from "./VoiceProfileIntents";
+import { voiceProfileManagement } from "./VoiceProfileManagement";
+import { voiceProfileStageEnabled } from "./VoiceProfileFlow";
+import { supportsProUpload, uploadRecording } from "./NativeUpload";
 import { services, serviceForWorker, SERVICE_KEY, serviceId, type ServiceId, type InnoSageServiceId } from "./ServiceConfig";
 
 const clients = new Map<InnoSageServiceId, ProClient>();
@@ -43,4 +47,14 @@ export async function hashRecording(file: File, signal?: AbortSignal) {
   } finally {
     handle.close();
   }
+}
+
+/** The UI mounts this only for its locally loaded, currently configured account. */
+export function voiceProfileManagerForStage(accountScope: string) {
+  if (!supportsProUpload || !voiceProfileStageEnabled('staging'))
+    throw new Error('Voice profiles are unavailable in this build.');
+  const client = clientForService('staging');
+  const scope = { workerURL: client.workerURL, accountScope };
+  return voiceProfileManagement(client, scope, new VoiceProfileIntents(SecureStore, scope, randomUUID),
+    bytes => Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join(''));
 }

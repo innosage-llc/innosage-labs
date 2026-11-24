@@ -217,7 +217,7 @@ export class ProClient {
       "recorder.pro." + new URL(workerURL).hostname.replace(/[^\w.-]/g, "_");
   }
 
-  private async request(url: string, init: RequestInit = {}) {
+  private async request(url: string, init: RequestInit = {}, voiceEnrollment = false) {
     const timeout = AbortSignal.timeout(30_000);
     const signal = init.signal
       ? AbortSignal.any([init.signal, timeout])
@@ -229,6 +229,12 @@ export class ProClient {
       cache: "no-store",
     });
     if (!response.ok) {
+      if (voiceEnrollment && response.status === 422) {
+        const detail = await response.json().catch(() => null);
+        if (detail && Object.keys(detail).length === 1 && detail.error === "invalid_sample")
+          throw new ProServiceError("Use a clear 2–30 second clip of just one speaker.", "voice_sample_rejected");
+        throw new ProServiceError("Could not verify the voice upload. Retry the same clip.", "voice_unavailable");
+      }
       if (response.status === 401 || response.status === 403)
         throw new ProServiceError(
           "Pro authorization is unavailable or expired. Check your API key.",
@@ -291,6 +297,7 @@ export class ProClient {
     path: string,
     init: RequestInit = {},
     key?: string,
+    voiceEnrollment = false,
   ) {
     if (scope.workerURL !== this.workerURL)
       throw new ProServiceError("This operation belongs to another environment.", "authorization");
@@ -307,7 +314,7 @@ export class ProClient {
         Authorization: `Bearer ${profile.key}`,
         ...(key === undefined ? {} : { "Idempotency-Key": key }),
       },
-    });
+    }, voiceEnrollment);
   }
 
   async listVoiceProfiles(scope: VoiceProfileScope, signal?: AbortSignal): Promise<VoiceProfileSummary[]> {
@@ -328,7 +335,7 @@ export class ProClient {
     const multipart = await enrollmentBody(input, { displayName: validVoiceName(displayName) }, this.clipVoiceSample, signal);
     const response = await this.voiceProfileRequest(input, "", {
       method: "POST", ...multipart, signal,
-    }, input.mutationKey);
+    }, input.mutationKey, true);
     const data = await response.json();
     if (data?.contract !== VOICE_CONTRACT)
       throw new ProServiceError("The voice profile response is unavailable.", "voice_unavailable");
