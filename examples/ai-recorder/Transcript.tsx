@@ -27,7 +27,7 @@ import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuest
 import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
-import { finishVoiceAfterSavingOriginal, voiceProfileStageEnabled } from './VoiceProfileFlow';
+import { finishVoiceAfterSavingOriginal, readLocalVoiceReceipt, voiceProfileStageEnabled, writeLocalVoiceReceipt, type LocalVoiceReceipt } from './VoiceProfileFlow';
 import { summarizeVoiceProfileResult, VoiceProfileStatus, type VoiceProfileReview } from './ui/voice-profile/voice-profile-status';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
 type StoredProOperation = ProOperation & { authorizationDeniedBeforeUpload?: true };
@@ -88,7 +88,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const autoOpened = useRef(false);
   const recordingUri = recording.uri;
   useEffect(() => {
-    if (!hasDraftEditor) return;
+    if (!hasDraftEditor || connecting) return;
     let active = true;
     void createDraftDocument(new File(recordingUri), 'transcript').then(async document => {
       const latest = await document.recover();
@@ -98,7 +98,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       }
     }).catch(() => { if (active) setMessage('Could not recover this recording’s Draft document.'); });
     return () => { active = false; };
-  }, [hasDraftEditor, recordingUri]);
+  }, [connecting, hasDraftEditor, recordingUri]);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
@@ -116,7 +116,15 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       else if (speakerFile.exists) speakerFile.delete();
     },
   };
-  const committedResult = () => readCommittedTranscript(original.uri, completionFiles);
+  const committedResult = (onOriginal?: (transcript: string) => void) =>
+    readCommittedTranscript(original.uri, onOriginal ? {
+      ...completionFiles,
+      readOriginal: async () => {
+        const transcript = await completionFiles.readOriginal();
+        if (transcript?.trim()) onOriginal(transcript);
+        return transcript;
+      },
+    } : completionFiles);
 
   async function showCompletion(committed: CompletedTranscript) {
     if (!seededRevision.current) {
@@ -146,7 +154,15 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
   useEffect(() => {
     let active = true;
-    async function readSavedOperation() {
+    async function restore() {
+      const committed = await committedResult(transcript => {
+        // Publish the saved text before reading speaker, revision, or operation metadata.
+        if (active) setJob({ state: 'COMPLETED', transcript });
+      });
+      if (!active) return;
+      if (committed) await showCompletion(committed);
+      if (!active) return;
+
       const savedOperation = await SecureStore.getItemAsync(operationKey);
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
@@ -154,14 +170,6 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
       const free = saved && saved.lane !== 'openai' && !paid ? readFreeOperation(saved) : undefined;
       const restoredService: ServiceId = paid ? serviceForWorker(paid.workerURL) : free ? free.service
         : saved?.lane === 'openai' ? 'openai' : await selectedService();
-      return { saved, paid, free, restoredService };
-    }
-    async function restore() {
-      const committed = await committedResult();
-      const { saved, paid, free, restoredService } = await readSavedOperation().catch(async error => {
-        if (committed && active) await showCompletion(committed);
-        throw error;
-      });
       if (!active) return;
       if (saved) {
         setIdentifySpeakers(free?.identifySpeakers ?? saved.identifySpeakers);
@@ -177,10 +185,12 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         setMessage('Pro authorization is unavailable or expired. Check your API key.');
       }
       if (committed) {
-        await showCompletion(committed);
-        if (!active) return;
         setServiceReady(true);
-        if (paid && !paid.voiceIdentification) await clientForOperation(paid).cleanup(paid, recording.name).catch(() => { if (active) setMessage('Saved locally. Service cleanup will retry when reopened.'); });
+        if (paid && (!paid.voiceIdentification || !voiceProfileStageEnabled(restoredService))) {
+          await clientForOperation(paid).cleanup(paid, recording.name).catch(() => {
+            if (active) setMessage('Saved locally. Service cleanup will retry when reopened.');
+          });
+        }
         return;
       }
       if (restoredService === 'openai') {
@@ -204,25 +214,32 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   }, [operationKey, restoreAttempt]);
 
   async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined, onTransfer?: () => void) {
-    let result: Job;
     if (paid) {
-      if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
+      const cleanupOnly = !!paid.voiceIdentification && !voiceProfileStageEnabled(serviceForWorker(paid.workerURL));
+      const saved = cleanupOnly ? await committedResult() : undefined;
+      if (cleanupOnly) signal?.throwIfAborted();
+      if (!saved && upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
       const operationClient = clientForOperation(paid);
-      result = upload
+      const result = saved ?? (upload
         ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal, onTransfer)
-        : await operationClient.read(paid, recording.name, signal);
-    } else {
-      if (!free) throw new KnownServiceFailure('Could not recover this recording’s Free operation.');
-      const guest = await restoreGateway(free).catch(() => {
-        throw new KnownServiceFailure('Could not restore Free access for this recording’s original operation.');
-      });
-      result = await requestGuestJob(guest, { ...free, accountScope: guest.accountScope }, upload ? recording : undefined, signal);
+        : await operationClient.read(paid, recording.name, signal));
+      const local = saved ?? await persistResult(result);
+      if (saved) await showCompletion(saved);
+      const shouldCleanup = cleanupOnly
+        ? local.state === 'COMPLETED' && !signal?.aborted
+        : !paid.voiceIdentification && result.state === 'COMPLETED';
+      if (shouldCleanup) {
+        await operationClient.cleanup(paid, recording.name).catch(() => {
+          if (!cleanupOnly || !signal?.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
+        });
+      }
+      return local;
     }
-    const local = await persistResult(result);
-    if (paid && !paid.voiceIdentification && result.state === 'COMPLETED') {
-      await clientForOperation(paid).cleanup(paid, recording.name).catch(() => setMessage('Saved locally. Service cleanup will retry when reopened.'));
-    }
-    return local;
+    if (!free) throw new KnownServiceFailure('Could not recover this recording’s Free operation.');
+    const guest = await restoreGateway(free).catch(() => {
+      throw new KnownServiceFailure('Could not restore Free access for this recording’s original operation.');
+    });
+    return persistResult(await requestGuestJob(guest, { ...free, accountScope: guest.accountScope }, upload ? recording : undefined, signal));
   }
 
   async function persistResult(result: Job): Promise<Job> {
@@ -241,42 +258,58 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
 
   const complete = job?.state === 'COMPLETED';
   const operationEnded = terminal.has(job?.state ?? '');
-  const canOfferVoiceProfiles = voiceProfileStageEnabled(service) && supportsProUpload && usePro &&
+  const voiceProfilesEnabled = voiceProfileStageEnabled(service);
+  const canOfferVoiceProfiles = voiceProfilesEnabled && supportsProUpload && usePro &&
     serviceReady && !connecting && !statusUnknown && (!operation || operationEnded);
-  const voiceProfileOperation = voiceProfileStageEnabled(service) &&
-    paidOperation?.workerURL === services.staging.workerURL && paidOperation.voiceIdentification ? paidOperation : undefined;
-  const showingOriginal = showOriginal ?? !!voiceProfileOperation;
+  const voiceProfileOperation = paidOperation?.workerURL === services.staging.workerURL &&
+    paidOperation.voiceIdentification ? paidOperation : undefined;
+  const showingOriginal = showOriginal ?? (connecting || !!voiceProfileOperation);
   const voiceLookup = voiceProfileResult?.operation === voiceProfileOperation ? voiceProfileResult : undefined;
   const voiceReview = voiceLookup?.review;
   const recordingName = recording.name;
+  const originalUri = original.uri;
   useEffect(() => {
-    // A completed job reaches the screen only through the durable original receipt.
-    if (!complete || !voiceProfileOperation) return;
+    if (!complete || connecting || !voiceProfilesEnabled || !voiceProfileOperation) return;
+    const operation = voiceProfileOperation;
     const controller = new AbortController();
-    const client = clientForOperation(voiceProfileOperation);
-    void finishVoiceAfterSavingOriginal({
-      client, operation: voiceProfileOperation, recording: recordingName,
-      originalSaved: true, signal: controller.signal,
-    }).then(async result => {
-      if (controller.signal.aborted || result.status === 'pending') return;
-      const review = result.status === 'ready' && result.result.status === 'completed'
-        ? summarizeVoiceProfileResult(result.result.segments) : undefined;
-      setVoiceProfileResult({ operation: voiceProfileOperation, review });
-      // An unavailable lookup can be retried on reopen if the service never confirmed a terminal result.
-      if (result.status === 'ready') {
-        await client.cleanup(voiceProfileOperation, recordingName).catch(() => {
-          if (!controller.signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
+    const { signal } = controller;
+    const receiptKey = 'voiceprofile.receipt.' + recordingName;
+
+    async function restoreVoiceReview() {
+      let receipt: LocalVoiceReceipt | undefined = await readLocalVoiceReceipt(SecureStore, receiptKey, operation, originalUri);
+      if (signal.aborted) return;
+      const client = clientForOperation(operation);
+      if (!receipt) {
+        const result = await finishVoiceAfterSavingOriginal({
+          client, operation, recording: recordingName, originalSaved: true, signal,
         });
+        if (signal.aborted || result.status === 'pending') return;
+        if (result.status === 'unavailable') {
+          setVoiceProfileResult({ operation });
+          return;
+        }
+        receipt = result.result.status === 'completed'
+          ? { outcome: 'completed', review: summarizeVoiceProfileResult(result.result.segments) }
+          : { outcome: 'failed' };
+        await writeLocalVoiceReceipt(SecureStore, receiptKey, operation, originalUri, receipt);
       }
+      if (signal.aborted) return;
+      setVoiceProfileResult({ operation, review: receipt.outcome === 'completed' ? receipt.review : undefined });
+      await client.cleanup(operation, recordingName).catch(() => {
+        if (!signal.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
+      });
+    }
+    void restoreVoiceReview().catch(() => {
+      if (!signal.aborted) setVoiceProfileResult({ operation });
     });
     return () => controller.abort();
-  }, [complete, recordingName, voiceProfileOperation]);
+  }, [complete, connecting, originalUri, recordingName, voiceProfileOperation, voiceProfilesEnabled]);
   useEffect(() => {
-    if (complete && !voiceProfileOperation && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
+    if (complete && !connecting && !voiceProfileOperation && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
       setEditingDraft(true);
     }
-  }, [complete, voiceProfileOperation, busy, draftDocument, revisionReadFailed]);
+  }, [complete, connecting, voiceProfileOperation, busy, draftDocument, revisionReadFailed]);
   async function readCommittedRevision() {
     const snapshot = await draftDocument?.recover();
     if (snapshot) return draftText(snapshot);
@@ -527,7 +560,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
                 accessibilityLabel="Transcript text" multiline editable={!hasDraftEditor && !revisionReadFailed && canEditTranscript(showingOriginal, busy)}
                 value={showingOriginal ? job?.transcript : draft} onChangeText={value => { setDraft(value); setDirty(true); }}
                 style={[input, { minHeight: 180, textAlignVertical: 'top' }, showingOriginal && voiceProfileOperation && styles.voiceOriginal]} /> : null}
-              {voiceProfileOperation ? <VoiceProfileStatus
+              {voiceProfilesEnabled && voiceProfileOperation ? <VoiceProfileStatus
                 pending={!voiceLookup} available={!!voiceReview}
                 matchedCount={voiceReview?.matchedCount ?? 0} reviewCount={voiceReview?.reviewCount ?? 0}
                 unknownCount={voiceReview?.unknownCount ?? 0}
@@ -536,7 +569,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
               {!showingOriginal && hasDraftEditor ? <ActionButton
                 title="Open in Draft" variant="primary" disabled={busy || summaryLocked || !draftDocument || revisionReadFailed}
                 onPress={() => setEditingDraft(true)} /> : null}
-              <ActionButton title={showingOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showingOriginal)} />
+              <ActionButton title={showingOriginal ? 'Show revision' : 'Show original'} disabled={busy || connecting} onPress={() => setShowOriginal(!showingOriginal)} />
               {!showingOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               {hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
                 output={summaryFile} hasRevision={draftRevision > 0 || revision.exists} readRevision={readCommittedRevision}
