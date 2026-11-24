@@ -5,3 +5,8 @@ deadline. Both failed closed with no merge attempt. Start and arm the same
 attach-only XCTest before the product's normal cold launch; require and record
 host-bound accessibility timing. Retain the 30-second readiness deadline,
 five-second stability observation, continuity, fail-before-merge, and no bypass.
+
+The first native pre-arm run launched the actual app promptly after arming,
+and the app reported activation, but XCTest held the prelaunch application
+proxy as not running. The new observer arms without constructing the proxy;
+the host independently verifies no existing PID, then owns normal launch.

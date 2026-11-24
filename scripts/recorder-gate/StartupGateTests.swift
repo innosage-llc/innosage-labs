@@ -4,19 +4,30 @@ import XCTest
 final class StartupGateTests: XCTestCase {
     func testRecordHome() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
         let armedAt = ProcessInfo.processInfo.systemUptime
         // The host cold-launches only after the observer process is ready.
         // Absolute clock samples let the host enforce the original readiness
         // deadline independently of harness initialization.
-        XCTAssertEqual(app.state, .notRunning, "Observer must start before the product")
         FileHandle.standardOutput.write(Data("LABS85_XCTEST_ARMED\n".utf8))
-        while app.state != .runningForeground {
-            guard ProcessInfo.processInfo.systemUptime - armedAt <= 40 else {
-                throw StabilityWindow.Invalid.readiness
+        // Avoid acquiring the UI-automation application proxy before it exists.
+        // The host already verifies no product PID and owns the launch timestamp.
+        Thread.sleep(forTimeInterval: 3.0)
+        var attached: XCUIApplication?
+        var previous: XCUIApplication.State?
+        while ProcessInfo.processInfo.systemUptime - armedAt <= 35 {
+            let candidate = XCUIApplication(bundleIdentifier: "co.innosage.labs.airecorder")
+            let state = candidate.state
+            if state != previous {
+                FileHandle.standardOutput.write(Data("LABS85_ATTACH_STATE \(state.rawValue)\n".utf8))
+                previous = state
             }
-            Thread.sleep(forTimeInterval: 0.1)
+            if state == .runningForeground {
+                attached = candidate
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.15)
         }
+        let app = try XCTUnwrap(attached, "No foreground product process after the normal launch")
         let ready = app.buttons["Start recording"].firstMatch
         var window = StabilityWindow(launchedAt: ProcessInfo.processInfo.systemUptime)
         var announced = false

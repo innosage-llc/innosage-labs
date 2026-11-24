@@ -31,6 +31,9 @@ export async function iosObservation({ command, output, uuid, app, workspace, de
       new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('XCTest observer arm deadline exceeded')), 60000); }),
     ]).finally(() => clearTimeout(deadline));
     requireThat(!fatal && !done, fatal ?? 'XCTest observer not alive at launch');
+    const before = sim('spawn', uuid, 'launchctl', 'list').split('\n')
+      .find(line => line.includes(BUNDLE))?.trim().split(/\s+/)[0];
+    requireThat(!/^\d+$/.test(before ?? ''), 'product already running before normal Simulator launch');
     const launched = now();
     const launchUptimeMs = 1000 * Number(command('python3', ['-c', 'import time; print(time.monotonic())']).trim());
     requireThat(Number.isFinite(launchUptimeMs) && launchUptimeMs > 0, 'host launch clock unavailable');
