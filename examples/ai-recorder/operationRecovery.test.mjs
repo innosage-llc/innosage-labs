@@ -96,7 +96,8 @@ test('opening Transcript reads local state and does not activate a guest', async
     let hasProProfile;
     const dependencies = {
       active: true, android: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
-      readSavedEdit: async () => ({ text: undefined }),
+      recording: { name: 'selected-recording.m4a' },
+      readSavedTranscriptEdit: async () => ({ text: undefined }),
       SecureStore: { getItemAsync: async () => saved }, readFreeOperation,
       selectedService: async () => 'production',
       serviceForWorker: url => { assert.equal(url, denied.workerURL); return 'staging'; },
@@ -126,9 +127,14 @@ test('a surviving saved edit opens its export actions without starting or restor
   for (const readOriginal of [async () => undefined, async () => { throw new Error('unreadable original'); }]) {
     const restored = {};
     const owner = { pageId: 'selected-recording' };
+    const recording = { name: 'selected-recording.m4a' };
     const dependencies = {
       active: true, android: true, committedResult: readOriginal,
-      readSavedEdit: async () => ({ document: owner, text: 'Corrected final line.' }),
+      recording,
+      readSavedTranscriptEdit: async selected => {
+        assert.equal(selected, recording);
+        return { document: owner, text: 'Corrected final line.' };
+      },
       setDraftDocument: value => { restored.document = value; },
       setRevisionOnly: value => { restored.revisionOnly = value; },
       SecureStore: { getItemAsync: () => assert.fail('must not start remote job recovery') },
