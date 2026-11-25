@@ -1,1 +1,1 @@
-{"platforms":["android"],"android":{"modules":["co.innosage.recorderdraft.RecorderDraftEditorModule"]}}
+{"platforms":["android"],"android":{"modules":["co.innosage.recorderdraft.RecorderDraftEditorModule","co.innosage.recorderdraft.TranscriptExportModule"]}}

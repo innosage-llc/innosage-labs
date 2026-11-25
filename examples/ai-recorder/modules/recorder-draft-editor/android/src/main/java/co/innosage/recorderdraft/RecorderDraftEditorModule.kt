@@ -2,6 +2,9 @@ package co.innosage.recorderdraft
 
 import android.content.Context
 import android.net.Uri
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import android.util.AtomicFile
 import android.view.ViewGroup.LayoutParams
 import android.webkit.WebResourceError
@@ -23,6 +26,17 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.InputStreamReader
+
+internal fun File.isMissing(): Boolean {
+  return try {
+    Os.lstat(path)
+    false
+  } catch (error: ErrnoException) {
+    if (error.errno != OsConstants.ENOENT) throw error
+    true
+  }
+}
 
 private const val ORIGIN = "https://appassets.androidplatform.net"
 private const val BASE_PATH = "/assets/recorder-draft/"
@@ -140,12 +154,16 @@ class RecorderDraftEditorModule : Module() {
     }
     AsyncFunction("readDocument") { pageId: String ->
       synchronized(diskLock) {
+        val file = document(pageId)
         try {
-          document(pageId).openRead().use { stream ->
+          file.openRead().use { stream ->
             require(stream.channel.size() <= MAX_MESSAGE.toLong() * 4)
-            stream.readBytes().toString(Charsets.UTF_8)
+            InputStreamReader(stream, Charsets.UTF_8.newDecoder()).readText()
           }
-        } catch (_: FileNotFoundException) {
+        } catch (error: FileNotFoundException) {
+          // FileInputStream also throws FileNotFoundException for permission errors.
+          // A failed AtomicFile recovery must never expose an older legacy export.
+          if (!listOf(file.baseFile, File(file.baseFile.path + ".bak"), File(file.baseFile.path + ".new")).all { it.isMissing() }) throw error
           null
         }
       }

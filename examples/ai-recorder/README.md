@@ -16,6 +16,15 @@ the system offers a Files destination. Sharing uses the original M4A bytes
 and works offline without a transcript or account. The receiving app controls
 what it saves. The original remains in Recorder.
 
+## Share a saved transcript with Draft on Android
+
+1. Open the recording’s transcript. In the bundled editor, go Back after editing and wait for the local save to finish. In the text editor, tap **Save revision**.
+2. Tap **Share transcript (.md)**. In Android’s receiving-app list, choose the installed **Draft** PWA. Recorder shares one UTF-8 Markdown attachment with its recording or import date and the saved revision used.
+3. In Draft, confirm the page title and save to the workspace paired with Draft MCP D. If Draft is missing from the list, use **Save Markdown file** in Recorder, then choose that file in Draft’s Markdown import.
+4. Open Draft and Codex Android in split screen. In Codex, ask Draft MCP D to read the exact saved page title and compare the corrected transcript against a named project decision in your connected repository. Ask it to cite the decision and identify what still needs agreement.
+
+The file handoff runs locally on your device. Saving a page follows the workspace’s existing storage settings. Dismissing the Sharesheet lets you retry from the same recording.
+
 ## Finalized save recovery (Android)
 
 New Android captures use a stable identity in persistent storage. On cold launch,

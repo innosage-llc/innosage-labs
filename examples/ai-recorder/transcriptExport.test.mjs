@@ -1,0 +1,138 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { draftTranscriptMarkdown, transcriptMarkdown } from './transcriptExport.ts';
+import { draftStore } from './draftDocumentModel.ts';
+import { prepareRecorderOpen } from './recorderDraftProtocol.ts';
+import { compareBody } from './scripts/experiment-a-readback.mjs';
+import { readFileSync } from 'node:fs';
+
+const fixtures = JSON.parse(readFileSync(new URL('./docs/release-verification/experiment-a/transcripts.json', import.meta.url)));
+const absent = async () => undefined;
+const unused = async () => assert.fail('Must not touch an unselected source');
+const recording = 'Recording-1704067200000-fixture.m4a';
+
+test('exports the latest committed editor correction from its disk owner through the last line', async () => {
+  let raw = null;
+  const key = { pageId: 'fixture', kind: 'transcript' };
+  const disk = { read: async () => raw, write: async data => { raw = data; } };
+  const store = draftStore(key, disk);
+  const { title, original, edited } = fixtures.meeting;
+  for (const [index, text] of [original, edited].entries()) {
+    await store.commit(index, prepareRecorderOpen(key.pageId, title, text).blocks);
+  }
+  const snapshot = await draftStore(key, disk).recover();
+  const result = await transcriptMarkdown(title, recording, {
+    readDraft: async () => ({ text: draftTranscriptMarkdown(snapshot), revision: snapshot.revision }),
+    readLegacy: unused, readOriginal: unused,
+  });
+  assert.equal(result.filename, 'Transcript - Experiment A meeting.md');
+  assert.match(result.markdown, /Recorded: 2024-01-01T00:00:00.000Z/);
+  assert.match(result.markdown, /Edited \(Draft revision 2\)/);
+  compareBody('meeting', 'file', result.markdown);
+});
+
+test('exports the committed legacy revision or original-only voice note without altering the body', async () => {
+  const { original } = fixtures.note;
+  const { edited } = fixtures.meeting;
+  const legacy = await transcriptMarkdown('older', recording, { readDraft: absent, readLegacy: async () => edited, readOriginal: unused });
+  assert.match(legacy.markdown, /Edited \(saved revision\)/);
+  compareBody('meeting', 'file', legacy.markdown);
+  const note = await transcriptMarkdown(fixtures.note.title, 'Import-1704067200000-fixture.m4a', {
+    readDraft: absent, readLegacy: absent, readOriginal: async () => ({ text: original }),
+  });
+  compareBody('note', 'file', Buffer.from(note.markdown, 'utf8').toString('utf8'));
+  assert.match(note.markdown, /Imported: 2024-01-01T00:00:00.000Z/);
+  assert.match(note.markdown, /Transcript source: Original/);
+});
+
+test('unreadable and empty saved sources never fall back', async () => {
+  const broken = async () => { throw new Error('Unreadable'); };
+  for (const sources of [
+    [broken, unused, unused], [absent, broken, unused], [absent, absent, broken],
+    [async () => ({ text: '', revision: 1 }), unused, unused], [absent, async () => '   ', unused],
+    [absent, absent, absent],
+  ]) {
+    const [readDraft, readLegacy, readOriginal] = sources;
+    await assert.rejects(transcriptMarkdown('meeting', recording, { readDraft, readLegacy, readOriginal }), /Unreadable|no saved text/);
+  }
+});
+
+test('handles long multilingual display names, control characters, missing dates and exact whitespace', async () => {
+  const body = '[00:03.800] Speaker 2: 好。\r\n\r\nfin  \n';
+  const result = await transcriptMarkdown('../案:\n' + '🦉'.repeat(110), 'old-recording.m4a', {
+    readDraft: absent, readLegacy: absent, readOriginal: async () => ({ text: body }),
+  });
+  assert.match(result.filename, /^Transcript - 案 🦉+\.md$/u);
+  assert.ok(Buffer.byteLength(result.filename) <= 255);
+  assert.ok(result.markdown.endsWith(body));
+  assert.match(result.markdown, /Recorded: Unknown/);
+});
+
+test('original-only exports retain the verbatim recording and full separate speaker timeline', async () => {
+  const text = '[00:00.000 - 00:02.000] 你好，世界。\n\nLast line.';
+  const attribution = '[00:00.000] Speaker 1: 你\n[00:00.200] Speaker 1: 好';
+  const result = await transcriptMarkdown('attributed meeting', recording, {
+    readDraft: absent, readLegacy: absent, readOriginal: async () => ({ text, attribution }),
+  });
+  assert.ok(result.markdown.includes(attribution));
+  assert.ok(result.markdown.endsWith(text));
+});
+
+test('editor Enter creates a new Markdown paragraph and Shift+Enter stays a hard break', () => {
+  const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+  const doc = { type: 'doc', content: [
+    paragraph('[00:03] Alba: 12 seats.'),
+    { type: 'paragraph', content: [{ type: 'text', text: 'Bo:' }, { type: 'hardBreak' }, { type: 'text', text: 'Friday?' }] },
+    { type: 'paragraph' }, paragraph('会议结束'),
+  ] };
+  assert.equal(draftTranscriptMarkdown({ blocks: [{ content: JSON.stringify(doc) }] }),
+    '[00:03] Alba: 12 seats.\n\nBo:  \nFriday?\n\n会议结束');
+});
+
+test('a malformed or unsupported node stops the entire edited export', async () => {
+  for (const bad of [null, { type: 'text', text: 37 }, { type: 'paragraph', content: [] }, { type: 'paragraph', content: 'lost' },
+    { type: 'text', text: 'first', content: [] }, { type: 'inlineWidget', attrs: { label: 'lost' } }]) {
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'valid prefix' }, bad] }] };
+    await assert.rejects(transcriptMarkdown('meeting', recording, {
+      readDraft: async () => ({ revision: 2, text: draftTranscriptMarkdown({ blocks: [{ content: JSON.stringify(doc) }] }) }),
+      readLegacy: unused, readOriginal: unused,
+    }), /cannot be exported completely/);
+  }
+});
+
+test('invalid document children and required list content stop an otherwise valid export', () => {
+  const valid = { type: 'paragraph', content: [{ type: 'text', text: 'valid prefix' }] };
+  for (const extra of [
+    { type: 'text', text: 'outside paragraph' },
+    { type: 'bulletList', content: [] },
+    { type: 'paragraph', content: [{ type: 'text', text: '' }] },
+    { type: 'listItem', content: [valid] },
+    { type: 'orderedList', content: [valid] },
+  ]) {
+    const doc = {type: 'doc', content: [valid, extra]};
+    assert.throws(() => draftTranscriptMarkdown({blocks: [{content: JSON.stringify(doc)}]}), /cannot be exported completely/);
+  }
+});
+
+test('literal Markdown paragraphs retain the full line in a fenced block', async () => {
+  const last = '[Final]: https://example.invalid/last';
+  const text = 'Ordinary opening.\n\n' + last;
+  const output = await transcriptMarkdown('reference', recording, { readDraft: absent, readLegacy: async () => text, readOriginal: unused });
+  assert.ok(output.markdown.endsWith('Ordinary opening.\n\n```text\n' + last + '\n```'));
+  for (const literal of ['[00:03]: https://example.invalid/last', '[00:03](https://example.invalid/last)']) {
+    const stamp = await transcriptMarkdown('literal', recording, { readDraft: absent, readLegacy: async () => literal, readOriginal: unused });
+    assert.ok(stamp.markdown.endsWith('```text\n' + literal + '\n```'));
+  }
+  const input = '```\nsecond line <x>';
+  const nested = await transcriptMarkdown('code', recording, {readDraft: absent, readLegacy: async () => input, readOriginal: unused});
+  assert.ok(nested.markdown.endsWith('````text\n' + input + '\n````'));
+});
+
+test('preserves both parts of a text toggle including its collapsed final paragraph', () => {
+  const label = { type: 'toggleSummaryV2', content: [{type: 'text', text: 'Agenda'}] };
+  const inside = { type: 'toggleContentV2', content: [{type: 'paragraph', content: [{type: 'text', text: '会议结束'}]}] };
+  const read = children => draftTranscriptMarkdown({ blocks: [{content: JSON.stringify({type: 'doc',
+    content: [{type: 'toggleDetailsV2', attrs: {opened: false}, content: children }]})}] });
+  assert.equal(read([label, inside]), 'Agenda\n\n会议结束');
+  assert.throws(() => read([inside, inside]), /cannot be exported completely/);
+});

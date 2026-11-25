@@ -95,7 +95,8 @@ test('opening Transcript reads local state and does not activate a guest', async
     const restored = {};
     let hasProProfile;
     const dependencies = {
-      active: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
+      active: true, android: true, committedResult: async () => undefined, operationKey: 'synthetic-operation-key',
+      readSavedEdit: async () => ({ text: undefined }),
       SecureStore: { getItemAsync: async () => saved }, readFreeOperation,
       selectedService: async () => 'production',
       serviceForWorker: url => { assert.equal(url, denied.workerURL); return 'staging'; },
@@ -117,6 +118,26 @@ test('opening Transcript reads local state and does not activate a guest', async
     assert.equal(canChangePlan(false, true, hasProProfile, restored.proDenied === true), false);
     assert.equal(canChangePlan(true, false, hasProProfile, restored.proDenied === true), false);
   }
+});
+
+test('a surviving saved edit opens its export actions without starting or restoring a provider job', async () => {
+  const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
+  const body = component.slice(component.indexOf('async function restore() {'), component.indexOf('\n    void restore().catch'));
+  for (const readOriginal of [async () => undefined, async () => { throw new Error('unreadable original'); }]) {
+    const restored = {};
+    const owner = { pageId: 'selected-recording' };
+    const dependencies = {
+      active: true, android: true, committedResult: readOriginal,
+      readSavedEdit: async () => ({ document: owner, text: 'Corrected final line.' }),
+      setDraftDocument: value => { restored.document = value; },
+      setRevisionOnly: value => { restored.revisionOnly = value; },
+      SecureStore: { getItemAsync: () => assert.fail('must not start remote job recovery') },
+    };
+    const restore = new Function(...Object.keys(dependencies), 'return (' + stripTypeScriptTypes(body) + ')')(...Object.values(dependencies));
+    await restore();
+    assert.deepEqual(restored, { document: owner, revisionOnly: true });
+  }
+  assert.match(component, /: revisionOnly \? \(\s*<>[\s\S]*?\{exportActions\}/);
 });
 
 test('Free submission checks known limits and binds access before upload', async () => {
