@@ -19,17 +19,18 @@ export type AppHeaderProps = {
   onBack?: () => void;
   backLabel?: string;
   backDisabled?: boolean;
+  quietTitle?: boolean;
   libraryImport?: { importing: boolean; disabled: boolean; onPress: () => void };
 };
 
-export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false, libraryImport }: AppHeaderProps) {
+export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false, quietTitle = false, libraryImport }: AppHeaderProps) {
   const { palette, mode } = useTheme();
-  const isLibraryRoot = title === 'Library' && !onBack;
+  const isRoot = !onBack && ['Record', 'Library', 'Settings'].includes(title);
   return <>
     <StatusBar barStyle={mode === 'light' ? 'dark-content' : 'light-content'} />
     <Host matchContents={{ vertical: true }} colorScheme={mode} style={{ width: '100%' }}>
       <TopAppBar windowInsets={{}} modifiers={[fillMaxWidth()]} colors={{
-        containerColor: palette.background, titleContentColor: palette.text,
+        containerColor: palette.background, titleContentColor: quietTitle ? palette.muted : palette.text,
         navigationIconContentColor: palette.text,
       }}>
         {onBack ? <TopAppBar.NavigationIcon>
@@ -38,7 +39,8 @@ export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = fa
           </IconButton>
         </TopAppBar.NavigationIcon> : null}
         <TopAppBar.Title>
-          {isLibraryRoot ? <Text style={{ typography: 'headlineMedium' }}>{title}</Text> : <Text>{title}</Text>}
+          {isRoot ? <Text style={{ typography: 'headlineMedium' }}>{title}</Text>
+            : quietTitle ? <Text style={{ typography: 'bodyLarge' }}>{title}</Text> : <Text>{title}</Text>}
         </TopAppBar.Title>
         {libraryImport ? <TopAppBar.Actions>
           <IconButton

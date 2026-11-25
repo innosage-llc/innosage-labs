@@ -11,6 +11,7 @@ import { generateSummaryCandidate, loadSummaryDocument, saveSummaryCandidate, ty
 import { TranscriptSummary, type RecipeRequest, type SummaryProps } from './TranscriptSummary';
 import { ActionButton } from './ui/ActionButton';
 import { useTheme } from './ui/theme';
+import { readLegacyRecordingSummary } from './savedRecordingDocuments';
 
 type Document = Awaited<ReturnType<typeof createDraftDocument>>;
 type ShareStatus = Awaited<ReturnType<ReturnType<typeof recorderSummaryPublication>['status']>>;
@@ -49,14 +50,7 @@ export function DraftSummary(props:Props) {
     setLoading(true);
     void (async () => {
       const doc = await createDraftDocument(new File(recordingUri),'summary');
-      const saved = await loadSummaryDocument(doc,async () => {
-        const output = new File(outputUri);
-        const latest = output.parentDirectory.list()
-          .filter((item):item is File => item instanceof File && item.name.startsWith(output.name + '.') && item.name.endsWith('.json'))
-          .sort((a,b) => b.name.localeCompare(a.name))[0] ?? output;
-        if (!latest.exists) return;
-        return {id:'legacy',data:JSON.parse(await latest.text())};
-      });
+      const saved = await loadSummaryDocument(doc, () => readLegacyRecordingSummary(new File(outputUri)));
       if (alive) { setDocument(doc); setSnapshot(saved); setMessage(''); }
     })().catch(() => { if (alive) setMessage('Could not read the saved summary. Your local files have not been replaced.'); })
       .finally(() => { if (alive) setLoading(false); });

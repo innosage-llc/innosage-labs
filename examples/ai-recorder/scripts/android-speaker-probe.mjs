@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { homedir } from 'node:os';
 import { BUNDLE, requireThat, sha, writeJSON } from '../../../scripts/recorder-gate/core.mjs';
 import { git, outDir, runAsync } from '../../../scripts/recorder-gate/host.mjs';
-import { captureRows, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
+import { captureRows, hasSavedRecordingFeedback, xmlControl } from '../../../scripts/recorder-gate/android.mjs';
 
 const rate = 16_000;
 const tones = { A: [440, 587, 740, 495], B: [880, 1175, 1480, 990] };
@@ -450,7 +450,7 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       await adb('shell', 'input', 'tap', String(startControl.x), String(startControl.y));
       const saved = await tree(adb);
       writeFileSync(join(out, `saved-${marker}.xml`), saved);
-      requireThat(saved.includes('Saved on this device'), `Save ${marker} was not confirmed`);
+      requireThat(hasSavedRecordingFeedback(saved), `Save ${marker} was not confirmed`);
       if (detail) {
         const nextCapture = xmlControl(saved, 'Start recording');
         requireThat(nextCapture && Math.abs(nextCapture.x - startControl.x) <= 4 && Math.abs(nextCapture.y - startControl.y) <= 4,
@@ -482,8 +482,9 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
     if (detail) {
       const rows = captureRows(library);
       requireThat(rows.length === 2 && rows[0].title !== rows[1].title, 'Both distinct saved rows must survive cold reopen');
+      const documentActions = ['Transcript', 'Transcribe', 'Open transcript', 'Open summary'];
       requireThat(!playLabels(library).length && !library.includes('content-desc="Share audio') &&
-        !library.includes('content-desc="Transcript for '), 'Library exposes per-recording actions');
+        documentActions.every(label => !library.includes(`content-desc="${label} for `)), 'Library exposes per-recording actions');
       receipt.labels = { A: rows[1].title, B: rows[0].title };
       receipt.row_labels = { A: rows[1].row, B: rows[0].row };
       receipt.stage = 'open-earlier';
@@ -493,7 +494,8 @@ async function journey([adbPort, serial, avd, pid, apk, output], detail = false)
       writeFileSync(join(out, 'earlier-detail.xml'), earlier);
       screenshot('earlier-detail');
       requireThat(xmlControl(earlier, `Share audio for ${rows[1].title}`) &&
-        xmlControl(earlier, `Transcript for ${rows[1].title}`), 'Earlier detail actions are missing');
+        (xmlControl(earlier, `Transcribe for ${rows[1].title}`) ||
+          xmlControl(earlier, `Transcript for ${rows[1].title}`)), 'Earlier detail actions are missing');
       const playLabel = `Play ${rows[1].title}`;
       const play = xmlControl(earlier, playLabel);
       requireThat(play, 'Earlier detail Play control is missing');
