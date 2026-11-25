@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { BUNDLE, requireThat, sha, writeJSON } from '../../../scripts/recorder-gate/core.mjs';
 import { clean, cli, git, root, run, runAsync } from '../../../scripts/recorder-gate/host.mjs';
+import { hasSavedRecordingFeedback } from '../../../scripts/recorder-gate/android.mjs';
 import { readCandidate } from './verify-release.mjs';
 
 const adbPort = '5117';
@@ -95,7 +96,7 @@ function evidence(directory, receipt, candidate, avd, head, apk, mode) {
   const reopened = readFileSync(join(directory, 'reopened-library.xml'), 'utf8');
   const rowLabels = detail ? receipt.row_labels : receipt.labels;
   requireThat(['A', 'B'].every(marker => rowLabels?.[marker] && reopened.includes(`content-desc="${rowLabels[marker]}"`) &&
-    readFileSync(join(directory, `saved-${marker}.xml`), 'utf8').includes('Saved on this device')), 'Saved or reopened Library evidence missing');
+    hasSavedRecordingFeedback(readFileSync(join(directory, `saved-${marker}.xml`), 'utf8'))), 'Saved or reopened Library evidence missing');
   const controls = detail
     ? [['A', 'A'], ['B', 'B'], ['open-A', null], ['rapid-back-A', null]]
     : [['B', 'B'], ['stale-A', 'A'], ['silence', null]];
