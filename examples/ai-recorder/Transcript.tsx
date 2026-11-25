@@ -1,10 +1,13 @@
 import { DraftSummary } from './DraftSummary';
 import { TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { readTranscriptSidecar, transferTranscript } from './transcriptTransfer';
 import { randomUUID } from 'expo-crypto';
+import { transcriptMarkdown } from './transcriptExport';
+import { prepareRecorderOpen } from './recorderDraftProtocol';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { AppHeader } from './ui/AppChrome';
@@ -79,19 +82,9 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const [editingDraft, setEditingDraft] = useState(false);
   const [draftRevision, setDraftRevision] = useState(0);
   const autoOpened = useRef(false);
+  const exportPending = useRef(false);
+  const android = Platform.OS === 'android';
   const recordingUri = recording.uri;
-  useEffect(() => {
-    if (!hasDraftEditor) return;
-    let active = true;
-    void createDraftDocument(new File(recordingUri), 'transcript').then(async document => {
-      const latest = await document.recover();
-      if (active) {
-        setDraftRevision(latest?.revision ?? 0);
-        setDraftDocument(document);
-      }
-    }).catch(() => { if (active) setMessage('Could not recover this recording’s Draft document.'); });
-    return () => { active = false; };
-  }, [hasDraftEditor, recordingUri]);
   const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   const summaryFile = new File(recording.parentDirectory, recording.name + '.summary.json');
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
@@ -114,13 +107,14 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   async function showCompletion(committed: CompletedTranscript) {
     if (!seededRevision.current) {
       try {
-        const savedRevision = await transcriptSeed(
-          async () => hasDraftEditor ? (await createDraftDocument(new File(recordingUri),'transcript')).recover() : undefined,
-          async () => revision.exists ? revision.text() : undefined,
-        );
+        const document = android ? await createDraftDocument(recording, 'transcript') : undefined;
+        const snapshot = await document?.recover();
+        const savedRevision = await transcriptSeed(async () => snapshot, () => readTranscriptSidecar(revision));
         // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
         if (!seededRevision.current) {
           seededRevision.current = true;
+          setDraftDocument(document);
+          setDraftRevision(snapshot?.revision ?? 0);
           setRevisionReadFailed(false);
           setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
             ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
@@ -227,11 +221,11 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   const complete = job?.state === 'COMPLETED';
   const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
-    if (complete && !busy && draftDocument && !revisionReadFailed && !autoOpened.current) {
+    if (complete && !busy && hasDraftEditor && draftDocument && !revisionReadFailed && !autoOpened.current) {
       autoOpened.current = true;
       setEditingDraft(true);
     }
-  }, [complete, busy, draftDocument, revisionReadFailed]);
+  }, [complete, busy, hasDraftEditor, draftDocument, revisionReadFailed]);
   async function readCommittedRevision() {
     const snapshot = await draftDocument?.recover();
     if (snapshot) return draftText(snapshot);
@@ -408,12 +402,55 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
   async function save() {
     setBusy(true);
     try {
-      await saveText(revision, draft);
+      if (android && draftRevision > 0) {
+        // An app update can remove the editor assets while its committed document
+        // remains. Continue that revision so a new legacy sidecar cannot be hidden.
+        if (!draftDocument) throw new Error();
+        const updated = prepareRecorderOpen(draftDocument.pageId, recordingTitle, draft);
+        if (!updated) throw new Error();
+        const committed = await draftDocument.commit(draftRevision, updated.blocks);
+        setDraftRevision(committed.revision);
+      } else {
+        await saveText(revision, draft);
+      }
       setDirty(false);
       setMessage('Revision saved on this device.');
     } catch {
       setMessage('Could not save the revision.');
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportTranscript(saveFile: boolean) {
+    if (busy || exportPending.current || summaryLocked || revisionReadFailed || dirty) return;
+    exportPending.current = true;
+    setBusy(true);
+    setMessage('');
+    try {
+      const { filename, markdown } = await transcriptMarkdown(recordingTitle, recording.name, {
+        readDraft: async () => {
+          // The on-disk page can outlive a build's optional editor assets.
+          if (!draftDocument) throw new Error();
+          const snapshot = await draftDocument.recover();
+          return snapshot && { text: draftText(snapshot), revision: snapshot.revision };
+        },
+        readLegacy: () => readTranscriptSidecar(revision),
+        readOriginal: async () => {
+          const originalText = await readTranscriptSidecar(original);
+          if (!originalText?.trim()) throw new Error();
+          const raw = await readTranscriptSidecar(speakerFile);
+          const speakers = raw === undefined ? undefined : parseSpeakerResult(JSON.parse(raw));
+          if (raw !== undefined && !speakers) throw new Error();
+          return { text: originalText, attribution: speakers?.transcript };
+        },
+      });
+      const result = await transferTranscript(filename, markdown, saveFile);
+      if (result === 'saved') setMessage('Markdown file saved.');
+    } catch {
+      setMessage('Could not export the saved transcript. Check the saved revision and destination, then retry.');
+    } finally {
+      exportPending.current = false;
       setBusy(false);
     }
   }
@@ -473,6 +510,13 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
                 onPress={() => setEditingDraft(true)} /> : null}
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
+              {android ? <>
+                {dirty ? <Text style={{ color: palette.muted }}>Save your revision to export it.</Text> : null}
+                <ActionButton title="Share transcript (.md)" disabled={busy || dirty || revisionReadFailed || summaryLocked}
+                  onPress={() => { void exportTranscript(false); }} />
+                <ActionButton title="Save Markdown file" variant="outlined" disabled={busy || dirty || revisionReadFailed || summaryLocked}
+                  onPress={() => { void exportTranscript(true); }} />
+              </> : null}
               {hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
                 output={summaryFile} hasRevision={draftRevision > 0 || revision.exists} readRevision={readCommittedRevision}
                 readRevisionWithId={async () => {
