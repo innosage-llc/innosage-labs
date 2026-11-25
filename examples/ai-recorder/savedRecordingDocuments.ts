@@ -1,7 +1,7 @@
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { createDraftDocument, draftEditorIsBundled } from './draftDocumentStore';
+import { createDraftDocument } from './draftDocumentStore';
 import { draftText, editedSummaryCitations, readSummaryGeneration, type SummarySourceCitation } from './draftDocumentModel';
 import { committedSummary } from './summaryDraftLifecycle';
 import { readCommittedTranscript } from './transcriptCompletion';
@@ -38,7 +38,7 @@ export async function readLegacyRecordingSummary(output: File) {
 export async function readSavedRecordingSummary(recording: File) {
   let draftError: unknown;
   try {
-    if (draftEditorIsBundled()) {
+    if (Platform.OS === 'android') {
       const committed = await committedSummary(await createDraftDocument(recording, 'summary'));
       const generation = committed?.snapshot.generation;
       if (committed && generation) return {
