@@ -14,6 +14,7 @@ import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
 import { RecordingDetail } from './ui/recording-detail';
+import type { RecordingDocumentDestination } from './savedRecordingDocuments';
 import { formatRecordingTime, recordingDate, recordingTimeLabel, type RecordingSummary } from './ui/recording-display';
 import { shareRecording } from './recordingShare';
 import { handoffReducer, initialHandoff, locateRecording } from './ui/libraryHandoff';
@@ -136,14 +137,46 @@ function RecorderScreen() {
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
   useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
-  const [transcriptRecording, setTranscriptRecording] = useState<File>();
+  const [transcriptRoute, setTranscriptRoute] = useState<{ file: File; destination: RecordingDocumentDestination }>();
   const [detailUri, setDetailUri] = useState<string>();
   const detailRecording = summaries.find(recording => recording.uri === detailUri);
   const detailFile = files.find(file => file.uri === detailUri);
   const [playingFile, setPlayingFile] = useState<string>();
+  const androidPlayRequested = useRef<{ status: typeof playback; deadline: number } | undefined>(undefined);
+  const [androidPlayPending, setAndroidPlayPending] = useState(false);
   const [seekPosition, setSeekPosition] = useState<number>();
   const pendingSeek = useRef<number>(undefined);
   const position = Math.min(seekPosition ?? playback.currentTime, playback.duration);
+  const playbackError = (playback as typeof playback & { error?: string | null }).error;
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !detailUri || detailUri !== playingFile) return;
+    if (playbackError) {
+      ++playRequest.current;
+      androidPlayRequested.current = undefined;
+      setAndroidPlayPending(false);
+      player.pause();
+      setPlayingFile(undefined);
+      setMessage('Could not play the recording.');
+      return;
+    }
+    const pending = androidPlayRequested.current;
+    if (!androidPlayPending || !pending) return;
+    if (playback.playing || (playback.didJustFinish && playback !== pending.status)) {
+      androidPlayRequested.current = undefined;
+      setAndroidPlayPending(false);
+      return;
+    }
+    // A refused native audio-focus request can return without a status event.
+    const timeout = setTimeout(() => {
+      if (androidPlayRequested.current !== pending) return;
+      ++playRequest.current;
+      androidPlayRequested.current = undefined;
+      setAndroidPlayPending(false);
+      player.pause();
+      setMessage('Playback did not start. Try again.');
+    }, Math.max(0, pending.deadline - Date.now()));
+    return () => clearTimeout(timeout);
+  }, [androidPlayPending, detailUri, player, playingFile, playback, playbackError, setMessage]);
   const recorder = session.recorder;
   useEffect(() => {
     if (!capture.savedUri) return;
@@ -168,7 +201,8 @@ function RecorderScreen() {
 
   function openRecording(uri: string) {
     if (session.getSnapshot().phase !== 'idle') return;
-    if (!files.some(file => file.uri === uri && file.exists)) {
+    const file = files.find(file => file.uri === uri && file.exists);
+    if (!file) {
       setFiles(listRecordings());
       setMessage('This recording is no longer available on this device.');
       return;
@@ -176,23 +210,31 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
+    if (Platform.OS === 'android' && playingFile !== uri) {
+      ++playRequest.current;
+      try {
+        preparePlayback(file);
+      } catch {
+        setMessage('Could not load the recording.');
+      }
+    }
   }
 
   function closeRecording() {
     ++playRequest.current;
-    player.pause();
+    pausePlayback();
     pendingSeek.current = undefined;
     setSeekPosition(undefined);
     setDetailUri(undefined);
     setMessage('');
   }
 
-  function openTranscript(file: File) {
+  function openTranscript(file: File, destination: RecordingDocumentDestination = 'transcript') {
     if (session.getSnapshot().phase !== 'idle') return;
     ++playRequest.current;
-    player.pause();
+    pausePlayback();
     setMessage('');
-    setTranscriptRecording(file);
+    setTranscriptRoute({ file, destination });
   }
 
   function viewSavedRecording() {
@@ -293,6 +335,7 @@ function RecorderScreen() {
     if (session.getSnapshot().phase !== 'idle') return;
     dispatchHandoff({ type: 'reset' });
     ++playRequest.current;
+    cancelAndroidPlayRequest();
     await session.start();
   }
 
@@ -300,27 +343,51 @@ function RecorderScreen() {
     await session.stop();
   }
 
+  function cancelAndroidPlayRequest() {
+    androidPlayRequested.current = undefined;
+    setAndroidPlayPending(false);
+  }
+
+  function pausePlayback() {
+    cancelAndroidPlayRequest();
+    player.pause();
+  }
+
+  function preparePlayback(file: File) {
+    pausePlayback();
+    pendingSeek.current = undefined;
+    setSeekPosition(undefined);
+    player.replace(file.uri);
+    setPlayingFile(file.uri);
+  }
+
   async function togglePlayback(file: File) {
     if (session.getSnapshot().phase !== 'idle') return;
     const request = ++playRequest.current;
     try {
       if (playingFile === file.uri) {
-        if (player.playing) {
-          player.pause();
+        const shouldPause = Platform.OS === 'android'
+          ? androidPlayRequested.current || playback.playing : player.playing;
+        if (shouldPause) {
+          pausePlayback();
           return;
         }
-        if (player.duration > 0 && player.currentTime >= player.duration) {
-          await player.seekTo(0);
-        }
       } else {
-        player.pause();
-        pendingSeek.current = undefined;
-        setSeekPosition(undefined);
-        player.replace(file.uri);
-        setPlayingFile(file.uri);
+        preparePlayback(file);
       }
-      if (request === playRequest.current && session.getSnapshot().phase === 'idle') player.play();
+      if (Platform.OS === 'android') {
+        // Native can defer Play until focus is granted. A second tap cancels that request.
+        androidPlayRequested.current = { status: playback, deadline: Date.now() + 5000 };
+        setAndroidPlayPending(true);
+      }
+      if (playingFile === file.uri && player.duration > 0 && player.currentTime >= player.duration) {
+        await player.seekTo(0);
+      }
+      if (request !== playRequest.current || session.getSnapshot().phase !== 'idle') return;
+      player.play();
     } catch {
+      if (request !== playRequest.current) return;
+      cancelAndroidPlayRequest();
       setMessage('Could not play the recording.');
     }
   }
@@ -355,9 +422,11 @@ function RecorderScreen() {
   return (
     <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
       libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle' || !recordings, onPress: importAudio }}>
-      {detailRecording && detailFile && !transcriptRecording ? <RecordingDetail
+      {detailRecording && detailFile && !transcriptRoute ? <RecordingDetail
+        key={detailUri}
         recording={detailRecording}
-        playing={detailOwnsPlayer && playback.playing}
+        file={detailFile}
+        playing={detailOwnsPlayer && (playback.playing || androidPlayPending)}
         disabled={phase !== 'idle'}
         shareDisabled={sharePending}
         message={message}
@@ -365,6 +434,7 @@ function RecorderScreen() {
         onTogglePlayback={() => { void togglePlayback(detailFile); }}
         onShare={() => { void shareAudio(detailFile, recordingLabel(detailFile)); }}
         onTranscript={() => openTranscript(detailFile)}
+        onSummary={() => openTranscript(detailFile, 'summary')}
         seek={detailOwnsPlayer && playback.isLoaded && playback.duration > 0 ? {
           max: playback.duration,
           value: position,
@@ -376,8 +446,9 @@ function RecorderScreen() {
         } : undefined}
       /> : null}
       {showPro ? <ProSettings onClose={() => setShowPro(false)} /> : null}
-      {transcriptRecording ? <Transcript recording={transcriptRecording} recordingTitle={recordingLabel(transcriptRecording)}
-        backLabel="Back to recording details" onClose={() => setTranscriptRecording(undefined)} /> : null}
+      {transcriptRoute ? <Transcript recording={transcriptRoute.file} recordingTitle={recordingLabel(transcriptRoute.file)}
+        initialDocument={transcriptRoute.destination}
+        backLabel="Back to recording details" onClose={() => setTranscriptRoute(undefined)} /> : null}
       {phase === 'recording' && destination !== 'record' ? <View style={[styles.recordingBanner, { backgroundColor: palette.surface }]}>
         <View style={{ flex: 1 }}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.text, fontWeight: '700' }}>Recording · {formatRecordingTime(durationMillis / 1000)}</Text>
