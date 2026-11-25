@@ -10,11 +10,12 @@ export function draftTranscriptMarkdown(snapshot: DraftSnapshot): string {
   // The embedded editor can also store media and custom atoms. Only accept
   // transcript structures whose complete visible text we can reproduce.
   const blocks = ['paragraph', 'heading', 'codeBlock', 'horizontalRule', 'blockquote',
-    'bulletList', 'orderedList', 'taskList', 'table'];
+    'bulletList', 'orderedList', 'taskList', 'table', 'toggleDetailsV2'];
   const allowed: Record<string, string[]> = {
     doc: blocks, blockquote: blocks, listItem: blocks, taskItem: blocks,
     bulletList: ['listItem'], orderedList: ['listItem'], taskList: ['taskItem'],
     table: ['tableRow'], tableRow: ['tableCell', 'tableHeader'], tableCell: blocks, tableHeader: blocks,
+    toggleDetailsV2: ['toggleSummaryV2', 'toggleContentV2'], toggleContentV2: blocks, toggleSummaryV2: ['text', 'hardBreak'],
     paragraph: ['text', 'hardBreak'], heading: ['text', 'hardBreak'], codeBlock: ['text'],
   };
 
@@ -32,10 +33,12 @@ export function draftTranscriptMarkdown(snapshot: DraftSnapshot): string {
       return node.type === 'hardBreak' ? '  \n' : '---';
     }
     if (!Object.prototype.hasOwnProperty.call(allowed, node.type)) return unsupported();
-    const textBlock = ['paragraph', 'heading', 'codeBlock'].includes(node.type);
+    const textBlock = ['paragraph', 'heading', 'codeBlock', 'toggleSummaryV2'].includes(node.type);
     if (textBlock && node.content === undefined) return '';
     if (!Array.isArray(node.content) || (!textBlock && !node.content.length)) return unsupported();
     if (['listItem', 'taskItem'].includes(node.type) && node.content[0]?.type !== 'paragraph') return unsupported();
+    if (node.type === 'toggleDetailsV2' && (node.content.length !== 2 ||
+      node.content[0]?.type !== 'toggleSummaryV2' || node.content[1]?.type !== 'toggleContentV2')) return unsupported();
     const permitted = allowed[node.type];
     const children = node.content.map(child => {
       if (!permitted.includes(child?.type)) return unsupported();
@@ -70,7 +73,7 @@ type SavedTranscript = {
 function literalParagraphs(text: string): string {
   return text.split(/((?:\r?\n){2,})/).map((part, index) => {
     if (!part || index % 2) return part;
-    const withoutTimestamps = part.replace(/\[[\d:.]+(?:\s*[-–]\s*[\d:.]+)?\]/g, '');
+    const withoutTimestamps = part.replace(/^\[[\d:.]+(?:[ \t]*[-–][ \t]*[\d:.]+)?\](?=[ \t]+[\p{L}\p{N}])/gmu, '');
     const markup = /[\\`*_~\[\]<>|$]|&(?:#\w+|[a-z]+);|^(?:[ \t]{4}|\t| {0,3}(?:#{1,6}(?:\s|$)|[-+=](?:\s|$)|-{2,}|={2,}|\d+[.)]\s))/im;
     const softLines = part.replace(/\r?\n$/, '').split(/\r?\n/).slice(0, -1);
     if (!markup.test(withoutTimestamps) && !softLines.some(line => !line.endsWith('  '))) return part;

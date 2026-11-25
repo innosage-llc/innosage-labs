@@ -467,12 +467,11 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
         },
         readLegacy: () => readTranscriptSidecar(revision),
         readOriginal: async () => {
-          const originalText = await readTranscriptSidecar(original);
-          if (!originalText?.trim()) throw new Error();
-          const raw = await readTranscriptSidecar(speakerFile);
-          const speakers = raw === undefined ? undefined : parseSpeakerResult(JSON.parse(raw));
-          if (raw !== undefined && !speakers) throw new Error();
-          return { text: originalText, attribution: speakers?.transcript };
+          const saved = await readCommittedTranscript(original.uri, {
+            readOriginal: () => readTranscriptSidecar(original),
+            readSpeakers: completionFiles.readSpeakers,
+          });
+          return saved && { text: saved.transcript, attribution: saved.speakerLabeling?.transcript };
         },
       });
       const result = await transferTranscript(filename, markdown, saveFile);

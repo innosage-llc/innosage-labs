@@ -119,7 +119,20 @@ test('literal Markdown paragraphs retain the full line in a fenced block', async
   const text = 'Ordinary opening.\n\n' + last;
   const output = await transcriptMarkdown('reference', recording, { readDraft: absent, readLegacy: async () => text, readOriginal: unused });
   assert.ok(output.markdown.endsWith('Ordinary opening.\n\n```text\n' + last + '\n```'));
+  for (const literal of ['[00:03]: https://example.invalid/last', '[00:03](https://example.invalid/last)']) {
+    const stamp = await transcriptMarkdown('literal', recording, { readDraft: absent, readLegacy: async () => literal, readOriginal: unused });
+    assert.ok(stamp.markdown.endsWith('```text\n' + literal + '\n```'));
+  }
   const input = '```\nsecond line <x>';
   const nested = await transcriptMarkdown('code', recording, {readDraft: absent, readLegacy: async () => input, readOriginal: unused});
   assert.ok(nested.markdown.endsWith('````text\n' + input + '\n````'));
+});
+
+test('preserves both parts of a text toggle including its collapsed final paragraph', () => {
+  const label = { type: 'toggleSummaryV2', content: [{type: 'text', text: 'Agenda'}] };
+  const inside = { type: 'toggleContentV2', content: [{type: 'paragraph', content: [{type: 'text', text: '会议结束'}]}] };
+  const read = children => draftTranscriptMarkdown({ blocks: [{content: JSON.stringify({type: 'doc',
+    content: [{type: 'toggleDetailsV2', attrs: {opened: false}, content: children }]})}] });
+  assert.equal(read([label, inside]), 'Agenda\n\n会议结束');
+  assert.throws(() => read([inside, inside]), /cannot be exported completely/);
 });
