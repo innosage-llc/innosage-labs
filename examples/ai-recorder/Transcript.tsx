@@ -6,7 +6,7 @@ import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { readTranscriptSidecar, transferTranscript } from './transcriptTransfer';
 import { randomUUID } from 'expo-crypto';
-import { transcriptMarkdown } from './transcriptExport';
+import { draftTranscriptMarkdown, transcriptMarkdown } from './transcriptExport';
 import { prepareRecorderOpen } from './recorderDraftProtocol';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
@@ -433,7 +433,7 @@ export function Transcript({ recording, recordingTitle, backLabel = 'Back to lib
           // The on-disk page can outlive a build's optional editor assets.
           if (!draftDocument) throw new Error();
           const snapshot = await draftDocument.recover();
-          return snapshot && { text: draftText(snapshot), revision: snapshot.revision };
+          return snapshot && { text: draftTranscriptMarkdown(snapshot), revision: snapshot.revision };
         },
         readLegacy: () => readTranscriptSidecar(revision),
         readOriginal: async () => {

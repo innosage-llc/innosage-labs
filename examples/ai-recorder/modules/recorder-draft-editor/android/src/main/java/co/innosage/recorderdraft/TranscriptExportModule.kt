@@ -17,7 +17,7 @@ import java.io.File
 import java.io.InputStreamReader
 import java.util.UUID
 
-private const val MARKDOWN = "text/markdown"
+internal const val MARKDOWN = "text/markdown"
 
 // Some Android versions report application/octet-stream for .md. WebAPK uses the
 // resolver as well as ACTION_SEND's type when constructing the multipart File.
@@ -39,26 +39,42 @@ private object ShareTranscript : AppContextActivityResultContract<String, Unit> 
   override fun parseResult(input: String, resultCode: Int, intent: Intent?) = Unit
 }
 
-private object CreateTranscript : AppContextActivityResultContract<String, Uri?> {
-  override fun createIntent(context: Context, input: String) = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-    addCategory(Intent.CATEGORY_OPENABLE)
-    type = MARKDOWN
-    putExtra(Intent.EXTRA_TITLE, input)
-    putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+// This launcher reports the outcome to a surviving JS screen. The private Activity,
+// rather than this transient Expo callback, owns the actual picker and write.
+private object CreateTranscript : AppContextActivityResultContract<String, Int> {
+  override fun createIntent(context: Context, input: String): Intent {
+    val snapshot = File(input)
+    return Intent(context, SaveTranscriptActivity::class.java)
+      .putExtra("job", requireNotNull(snapshot.parentFile).name)
+      .putExtra("filename", snapshot.name)
   }
-  override fun parseResult(input: String, resultCode: Int, intent: Intent?): Uri? =
-    when (resultCode) {
-      Activity.RESULT_CANCELED -> null
-      Activity.RESULT_OK -> intent?.data ?: Uri.EMPTY
-      else -> Uri.EMPTY
+
+  override fun parseResult(input: String, resultCode: Int, intent: Intent?) = resultCode
+}
+
+private fun stageSnapshot(root: File, filename: String, markdown: String): File {
+  val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+  root.listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.deleteRecursively() }
+  val directory = File(root, UUID.randomUUID().toString())
+  check(directory.mkdirs())
+  try {
+    return File(directory, filename).also { snapshot ->
+      snapshot.outputStream().use { output ->
+        output.write(markdown.toByteArray(Charsets.UTF_8))
+        output.fd.sync()
+      }
     }
+  } catch (error: Exception) {
+    directory.deleteRecursively()
+    throw error
+  }
 }
 
 class TranscriptExportModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("RecorderTranscriptExport")
     lateinit var share: AppContextActivityResultLauncher<String, Unit>
-    lateinit var create: AppContextActivityResultLauncher<String, Uri?>
+    lateinit var create: AppContextActivityResultLauncher<String, Int>
     RegisterActivityContracts {
       share = registerForActivityResult(ShareTranscript)
       create = registerForActivityResult(CreateTranscript)
@@ -71,27 +87,17 @@ class TranscriptExportModule : Module() {
     AsyncFunction("exportMarkdown") Coroutine { filename: String, markdown: String, save: Boolean ->
       require(filename.endsWith(".md") && File(filename).name == filename)
       val context = requireNotNull(appContext.reactContext)
+      val snapshot = withContext(Dispatchers.IO) {
+        val root = if (save) File(context.noBackupFilesDir, "transcript-saves") else File(context.cacheDir, "transcript-shares")
+        stageSnapshot(root, filename, markdown)
+      }
       if (save) {
-        val uri = create.launch(filename) ?: return@Coroutine "cancelled"
-        check(uri.scheme == "content")
-        withContext(Dispatchers.IO) {
-          requireNotNull(context.contentResolver.openOutputStream(uri, "wt")).use { it.write(markdown.toByteArray(Charsets.UTF_8)) }
+        when (create.launch(snapshot.path)) {
+          Activity.RESULT_OK -> "saved"
+          Activity.RESULT_CANCELED -> "cancelled"
+          else -> throw IllegalStateException("Could not write the selected document.")
         }
-        "saved"
       } else {
-        val snapshot = withContext(Dispatchers.IO) {
-          val root = File(context.cacheDir, "transcript-shares")
-          val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
-          root.listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.deleteRecursively() }
-          val directory = File(root, UUID.randomUUID().toString())
-          check(directory.mkdirs())
-          try {
-            File(directory, filename).also { it.writeText(markdown, Charsets.UTF_8) }
-          } catch (error: Exception) {
-            directory.deleteRecursively()
-            throw error
-          }
-        }
         val attachment = FileProvider.getUriForFile(context, context.packageName + ".transcripts", snapshot)
         try {
           share.launch(attachment.toString())

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { transcriptMarkdown } from './transcriptExport.ts';
-import { draftStore, draftText } from './draftDocumentModel.ts';
+import { draftTranscriptMarkdown, transcriptMarkdown } from './transcriptExport.ts';
+import { draftStore } from './draftDocumentModel.ts';
 import { prepareRecorderOpen } from './recorderDraftProtocol.ts';
 import { compareBody } from './scripts/experiment-a-readback.mjs';
 import { readFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ test('exports the latest committed editor correction from its disk owner through
   }
   const snapshot = await draftStore(key, disk).recover();
   const result = await transcriptMarkdown(title, recording, {
-    readDraft: async () => ({ text: draftText(snapshot), revision: snapshot.revision }),
+    readDraft: async () => ({ text: draftTranscriptMarkdown(snapshot), revision: snapshot.revision }),
     readLegacy: unused, readOriginal: unused,
   });
   assert.equal(result.filename, 'Transcript - Experiment A meeting.md');
@@ -76,4 +76,26 @@ test('original-only exports retain the verbatim recording and full separate spea
   });
   assert.ok(result.markdown.includes(attribution));
   assert.ok(result.markdown.endsWith(text));
+});
+
+test('editor Enter creates a new Markdown paragraph and Shift+Enter stays a hard break', () => {
+  const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+  const doc = { type: 'doc', content: [
+    paragraph('[00:03] Alba: 12 seats.'),
+    { type: 'paragraph', content: [{ type: 'text', text: 'Bo:' }, { type: 'hardBreak' }, { type: 'text', text: 'Friday?' }] },
+    { type: 'paragraph' }, paragraph('会议结束'),
+  ] };
+  assert.equal(draftTranscriptMarkdown({ blocks: [{ content: JSON.stringify(doc) }] }),
+    '[00:03] Alba: 12 seats.\n\nBo:  \nFriday?\n\n会议结束');
+});
+
+test('a malformed or unsupported node stops the entire edited export', async () => {
+  for (const bad of [null, { type: 'text', text: 37 }, { type: 'paragraph', content: [] }, { type: 'paragraph', content: 'lost' },
+    { type: 'text', text: 'first', content: [] }, { type: 'inlineWidget', attrs: { label: 'lost' } }]) {
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'valid prefix' }, bad] }] };
+    await assert.rejects(transcriptMarkdown('meeting', recording, {
+      readDraft: async () => ({ revision: 2, text: draftTranscriptMarkdown({ blocks: [{ content: JSON.stringify(doc) }] }) }),
+      readLegacy: unused, readOriginal: unused,
+    }), /cannot be exported completely/);
+  }
 });
