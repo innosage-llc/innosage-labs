@@ -95,6 +95,8 @@ class TranscriptExportModule : Module() {
         when (create.launch(snapshot.path)) {
           Activity.RESULT_OK -> "saved"
           Activity.RESULT_CANCELED -> "cancelled"
+          SaveTranscriptActivity.OCCUPIED -> "occupied"
+          SaveTranscriptActivity.INCOMPLETE -> "incomplete"
           else -> throw IllegalStateException("Could not write the selected document.")
         }
       } else {

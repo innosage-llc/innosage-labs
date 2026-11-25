@@ -99,3 +99,27 @@ test('a malformed or unsupported node stops the entire edited export', async () 
     }), /cannot be exported completely/);
   }
 });
+
+test('invalid document children and required list content stop an otherwise valid export', () => {
+  const valid = { type: 'paragraph', content: [{ type: 'text', text: 'valid prefix' }] };
+  for (const extra of [
+    { type: 'text', text: 'outside paragraph' },
+    { type: 'bulletList', content: [] },
+    { type: 'paragraph', content: [{ type: 'text', text: '' }] },
+    { type: 'listItem', content: [valid] },
+    { type: 'orderedList', content: [valid] },
+  ]) {
+    const doc = {type: 'doc', content: [valid, extra]};
+    assert.throws(() => draftTranscriptMarkdown({blocks: [{content: JSON.stringify(doc)}]}), /cannot be exported completely/);
+  }
+});
+
+test('literal Markdown paragraphs retain the full line in a fenced block', async () => {
+  const last = '[Final]: https://example.invalid/last';
+  const text = 'Ordinary opening.\n\n' + last;
+  const output = await transcriptMarkdown('reference', recording, { readDraft: absent, readLegacy: async () => text, readOriginal: unused });
+  assert.ok(output.markdown.endsWith('Ordinary opening.\n\n```text\n' + last + '\n```'));
+  const input = '```\nsecond line <x>';
+  const nested = await transcriptMarkdown('code', recording, {readDraft: absent, readLegacy: async () => input, readOriginal: unused});
+  assert.ok(nested.markdown.endsWith('````text\n' + input + '\n````'));
+});

@@ -64,7 +64,7 @@ class SaveTranscriptActivity : Activity() {
       check(pending.renameTo(File(jobDirectory, "destination")))
       writeDocument(uri)
     } catch (_: Exception) {
-      complete(RESULT_FIRST_USER)
+      complete(INCOMPLETE)
     }
   }
 
@@ -72,21 +72,17 @@ class SaveTranscriptActivity : Activity() {
     check(uri.scheme == "content")
     writing = true
     writer.execute {
-      val success = try {
-        // A configuration change can enqueue another copy while the first is finishing.
-        val written = File(jobDirectory, "written")
-        if (!written.exists()) {
-          requireNotNull(contentResolver.openOutputStream(uri, "wt")).use { out ->
-            snapshot.inputStream().use { input -> check(input.copyTo(out) == snapshot.length()) }
-          }
-          check(written.createNewFile())
-        }
-        true
-      } catch (_: Exception) {
-        false
+      val result = when (MarkdownDocumentCopy.write(
+        snapshot, File(jobDirectory, "attempted"),
+        { requireNotNull(contentResolver.openInputStream(uri)) },
+        { requireNotNull(contentResolver.openOutputStream(uri, "wt")) },
+      )) {
+        MarkdownDocumentCopy.Result.SAVED -> RESULT_OK
+        MarkdownDocumentCopy.Result.OCCUPIED -> OCCUPIED
+        else -> INCOMPLETE
       }
       runOnUiThread {
-        if (!isDestroyed && !isFinishing) complete(if (success) RESULT_OK else RESULT_FIRST_USER)
+        if (!isDestroyed && !isFinishing) complete(result)
       }
     }
   }
@@ -99,7 +95,12 @@ class SaveTranscriptActivity : Activity() {
   private fun complete(result: Int) {
     if (::snapshot.isInitialized) jobDirectory.deleteRecursively()
     if (result != RESULT_CANCELED) {
-      val message = if (result == RESULT_OK) "Markdown file saved." else "Could not finish saving the Markdown file. Retry from Recorder."
+      val message = when (result) {
+        RESULT_OK -> "Markdown file saved."
+        OCCUPIED -> "That document already contains data. Save again with a new filename."
+        INCOMPLETE -> "The destination may contain an incomplete file. Save again with a new filename, then check the last line."
+        else -> "Could not finish saving the Markdown file. Retry from Recorder."
+      }
       Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
     setResult(result)
@@ -107,6 +108,8 @@ class SaveTranscriptActivity : Activity() {
   }
 
   companion object {
+    const val OCCUPIED = RESULT_FIRST_USER + 1
+    const val INCOMPLETE = RESULT_FIRST_USER + 2
     private const val PICK_DOCUMENT = 1
     private val writer = Executors.newSingleThreadExecutor()
   }

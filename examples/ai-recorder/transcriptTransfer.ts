@@ -4,7 +4,7 @@ export async function readTranscriptSidecar(file: File) {
   return file.exists ? file.text() : undefined;
 }
 
-export type TransferOutcome = 'saved' | 'cancelled' | 'dismissed';
+export type TransferOutcome = 'saved' | 'cancelled' | 'dismissed' | 'occupied' | 'incomplete';
 
 export async function transferTranscript(_filename: string, _markdown: string, _save: boolean): Promise<TransferOutcome> {
   throw new Error('Markdown transfer requires Android.');
