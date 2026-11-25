@@ -7,8 +7,12 @@ import { monitor } from './host.mjs';
 export function xmlControl(xml, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const node = xml.match(new RegExp(`<node\\b[^>]*(?:text|content-desc)="${escaped}"[^>]*>`));
-  if (!node || /(?:visible-to-user|displayed)="false"/.test(node[0])) return null;
-  const bounds = node[0].match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  return node ? visibleNodeCenter(node[0]) : null;
+}
+
+function visibleNodeCenter(node) {
+  if (/(?:visible-to-user|displayed)="false"/.test(node)) return null;
+  const bounds = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if (!bounds) return null;
   const [x1,y1,x2,y2] = bounds.slice(1).map(Number);
   return x2 > x1 && y2 > y1 ? { x: Math.round((x1+x2)/2), y: Math.round((y1+y2)/2) } : null;
@@ -25,7 +29,7 @@ export function captureRows(xml) {
 
 export function hasSavedRecordingFeedback(xml) {
   const row = xml.match(/<node\b[^>]*resource-id="(?:(?:[^":]+:)?id\/)?last-recording-saved"[^>]*>/);
-  return !!row && !/(?:visible-to-user|displayed)="false"/.test(row[0]) ||
+  return !!(row && visibleNodeCenter(row[0])) ||
     ['Saved on this device', 'Last recording saved'].some(label => xmlControl(xml, label));
 }
 

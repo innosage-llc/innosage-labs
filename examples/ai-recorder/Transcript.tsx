@@ -15,7 +15,7 @@ import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
 import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
-import { draftText, transcriptSeed } from './draftDocumentModel';
+import { draftText } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
 
 import { clientForService, clientForOperation, selectedService, hashRecording } from './ProAccess';
@@ -29,7 +29,7 @@ import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuest
 import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
-import { readSavedRecordingSummary, type RecordingDocumentDestination } from './savedRecordingDocuments';
+import { readSavedRecordingSummary, readSavedTranscriptEdit, type RecordingDocumentDestination } from './savedRecordingDocuments';
 import { knownRecordingDuration, recordingDate, recordingDayLabel, recordingTimeLabel, type RecordingSummary } from './ui/recording-display';
 import { transcriptReaderBlocks } from './ui/document-content';
 type Job = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };
@@ -124,25 +124,17 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   };
   const committedResult = () => readCommittedTranscript(original.uri, completionFiles);
 
-  async function readSavedEdit() {
-    const document = android ? await createDraftDocument(recording, 'transcript') : undefined;
-    const snapshot = await document?.recover();
-    const text = await transcriptSeed(async () => snapshot, () => readTranscriptSidecar(revision));
-    return { document, revisionNumber: snapshot?.revision ?? 0, text };
-  }
-
   async function showCompletion(committed: CompletedTranscript) {
     if (!seededRevision.current) {
       try {
-        const { document, revisionNumber, text: savedRevision } = await readSavedEdit();
+        const { document, revisionNumber, text: savedRevision } = await readSavedTranscriptEdit(recording);
         // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
         if (!seededRevision.current) {
           seededRevision.current = true;
           setDraftDocument(document);
           setDraftRevision(revisionNumber);
           setRevisionReadFailed(false);
-          setDraft(savedRevision !== undefined && savedRevision !== committed.speakerLabeling?.transcript
-            ? savedRevision : readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
+          setDraft(savedRevision ?? readableSpeakerTranscript(committed.transcript, committed.speakerLabeling?.transcript));
         }
       } catch {
         if (!seededRevision.current) {
@@ -168,7 +160,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         // Older recordings can retain a committed edit after losing their original.
         // Recover it for export without starting a transcription or inventing an original.
         try {
-          const edit = await readSavedEdit();
+          const edit = await readSavedTranscriptEdit(recording);
           if (!active) return;
           if (edit.text !== undefined) {
             setDraftDocument(edit.document);
@@ -285,9 +277,8 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     return () => { current = false; };
   }, [android, complete, recordingUri, summaryLocked]);
   async function readCommittedRevision() {
-    const snapshot = await draftDocument?.recover();
-    if (snapshot) return draftText(snapshot);
-    return revision.exists ? revision.text() : undefined;
+    if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
+    return (await readSavedTranscriptEdit(recording)).text;
   }
   useEffect(() => {
     if ((!freeOperation && !paidOperation) || connecting || !serviceReady || busy || complete || statusUnknown || operationEnded) return;
@@ -546,6 +537,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     setRestoreAttempt(attempt => attempt + 1);
   };
   const exportDisabled = busy || dirty || revisionReadFailed || summaryLocked;
+  const canSummarizeRevision = !revisionReadFailed && (draftRevision > 0 || revision.exists);
   const exportActions = android ? <>
     {dirty ? <Text style={{ color: palette.muted }}>Save your revision to export it.</Text> : null}
     <ActionButton title="Share transcript (.md)" disabled={exportDisabled}
@@ -618,9 +610,11 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                       else { beforeEdit.current = draft; setEditingReader(true); }
                     }} />
                   {summaryAvailable ? <ActionButton title="Open summary" variant="text" fullWidth={false}
-                    onPress={() => setShowSavedSummary(true)} /> : null}
+                    disabled={busy || summaryLocked}
+                    onPress={() => { if (!exportPending.current) setShowSavedSummary(true); }} /> : null}
                   <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
-                    onPress={() => setShowSummaryTools(true)} />
+                    disabled={busy || summaryLocked}
+                    onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} />
                 </> : null}
                 {exportActions}
               </> : <>
@@ -642,14 +636,15 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
               {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               </>}
               {!android || showSummaryTools ? hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
-                output={summaryFile} hasRevision={draftRevision > 0 || revision.exists} readRevision={readCommittedRevision}
+                output={summaryFile} hasRevision={canSummarizeRevision} readRevision={readCommittedRevision}
                 readRevisionWithId={async () => {
-                  if (!draftDocument) throw new Error('The saved transcript is not ready.');
-                  const saved = await draftDocument.recover();
-                  return saved ? {text:draftText(saved), sourceRevision:saved.revision}
-                    : {text:revision.exists ? await revision.text() : ''};
+                  if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
+                  const saved = await readSavedTranscriptEdit(recording);
+                  return saved.revisionNumber > 0
+                    ? { text: saved.text ?? '', sourceRevision: saved.revisionNumber }
+                    : { text: saved.text ?? '' };
                 }}
-                save={saveText} onLockChange={setSummaryLocked} /> : <TranscriptSummary original={original} hasRevision={draftRevision > 0 || revision.exists}
+                save={saveText} onLockChange={setSummaryLocked} /> : <TranscriptSummary original={original} hasRevision={canSummarizeRevision}
                 readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked}
                 startOpen={android} /> : null}
             </>

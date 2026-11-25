@@ -29,6 +29,7 @@ test('Android staging verification recognizes legacy and current successful-save
   assert.ok(hasSavedRecordingFeedback('<node text="Last recording saved" bounds="[0,0][320,48]"/>'));
   assert.ok(hasSavedRecordingFeedback('<node resource-id="last-recording-saved" content-desc="Last recording saved, 42 sec, View in Library" bounds="[0,0][320,48]"/>'));
   assert.equal(hasSavedRecordingFeedback('<node resource-id="last-recording-saved" displayed="false" bounds="[0,0][320,48]"/>'), false);
+  assert.equal(hasSavedRecordingFeedback('<node resource-id="last-recording-saved" bounds="[3,3][3,3]"/>'), false);
   assert.equal(hasSavedRecordingFeedback('<node text="Last recording saved" displayed="false" bounds="[0,0][320,48]"/>'), false);
   assert.equal(hasSavedRecordingFeedback('<node text="Saving…" bounds="[0,0][320,48]"/>'), false);
 });

@@ -1,9 +1,11 @@
 import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createDraftDocument, draftEditorIsBundled } from './draftDocumentStore';
-import { editedSummaryCitations, readSummaryGeneration, type SummarySourceCitation } from './draftDocumentModel';
+import { draftText, editedSummaryCitations, readSummaryGeneration, type SummarySourceCitation } from './draftDocumentModel';
 import { committedSummary } from './summaryDraftLifecycle';
 import { readCommittedTranscript } from './transcriptCompletion';
+import { readTranscriptSidecar } from './transcriptTransfer';
 
 export type RecordingDocumentDestination = 'transcript' | 'summary';
 
@@ -55,22 +57,39 @@ export async function readSavedRecordingSummary(recording: File) {
   if (draftError) throw draftError;
 }
 
-export async function readRecordingDocumentActions(recording: File): Promise<RecordingDocumentActions> {
-  const original = new File(recording.parentDirectory, recording.name + '.original.txt');
-  const committed = await readCommittedTranscript(original.uri, {
-    readOriginal: async () => original.exists ? original.text() : undefined,
-    readSpeakers: async () => undefined,
-  });
-  if (!committed) {
-    const operation = await SecureStore.getItemAsync('transcription.' + recording.name);
-    return { transcript: operation ? 'Transcript' : 'Transcribe', summary: false };
-  }
+export async function readSavedTranscriptEdit(recording: File) {
+  const document = Platform.OS === 'android' ? await createDraftDocument(recording, 'transcript') : undefined;
+  const snapshot = await document?.recover();
+  const text = snapshot
+    ? draftText(snapshot)
+    : await readTranscriptSidecar(new File(recording.parentDirectory, recording.name + '.revision.txt'));
+  return { document, revisionNumber: snapshot?.revision ?? 0, text };
+}
 
-  // Opening recording detail only reads local state. Migration remains in the summary route.
+async function transcriptAction(recording: File): Promise<RecordingDocumentActions['transcript']> {
+  const original = new File(recording.parentDirectory, recording.name + '.original.txt');
   try {
-    return { transcript: 'Open transcript', summary: !!await readSavedRecordingSummary(recording) };
+    const committed = await readCommittedTranscript(original.uri, {
+      readOriginal: () => readTranscriptSidecar(original),
+      readSpeakers: async () => undefined,
+    });
+    if (committed) return 'Open transcript';
   } catch {
-    // A damaged summary must not hide the still-readable transcript.
-    return { transcript: 'Open transcript', summary: false };
+    // The canonical edit can still be readable when the original cannot be read.
   }
+  try {
+    if ((await readSavedTranscriptEdit(recording)).text !== undefined) return 'Open transcript';
+  } catch {
+    return 'Transcript';
+  }
+  const operation = await SecureStore.getItemAsync('transcription.' + recording.name).catch(() => undefined);
+  return operation ? 'Transcript' : 'Transcribe';
+}
+
+export async function readRecordingDocumentActions(recording: File): Promise<RecordingDocumentActions> {
+  const [transcript, summary] = await Promise.all([
+    transcriptAction(recording),
+    readSavedRecordingSummary(recording).catch(() => undefined),
+  ]);
+  return { transcript, summary: !!summary };
 }
