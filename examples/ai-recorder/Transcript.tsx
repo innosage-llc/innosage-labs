@@ -225,7 +225,6 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       }
     }
     void restore().catch(error => {
-      if (restoredLocalTranscript && Platform.OS === 'ios') return;
       if (active) setMessage(error instanceof Error && error.message === 'The original transcript needs recovery. It has not been changed.'
         ? error.message : 'Could not connect. Retry when online.');
     })
