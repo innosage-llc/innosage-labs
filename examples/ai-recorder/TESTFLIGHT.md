@@ -41,3 +41,7 @@ This guide records preparation only: no cloud build, signed distribution IPA,
 upload, App Store Connect processing, TestFlight installation, membership or
 tester approval is asserted. Verify all account, signing, archive, cost and
 compliance prerequisites before any separately authorized distribution work.
+
+### Staging-only internal candidate
+
+For an authorized Staging internal archive, set `RECORDER_STAGING_IOS_INTERNAL=1` and `EXPO_PUBLIC_RECORDER_GATEWAY_URL` to the exact Staging value in `recorder-free-targets.json` during Expo prebuild and the Xcode Release bundle phase. Leave the Production Free input unset. The config check rejects a missing or mismatched Staging target and a Production target in this profile. Verify the embedded bundle actually binds the Staging input, the internal-only export option, the archive version and signed Info.plist. A successful upload does not establish processing or internal-group assignment.
