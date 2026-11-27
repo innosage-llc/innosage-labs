@@ -1,7 +1,6 @@
 import { Host } from '@expo/ui';
 import { Image } from '@expo/ui/swift-ui';
 import { font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
-import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { services } from '../ServiceConfig';
 import { DetailShell } from './DetailShell';
@@ -78,14 +77,7 @@ export function ServiceSettingsLayout({
   onChange, onOpenKeys, onBack,
 }: ServiceSettingsLayoutProps) {
   const { palette, spacing, typography } = useTheme();
-  const [initialRead, setInitialRead] = useState<'pending' | 'loaded' | 'failed'>('pending');
-  // The owner starts busy and also uses busy for later changes and key operations.
-  useEffect(() => {
-    if (initialRead === 'pending' && !busy) setInitialRead(message ? 'failed' : 'loaded');
-  }, [initialRead, busy, message]);
-
-  const loading = initialRead === 'pending' && busy;
-  const stagingIsDefault = service === 'staging' && (initialRead === 'loaded' || (!busy && !message));
+  const loading = service === undefined && busy;
   const canManageKey = service === 'openai' && canConfigureKey;
   const showKeyScreen = managingKeys && canManageKey;
   const muted = [typography.body, { color: palette.muted }];
@@ -120,8 +112,8 @@ export function ServiceSettingsLayout({
                 <ServiceRow
                   title={services.staging.label}
                   detail={stagingAvailable ? 'Free access available in this build' : 'Free access unavailable in this build'}
-                  selected={stagingIsDefault}
-                  disabled={busy || !stagingAvailable}
+                  selected={service === 'staging'}
+                  disabled={busy}
                   onPress={() => onChange('staging')}
                 />
                 <ServiceRow
