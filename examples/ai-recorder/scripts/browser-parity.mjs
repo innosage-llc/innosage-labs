@@ -121,9 +121,22 @@ try {
     await visible('Default saved for new transcriptions. Existing jobs keep their service.');
     await click('Back to settings');
     await click('Library');
-    const chooser = page.waitForEvent('filechooser');
-    await click('Import audio');
-    await (await chooser).setFiles({ name: label, mimeType: 'audio/mp4', buffer: audio });
+    const importFile = async (name, buffer) => {
+      const chooser = page.waitForEvent('filechooser');
+      await click('Import audio');
+      await (await chooser).setFiles({ name, mimeType: 'audio/mp4', buffer });
+      await page.getByText(name, { exact: true }).waitFor();
+    };
+    const unreadable = 'Unreadable duration fixture.m4a';
+    await importFile(unreadable, Buffer.from('synthetic container without duration'));
+    await page.getByText(unreadable, { exact: true }).click();
+    await click('Transcript for ' + unreadable);
+    await click('Transcribe');
+    await visible('Could not verify the recording duration for Free transcription. Check that the recording plays, then retry.');
+    assert.deepEqual(calls, ['verify key'], 'Missing duration must stop before guest provision or upload');
+    await click('Back to recording details');
+    await click('Back to Library');
+    await importFile(label, audio);
     await page.getByText(label, { exact: true }).click();
     assert.deepEqual(await download('Share audio for ' + label), audio);
     await click('Play ' + label);
@@ -176,7 +189,7 @@ try {
     console.log(JSON.stringify({ runtime: 'Chromium ' + browser.version(), artifact: server.artifact.sha256,
       source: 'synthetic microphone and M4A', provider: 'local intercepted responses', passed: [
         'capture/save', 'service setting/key verification', 'file import', 'byte-exact share/download', 'play/pause/seek',
-        'explicit upload and same-operation recovery', 'immutable original/edit', 'saved revision Markdown',
+        'unknown duration refused locally', 'explicit upload and same-operation recovery', 'immutable original/edit', 'saved revision Markdown',
         'revision-sourced summary', 'offline audio, original, revision and summary reopen' ] }, null, 2));
   } catch (error) {
     console.error('Browser parity fixture failed:', await page.locator('body').innerText(), errors);
