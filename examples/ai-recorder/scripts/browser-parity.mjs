@@ -129,9 +129,14 @@ try {
     await click('Play ' + label);
     await click('Pause ' + label);
     const slider = page.getByRole('slider');
-    await slider.focus();
-    await slider.press('End');
-    assert.ok(Number(await slider.inputValue()) > 2, 'Could not seek the three-second file');
+    const bounds = await slider.boundingBox();
+    assert.ok(bounds, 'Seek control has no bounds');
+    await slider.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+    // Expo publishes currentTime on the native media element's asynchronous seeked event.
+    await page.waitForFunction(() => {
+      const range = document.querySelector('input[type="range"]');
+      return range && range.valueAsNumber > 1 && range.valueAsNumber < 2;
+    });
     await click('Transcript for ' + label);
     await button('Transcribe').waitFor();
     assert.deepEqual(calls, ['verify key']);
