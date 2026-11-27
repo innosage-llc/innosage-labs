@@ -128,6 +128,18 @@ test('the iOS Settings entry distinguishes unknown key status and can retry the 
   assert.match(settings, /Retry reading settings[\s\S]*?setReadAttempt\(attempt => attempt \+ 1\)/);
 });
 
+test('Settings reports a failed preference read and Staging Free discloses original retention before upload', () => {
+  const files = graph('ios');
+  const entry = files.get(resolve(root, 'App.tsx'));
+  const settings = files.get(resolve(root, 'ui/service-flow.ios.tsx'));
+  const setup = files.get(resolve(root, 'ui/InnoSageTranscriptAction.tsx'));
+  assert.match(entry, /useState\("Reading saved service…"\)/);
+  assert.match(entry, /catch\(\(\) => \{ if \(current\) setServiceLabel\('Saved service unavailable'\)/);
+  assert.match(settings, /onChange\('staging'\)/);
+  assert.match(setup, /!isProduction && !usePro[^\n]*Staging Gateway keeps the original transcript/);
+  assert.ok(setup.indexOf('Staging Gateway keeps') < setup.indexOf('onPress={onTranscribe}'));
+});
+
 test('iOS Free transcription preflights local duration before recovering or provisioning upload access', () => {
   const files = graph('ios');
   const transcript = files.get(resolve(root, 'Transcript.tsx'));
