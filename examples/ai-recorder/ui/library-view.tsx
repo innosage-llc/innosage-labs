@@ -148,9 +148,38 @@ export function LibraryView({
               </Text>
               {metadata.length > 0 ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.xs }}>
-                  {metadata.map(field => (
-                    <Text key={field} style={[typography.caption, { color: palette.muted }]}>{field}</Text>
-                  ))}
+                  {time ? (
+                    <Text
+                      style={[
+                        typography.caption,
+                        {
+                          color: palette.muted,
+                          fontVariant: ['tabular-nums'],
+                          flexShrink: 1,
+                          maxWidth: '100%',
+                        },
+                      ]}
+                    >
+                      {time}
+                    </Text>
+                  ) : null}
+                  {duration ? (
+                    <Text
+                      style={[
+                        typography.caption,
+                        {
+                          color: palette.muted,
+                          fontVariant: ['tabular-nums'],
+                          marginLeft: 'auto',
+                          flexShrink: 0,
+                          maxWidth: '100%',
+                          textAlign: 'right',
+                        },
+                      ]}
+                    >
+                      {duration}
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
               {status ? (
