@@ -8,7 +8,7 @@ export type SettingsEntryProps = {
 };
 
 export type ServiceSettingsLayoutProps = {
-  service: ServiceId;
+  service: ServiceId | undefined;
   serviceLabel: string;
   stagingAvailable: boolean;
   managingKeys: boolean;

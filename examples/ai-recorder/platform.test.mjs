@@ -119,6 +119,14 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });
 
+test('iOS Free transcription preflights local duration before recovering or provisioning upload access', () => {
+  const files = graph('ios');
+  const transcript = files.get(resolve(root, 'Transcript.tsx'));
+  assert.match(transcript, /import \{ recordingDurationMillis \} from '\.\/libraryDuration';/);
+  assert.match(files.get(resolve(root, 'libraryDuration.ios.ts')), /file\.open\(FileMode\.ReadOnly\)/);
+  assert.match(transcript, /freeRecordingLimit\(recording.size, await recordingDurationMillis\(recording\)[^\n]*\n\s*if \(limit\) throw new KnownServiceFailure\(limit\);[\s\S]*?await connectGateway\(service\)/);
+});
+
 test('iOS config declares its identity and microphone purpose without broad file sharing', () => {
   const { expo } = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
   assert.deepEqual(expo.platforms, ['android', 'ios', 'web']);

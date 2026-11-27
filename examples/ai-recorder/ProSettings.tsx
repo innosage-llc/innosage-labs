@@ -22,7 +22,8 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   const [managingKeys, setManagingKeys] = useState(false);
   const working = useRef(false);
   const key = useNativeState("");
-  const [service, setService] = useState<ServiceId>("staging");
+  const [knownService, setService] = useState<ServiceId>();
+  const service = knownService ?? "staging";
   const access = accessFor(service);
   const isOpenAI = service === "openai";
   const environment = service === "production" ? "Production" : "Staging";
@@ -41,7 +42,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     return () => { active = false; };
   }, []);
   async function changeService(id: ServiceId) {
-    if (busy || working.current || id === service) return;
+    if (busy || working.current || id === (Platform.OS === 'ios' ? knownService : service)) return;
     working.current = true;
     setBusy(true);
     setMessage("");
@@ -160,7 +161,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   </>;
 
   if (Platform.OS === 'ios') {
-    return <ServiceSettingsLayout service={service} serviceLabel={services[service].label}
+    return <ServiceSettingsLayout service={knownService} serviceLabel={services[service].label}
       stagingAvailable={gatewayAvailable('staging')} managingKeys={managingKeys} canConfigureKey={canConfigureKey}
       busy={busy} message={message} keys={keyControls} onChange={id => { void changeService(id); }}
       onOpenKeys={openKeys} onBack={goBack} />;
