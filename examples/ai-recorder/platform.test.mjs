@@ -55,7 +55,7 @@ test('iOS seek uses a 0-to-duration range rather than SwiftUI default 0-to-1', (
   assert.match(seek, /<Slider \{\.\.\.props\} min=\{0\}/);
   assert.match(seek, /enabled, label, onValueChangeFinished, \.\.\.props/);
   assert.match(files.get(resolve(root, 'App.tsx')), /<RecordingDetail\b[\s\S]*?seek=\{detailOwnsPlayer[^\n]*\{\s*max: playback\.duration/);
-  assert.match(files.get(resolve(root, 'ui/recording-detail.tsx')), /<PlaybackSeek\s+\{\.\.\.activeSeek\}/);
+  assert.match(files.get(resolve(root, 'ui/recording-detail.ios.tsx')), /<PlaybackSeek\s+\{\.\.\.activeSeek\}/);
 });
 
 test('Android retains its Compose controls and bounded native uploader', () => {
