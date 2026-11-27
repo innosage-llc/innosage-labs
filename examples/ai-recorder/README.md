@@ -45,6 +45,8 @@ offline AI. There is no cross-device sync or backup promise. Uninstall removes
 app-private files and saved results; it does not delete an original transcript
 already retained by the staging Gateway.
 
+The [versioned cross-platform acceptance matrix](docs/platform-parity.md) records the current product contract, known gaps, approved release exceptions and required local evidence for #139. The dated Android and prototype status below supplies historical context.
+
 ### Available in the current Android `main`
 
 - **Capture and review:** Record, Library, and Settings destinations; a large,

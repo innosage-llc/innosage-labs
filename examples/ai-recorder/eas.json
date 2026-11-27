@@ -10,6 +10,10 @@
       "ios": {
         "simulator": false,
         "buildConfiguration": "Release"
+      },
+      "env": {
+        "RECORDER_STAGING_IOS_INTERNAL": "1",
+        "EXPO_PUBLIC_RECORDER_GATEWAY_URL": "https://rd.innosage.co:8443/recorder"
       }
     }
   },

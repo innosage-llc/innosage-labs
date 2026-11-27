@@ -7,9 +7,10 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
-import { recordingDurationMillis } from './NativeUpload';
+import { recordingDurationMillis } from './libraryDuration';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
+import { SettingsEntry } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
@@ -99,7 +100,7 @@ function RecorderScreen() {
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const latestCapture = capture.savedUri;
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS === 'web') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
     const latest = pending.find(file => file.uri === latestCapture);
@@ -142,7 +143,7 @@ function RecorderScreen() {
   const [sharePending, setSharePending] = useState(false);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
   const library = useRef<LibraryViewHandle>(null);
-  const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
+  const [serviceLabel, setServiceLabel] = useState("Reading saved service…");
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
@@ -197,7 +198,9 @@ function RecorderScreen() {
 
   useEffect(() => {
     let current = true;
-    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); }).catch(() => {});
+    setServiceLabel('Reading saved service…');
+    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); })
+      .catch(() => { if (current) setServiceLabel('Saved service unavailable'); });
     return () => { current = false; };
   }, [showPro]);
 
@@ -220,7 +223,7 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
-    if (Platform.OS === 'android' && playingFile !== uri) {
+    if (Platform.OS !== 'web' && playingFile !== uri) {
       ++playRequest.current;
       try {
         preparePlayback(file);
@@ -490,6 +493,8 @@ function RecorderScreen() {
             </ListItem>
           </Host>
         </ScrollView>
+      ) : Platform.OS === 'ios' ? (
+        <SettingsEntry serviceLabel={serviceLabel} disabled={phase !== 'idle'} onOpen={() => setShowPro(true)} />
       ) : <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>

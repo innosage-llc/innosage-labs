@@ -1,0 +1,1 @@
+export { recordingDurationMillis } from './NativeUpload';

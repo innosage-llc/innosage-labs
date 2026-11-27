@@ -55,7 +55,7 @@ test('iOS seek uses a 0-to-duration range rather than SwiftUI default 0-to-1', (
   assert.match(seek, /<Slider \{\.\.\.props\} min=\{0\}/);
   assert.match(seek, /enabled, label, onValueChangeFinished, \.\.\.props/);
   assert.match(files.get(resolve(root, 'App.tsx')), /<RecordingDetail\b[\s\S]*?seek=\{detailOwnsPlayer[^\n]*\{\s*max: playback\.duration/);
-  assert.match(files.get(resolve(root, 'ui/recording-detail.tsx')), /<PlaybackSeek\s+\{\.\.\.activeSeek\}/);
+  assert.match(files.get(resolve(root, 'ui/recording-detail.ios.tsx')), /<PlaybackSeek\s+\{\.\.\.activeSeek\}/);
 });
 
 test('Android retains its Compose controls and bounded native uploader', () => {
@@ -119,6 +119,36 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });
 
+test('the iOS Settings entry distinguishes unknown key status and can retry the stored preference', () => {
+  const files = graph('ios');
+  const settings = files.get(resolve(root, 'ProSettings.tsx'));
+  const layout = files.get(resolve(root, 'ui/service-flow.ios.tsx'));
+  assert.match(settings, /<ServiceSettingsLayout service=\{knownService\}/);
+  assert.match(layout, /showKeyScreen \? keys/);
+  assert.match(settings, /configured === undefined \? busy [^\n]*Saved key status is unavailable/);
+  assert.match(settings, /Retry reading settings[\s\S]*?setReadAttempt\(attempt => attempt \+ 1\)/);
+});
+
+test('Settings reports a failed preference read and Staging Free discloses original retention before upload', () => {
+  const files = graph('ios');
+  const entry = files.get(resolve(root, 'App.tsx'));
+  const settings = files.get(resolve(root, 'ui/service-flow.ios.tsx'));
+  const setup = files.get(resolve(root, 'ui/InnoSageTranscriptAction.tsx'));
+  assert.match(entry, /useState\("Reading saved service…"\)/);
+  assert.match(entry, /catch\(\(\) => \{ if \(current\) setServiceLabel\('Saved service unavailable'\)/);
+  assert.match(settings, /onChange\('staging'\)/);
+  assert.match(setup, /!isProduction && !usePro[^\n]*Staging Gateway keeps the original transcript/);
+  assert.ok(setup.indexOf('Staging Gateway keeps') < setup.indexOf('onPress={onTranscribe}'));
+});
+
+test('iOS Free transcription preflights local duration before recovering or provisioning upload access', () => {
+  const files = graph('ios');
+  const transcript = files.get(resolve(root, 'Transcript.tsx'));
+  assert.match(transcript, /import \{ recordingDurationMillis \} from '\.\/libraryDuration';/);
+  assert.match(files.get(resolve(root, 'libraryDuration.ios.ts')), /file\.open\(FileMode\.ReadOnly\)/);
+  assert.match(transcript, /freeRecordingLimit\(recording.size, await recordingDurationMillis\(recording\)[^\n]*\n\s*if \(limit\) throw new KnownServiceFailure\(limit\);[\s\S]*?await connectGateway\(service\)/);
+});
+
 test('iOS config declares its identity and microphone purpose without broad file sharing', () => {
   const { expo } = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
   assert.deepEqual(expo.platforms, ['android', 'ios', 'web']);
@@ -145,4 +175,16 @@ test('iOS distribution icon is 1024px opaque RGB, not the transparent template f
   assert.equal(png[25], 2); // PNG RGB, no alpha channel.
   const { expo } = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
   assert.equal(expo.ios.icon, './assets/ios-icon.png');
+});
+
+test('native entries reach the shared provider, capture and document contracts', () => {
+  for (const platform of ['android', 'ios']) {
+    const files = graph(platform);
+    for (const file of ['captureSession.ts', 'ServiceConfig.ts', 'GatewayGuest.ts', 'freeTargets.ts',
+      'transcriptCompletion.ts', 'operationRecovery.ts', 'transcriptExport.ts']) {
+      assert.ok(files.has(resolve(root, file)), platform + ' disconnected from ' + file);
+    }
+    const rollout = platform === 'android' ? 'productionFreeEligible.android.ts' : 'productionFreeEligible.ts';
+    assert.ok(files.has(resolve(root, rollout)), platform + ' missing its protected rollout adapter');
+  }
 });

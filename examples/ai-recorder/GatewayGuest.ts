@@ -124,10 +124,18 @@ export function createGatewayGuests({ targets, store, fingerprint, provision }: 
   return { connect, restore };
 }
 
-export function freeRecordingLimit(bytes: number, durationMillis?: number) {
+export function freeSizeLimit(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return 'This recording is empty or unavailable.';
   if (bytes > 50_000_000) return 'This recording is larger than the Free limit of 50 MB.';
-  if (durationMillis !== undefined && Number.isFinite(durationMillis) && durationMillis > 15 * 60_000) {
+}
+
+export function freeRecordingLimit(bytes: number, durationMillis: number | undefined) {
+  const sizeLimit = freeSizeLimit(bytes);
+  if (sizeLimit) return sizeLimit;
+  if (durationMillis === undefined || !Number.isFinite(durationMillis) || durationMillis <= 0) {
+    return 'Could not verify the recording duration for Free transcription. Check that the recording plays, then retry.';
+  }
+  if (durationMillis > 15 * 60_000) {
     return 'This recording is longer than the Free limit of 15 minutes.';
   }
 }

@@ -2,7 +2,8 @@ import { DraftSummary } from './DraftSummary';
 import { SavedRecordingSummary, TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
-import { recordingDurationMillis, supportsProUpload } from './NativeUpload';
+import { supportsProUpload } from './NativeUpload';
+import { recordingDurationMillis } from './libraryDuration';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { readTranscriptSidecar, transferTranscript } from './transcriptTransfer';
 import { randomUUID } from 'expo-crypto';
@@ -11,6 +12,7 @@ import { prepareRecorderOpen } from './recorderDraftProtocol';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { AppHeader } from './ui/AppChrome';
+import { TranscriptSetup } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
@@ -26,7 +28,7 @@ import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuestJob, restoreGateway } from './GatewayConnection';
-import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
+import { freeSizeLimit, freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 import { readSavedRecordingSummary, readSavedTranscriptEdit, type RecordingDocumentDestination } from './savedRecordingDocuments';
@@ -156,7 +158,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       if (!active) return;
       if (committed) {
         await showCompletion(committed);
-      } else if (android) {
+      } else if (android || Platform.OS === 'ios') {
         // Older recordings can retain a committed edit after losing their original.
         // Recover it for export without starting a transcription or inventing an original.
         try {
@@ -164,6 +166,10 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           if (!active) return;
           if (edit.text !== undefined) {
             setDraftDocument(edit.document);
+            if (!android && !seededRevision.current) {
+              setDraft(edit.text);
+              seededRevision.current = true;
+            }
             setRevisionOnly(true);
             return;
           }
@@ -177,7 +183,12 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         }
       }
       if (originalFailure) throw originalFailure;
-      const savedOperation = await SecureStore.getItemAsync(operationKey);
+      const localIOSDocument = committed && Platform.OS === 'ios';
+      const savedOperation = await SecureStore.getItemAsync(operationKey).catch(error => {
+        if (localIOSDocument) return null;
+        throw error;
+      });
+      if (localIOSDocument && !savedOperation) return;
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
       const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
@@ -217,7 +228,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
     void restore().catch(error => {
       if (active) setMessage(error instanceof Error && error.message === 'The original transcript needs recovery. It has not been changed.'
-        ? error.message : 'Could not connect. Retry when online.');
+        ? error.message : Platform.OS === 'ios' ? 'Could not read the transcription settings.' : 'Could not connect. Retry when online.');
     })
       .finally(() => { if (active) setConnecting(false); });
     return () => { active = false; submission.current?.abort(); };
@@ -260,6 +271,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   }
 
   const complete = job?.state === 'COMPLETED';
+  const recoveredIOSRevision = Platform.OS === 'ios' && revisionOnly && !revisionReadFailed;
+  const showDocument = complete || recoveredIOSRevision;
+  const readerLayout = android || (Platform.OS === 'ios' && showDocument);
   const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (!android && complete && !busy && hasDraftEditor && draftDocument && !revisionReadFailed && !autoOpened.current) {
@@ -268,14 +282,14 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
   }, [android, complete, busy, hasDraftEditor, draftDocument, revisionReadFailed]);
   useEffect(() => {
-    if (!android || !complete || summaryLocked) return;
+    if (!readerLayout || !complete || summaryLocked) return;
     let current = true;
     void readSavedRecordingSummary(new File(recordingUri)).then(
       saved => { if (current) setSummaryAvailable(!!saved); },
       () => { if (current) setSummaryAvailable(false); },
     );
     return () => { current = false; };
-  }, [android, complete, recordingUri, summaryLocked]);
+  }, [readerLayout, complete, recordingUri, summaryLocked]);
   async function readCommittedRevision() {
     if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
     return (await readSavedTranscriptEdit(recording)).text;
@@ -381,7 +395,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         freshPaid = paid;
       } else if (!paid) {
         if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
-        const sizeLimit = freeRecordingLimit(recording.size);
+        const sizeLimit = freeSizeLimit(recording.size);
         if (sizeLimit) throw new KnownServiceFailure(sizeLimit);
         const limit = freeRecordingLimit(recording.size, await recordingDurationMillis(recording).catch(() => undefined));
         if (limit) throw new KnownServiceFailure(limit);
@@ -510,9 +524,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   function requestClose() {
     if (!canGoBack) return;
     const goBack = () => {
-      if (android && showSummaryTools) setShowSummaryTools(false);
-      else if (android && showOriginal) setShowOriginal(false);
-      else if (android && editingReader) {
+      if (readerLayout && showSummaryTools) setShowSummaryTools(false);
+      else if (readerLayout && showOriginal) setShowOriginal(false);
+      else if (readerLayout && editingReader) {
         if (dirty) {
           setDraft(beforeEdit.current);
           setDirty(false);
@@ -553,35 +567,79 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const recordingMeta = recordedOn
     ? [recordingDayLabel(recordedOn, new Date()), recordingTimeLabel(recordedOn, 'minute')]
     : [];
-  const readerMeta = [...recordingMeta, complete ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
+  const readerMeta = [...recordingMeta, showDocument ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
     .filter(Boolean).join(' · ');
-  const screenTitle = android && showOriginal ? 'Original transcript'
-    : android && editingReader ? 'Edit transcript' : android && showSummaryTools ? 'Summary setup'
-      : android && !complete && operation ? 'Transcription status' : 'Transcript';
+  const iosSetup = Platform.OS === 'ios' && !showDocument && !revisionOnly;
+  const screenTitle = readerLayout && showOriginal ? 'Original transcript'
+    : readerLayout && editingReader ? 'Edit transcript' : readerLayout && showSummaryTools ? 'Summary setup'
+      : (android && !complete || iosSetup) && operation ? 'Transcription status'
+        : iosSetup ? 'Transcribe' : 'Transcript';
+  const providerAction = isOpenAI ? (
+    <>
+      {iosSetup ? <>
+        <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services.openai.label}</Text>
+        <Text style={{ color: palette.text }}>Transcribing sends this M4A directly to your OpenAI Platform project.</Text>
+        <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change your default service in Settings for new transcriptions.'}</Text>
+      </> : null}
+      <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
+      {busy || connecting ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
+        <ActionButton title="Retry" variant="primary" onPress={retryService} />
+      ) : (openAIConfigured || unsavedOpenAI) ? (
+        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
+      ) : (
+        <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
+      )}
+    </>
+  ) : (
+    <InnoSageTranscriptAction
+      serviceLabel={services[service].label}
+      loading={connecting}
+      serviceReady={serviceReady}
+      canUseFree={canUseFree}
+      supportsPro={supportsProUpload}
+      usePro={usePro}
+      canChoosePro={canChangeInnoSagePlan}
+      proDenied={proDenied}
+      isProduction={service === 'production'}
+      hasOperation={!!operation}
+      jobState={job && (stateLabels[job.state] ?? job.state)}
+      operationEnded={operationEnded}
+      operationPending={!!operation && (!job || pending.has(job.state))}
+      statusUnknown={statusUnknown}
+      identifySpeakers={identifySpeakers}
+      canChooseSpeakers={canChooseSpeakers}
+      busy={busy}
+      onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
+      onIdentifySpeakers={setIdentifySpeakers}
+      onRetryService={retryService}
+      onCheckStatus={checkOperationStatus}
+      onTranscribe={submit}
+    />
+  );
   return (
     <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
         <AppHeader title={screenTitle} quietTitle={android} onBack={requestClose}
-          backLabel={android && (showOriginal || editingReader || showSummaryTools) ? 'Back to transcript' : backLabel}
+          backLabel={readerLayout && (showOriginal || editingReader || showSummaryTools) ? 'Back to transcript' : backLabel}
           backDisabled={!canGoBack} />
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: android ? spacing.xxl : spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
-          <Text accessibilityRole={android ? 'header' : undefined}
-            style={android ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text>
-          {android && readerMeta ? <Text style={[typography.dayLabel, { color: palette.muted }]}>{readerMeta}</Text> : null}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: readerLayout ? spacing.xxl : spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
+          {!iosSetup ? <Text accessibilityRole={readerLayout ? 'header' : undefined}
+            style={readerLayout ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text> : null}
+          {readerLayout && readerMeta ? <Text style={[typography.dayLabel, { color: palette.muted }]}>{readerMeta}</Text> : null}
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          {!android && (complete || isOpenAI) || isOpenAI && !complete ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
+          {!iosSetup && (!readerLayout && (complete || isOpenAI) || isOpenAI && !complete) ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
             {isOpenAI ? <>
               <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
               <Text style={{ color: palette.muted }}>Limit: M4A under 25 MB.</Text>
             </> : null}
           </View> : null}
-          {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
-          {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
-          {complete ? (
+          {!iosSetup && isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
+          {!iosSetup && message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
+          {showDocument ? (
             <>
-              {android ? showSummaryTools ? null : editingReader ? <>
+              {readerLayout ? showSummaryTools ? null : editingReader ? <>
                 <Text style={[typography.caption, { color: palette.muted }]}>
                   {dirty ? 'Unsaved changes' : revision.exists ? 'Saved revision' : 'New revision'}
                 </Text>
@@ -602,7 +660,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   ))}
                 </View>
                 {!showOriginal ? <>
-                  <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />
+                  {recoveredIOSRevision ? <Text style={{ color: palette.muted }}>The original transcript is unavailable.</Text> : <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />}
                   <ActionButton title="Edit transcript" variant="text" fullWidth={false}
                     disabled={busy || revisionReadFailed || (hasDraftEditor && !draftDocument)}
                     onPress={() => {
@@ -612,9 +670,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   {summaryAvailable ? <ActionButton title="Open summary" variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
                     onPress={() => { if (!exportPending.current) setShowSavedSummary(true); }} /> : null}
-                  <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
+                  {!recoveredIOSRevision ? <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
-                    onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} />
+                    onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} /> : null}
                 </> : null}
                 {exportActions}
               </> : <>
@@ -635,7 +693,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               </>}
-              {!android || showSummaryTools ? hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
+              {!readerLayout || showSummaryTools ? hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
                 output={summaryFile} hasRevision={canSummarizeRevision} readRevision={readCommittedRevision}
                 readRevisionWithId={async () => {
                   if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
@@ -646,48 +704,20 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                 }}
                 save={saveText} onLockChange={setSummaryLocked} /> : <TranscriptSummary original={original} hasRevision={canSummarizeRevision}
                 readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked}
-                startOpen={android} /> : null}
+                startOpen={readerLayout} /> : null}
             </>
           ) : revisionOnly ? (
             <>
               {!revisionReadFailed ? <Text style={{ color: palette.text }}>Your saved edit is available to export. The original transcript is unavailable.</Text> : null}
               {exportActions}
             </>
-          ) : isOpenAI ? (
-            <>
-              <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
-              {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
-                <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
-              ) : (
-                <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
-              )}
-            </>
-          ) : (
-            <InnoSageTranscriptAction
-              serviceLabel={services[service].label}
-              loading={connecting}
-              serviceReady={serviceReady}
-              canUseFree={canUseFree}
-              supportsPro={supportsProUpload}
-              usePro={usePro}
-              canChoosePro={canChangeInnoSagePlan}
-              proDenied={proDenied}
-              isProduction={service === 'production'}
-              hasOperation={!!operation}
-              jobState={job && (stateLabels[job.state] ?? job.state)}
-              operationEnded={operationEnded}
-              operationPending={!!operation && (!job || pending.has(job.state))}
-              statusUnknown={statusUnknown}
-              identifySpeakers={identifySpeakers}
-              canChooseSpeakers={canChooseSpeakers}
-              busy={busy}
-              onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
-              onIdentifySpeakers={setIdentifySpeakers}
-              onRetryService={retryService}
-              onCheckStatus={checkOperationStatus}
-              onTranscribe={submit}
-            />
-          )}
+          ) : iosSetup ? (
+            <TranscriptSetup title={recordingTitle}
+              metadata={[...recordingMeta, knownRecordingDuration(recordingSummary?.durationSeconds)].filter(Boolean).join(' · ')}
+              message={message}>
+              {providerAction}
+            </TranscriptSetup>
+          ) : providerAction}
         </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

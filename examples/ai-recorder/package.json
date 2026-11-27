@@ -13,7 +13,7 @@
     "test:capture": "node --test captureSession.test.mjs",
     "ios": "expo run:ios --device",
     "ios:prebuild": "expo prebuild --platform ios --no-install",
-    "test:platform": "node --test platform.test.mjs audioShareFilename.test.mjs recordingShare.test.mjs",
+    "test:platform": "node --test platform.test.mjs parity.test.mjs audioShareFilename.test.mjs recordingShare.test.mjs m4aDuration.test.mjs",
     "ios:check": "bash scripts/check-ios-development.sh",
     "ios:testflight:build": "npx eas-cli build --platform ios --profile testflight",
     "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight",
