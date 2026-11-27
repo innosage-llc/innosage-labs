@@ -1,4 +1,3 @@
-import { Host } from '@expo/ui';
 import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { FlatList, Platform, Pressable, Text, View } from 'react-native';
 import { LibraryAudioIcon } from './library-icons';
@@ -23,21 +22,6 @@ export type LibraryViewProps = {
   highlightedUri?: string;
   onOpenRecording: (uri: string) => void;
 };
-
-function IOSLibraryAudioIcon({ highlighted }: { highlighted: boolean }) {
-  // This component is only rendered on iOS. Keep SwiftUI out of the shared module's initialization.
-  const { Image } = require('@expo/ui/swift-ui') as typeof import('@expo/ui/swift-ui');
-  const { font, foregroundStyle } = require('@expo/ui/swift-ui/modifiers') as typeof import('@expo/ui/swift-ui/modifiers');
-  const { mode, palette, spacing } = useTheme();
-
-  return (
-    <View pointerEvents="none" accessibilityElementsHidden style={{ width: 24, alignItems: 'center', paddingTop: spacing.xs }}>
-      <Host matchContents colorScheme={mode}>
-        <Image systemName="waveform" modifiers={[font({ size: 20 }), foregroundStyle(highlighted ? palette.accent : palette.muted)]} />
-      </Host>
-    </View>
-  );
-}
 
 function groupByDay(recordings: readonly RecordingSummary[]): LibraryItem[] {
   const sorted = recordings
@@ -151,7 +135,7 @@ export function LibraryView({
               overflow: 'hidden',
             })}
           >
-            {ios ? <IOSLibraryAudioIcon highlighted={highlighted} /> : <LibraryAudioIcon highlighted={highlighted} />}
+            <LibraryAudioIcon highlighted={highlighted} />
             <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
               <Text
                 textBreakStrategy="simple"

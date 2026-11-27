@@ -156,7 +156,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       if (!active) return;
       if (committed) {
         await showCompletion(committed);
-      } else if (android) {
+      } else if (android || Platform.OS === 'ios') {
         // Older recordings can retain a committed edit after losing their original.
         // Recover it for export without starting a transcription or inventing an original.
         try {
@@ -164,6 +164,10 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           if (!active) return;
           if (edit.text !== undefined) {
             setDraftDocument(edit.document);
+            if (!android && !seededRevision.current) {
+              setDraft(edit.text);
+              seededRevision.current = true;
+            }
             setRevisionOnly(true);
             return;
           }
@@ -177,7 +181,12 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         }
       }
       if (originalFailure) throw originalFailure;
-      const savedOperation = await SecureStore.getItemAsync(operationKey);
+      const localIOSDocument = committed && Platform.OS === 'ios';
+      const savedOperation = await SecureStore.getItemAsync(operationKey).catch(error => {
+        if (localIOSDocument) return null;
+        throw error;
+      });
+      if (localIOSDocument && !savedOperation) return;
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
       const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
@@ -216,6 +225,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       }
     }
     void restore().catch(error => {
+      if (restoredLocalTranscript && Platform.OS === 'ios') return;
       if (active) setMessage(error instanceof Error && error.message === 'The original transcript needs recovery. It has not been changed.'
         ? error.message : 'Could not connect. Retry when online.');
     })
@@ -260,7 +270,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   }
 
   const complete = job?.state === 'COMPLETED';
-  const readerLayout = android || (Platform.OS === 'ios' && complete);
+  const recoveredIOSRevision = Platform.OS === 'ios' && revisionOnly && !revisionReadFailed;
+  const showDocument = complete || recoveredIOSRevision;
+  const readerLayout = android || (Platform.OS === 'ios' && showDocument);
   const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (!android && complete && !busy && hasDraftEditor && draftDocument && !revisionReadFailed && !autoOpened.current) {
@@ -554,7 +566,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const recordingMeta = recordedOn
     ? [recordingDayLabel(recordedOn, new Date()), recordingTimeLabel(recordedOn, 'minute')]
     : [];
-  const readerMeta = [...recordingMeta, complete ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
+  const readerMeta = [...recordingMeta, showDocument ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
     .filter(Boolean).join(' · ');
   const screenTitle = readerLayout && showOriginal ? 'Original transcript'
     : readerLayout && editingReader ? 'Edit transcript' : readerLayout && showSummaryTools ? 'Summary setup'
@@ -580,7 +592,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           </View> : null}
           {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
-          {complete ? (
+          {showDocument ? (
             <>
               {readerLayout ? showSummaryTools ? null : editingReader ? <>
                 <Text style={[typography.caption, { color: palette.muted }]}>
@@ -603,7 +615,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   ))}
                 </View>
                 {!showOriginal ? <>
-                  <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />
+                  {recoveredIOSRevision ? <Text style={{ color: palette.muted }}>The original transcript is unavailable.</Text> : <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />}
                   <ActionButton title="Edit transcript" variant="text" fullWidth={false}
                     disabled={busy || revisionReadFailed || (hasDraftEditor && !draftDocument)}
                     onPress={() => {
@@ -613,9 +625,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   {summaryAvailable ? <ActionButton title="Open summary" variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
                     onPress={() => { if (!exportPending.current) setShowSavedSummary(true); }} /> : null}
-                  <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
+                  {!recoveredIOSRevision ? <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
-                    onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} />
+                    onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} /> : null}
                 </> : null}
                 {exportActions}
               </> : <>

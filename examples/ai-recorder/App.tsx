@@ -7,7 +7,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
-import { recordingDurationMillis } from './NativeUpload';
+import { recordingDurationMillis } from './libraryDuration';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
 import { ActionButton } from './ui/ActionButton';
@@ -99,7 +99,7 @@ function RecorderScreen() {
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const latestCapture = capture.savedUri;
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS === 'web') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
     const latest = pending.find(file => file.uri === latestCapture);
