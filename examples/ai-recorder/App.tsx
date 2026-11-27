@@ -220,7 +220,7 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
-    if (Platform.OS === 'android' && playingFile !== uri) {
+    if (Platform.OS !== 'web' && playingFile !== uri) {
       ++playRequest.current;
       try {
         preparePlayback(file);

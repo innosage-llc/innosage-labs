@@ -260,6 +260,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   }
 
   const complete = job?.state === 'COMPLETED';
+  const readerLayout = android || (Platform.OS === 'ios' && complete);
   const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (!android && complete && !busy && hasDraftEditor && draftDocument && !revisionReadFailed && !autoOpened.current) {
@@ -268,14 +269,14 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
   }, [android, complete, busy, hasDraftEditor, draftDocument, revisionReadFailed]);
   useEffect(() => {
-    if (!android || !complete || summaryLocked) return;
+    if (!readerLayout || !complete || summaryLocked) return;
     let current = true;
     void readSavedRecordingSummary(new File(recordingUri)).then(
       saved => { if (current) setSummaryAvailable(!!saved); },
       () => { if (current) setSummaryAvailable(false); },
     );
     return () => { current = false; };
-  }, [android, complete, recordingUri, summaryLocked]);
+  }, [readerLayout, complete, recordingUri, summaryLocked]);
   async function readCommittedRevision() {
     if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
     return (await readSavedTranscriptEdit(recording)).text;
@@ -510,9 +511,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   function requestClose() {
     if (!canGoBack) return;
     const goBack = () => {
-      if (android && showSummaryTools) setShowSummaryTools(false);
-      else if (android && showOriginal) setShowOriginal(false);
-      else if (android && editingReader) {
+      if (readerLayout && showSummaryTools) setShowSummaryTools(false);
+      else if (readerLayout && showOriginal) setShowOriginal(false);
+      else if (readerLayout && editingReader) {
         if (dirty) {
           setDraft(beforeEdit.current);
           setDirty(false);
@@ -555,22 +556,22 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     : [];
   const readerMeta = [...recordingMeta, complete ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
     .filter(Boolean).join(' · ');
-  const screenTitle = android && showOriginal ? 'Original transcript'
-    : android && editingReader ? 'Edit transcript' : android && showSummaryTools ? 'Summary setup'
+  const screenTitle = readerLayout && showOriginal ? 'Original transcript'
+    : readerLayout && editingReader ? 'Edit transcript' : readerLayout && showSummaryTools ? 'Summary setup'
       : android && !complete && operation ? 'Transcription status' : 'Transcript';
   return (
     <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
         <AppHeader title={screenTitle} quietTitle={android} onBack={requestClose}
-          backLabel={android && (showOriginal || editingReader || showSummaryTools) ? 'Back to transcript' : backLabel}
+          backLabel={readerLayout && (showOriginal || editingReader || showSummaryTools) ? 'Back to transcript' : backLabel}
           backDisabled={!canGoBack} />
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: android ? spacing.xxl : spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
-          <Text accessibilityRole={android ? 'header' : undefined}
-            style={android ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text>
-          {android && readerMeta ? <Text style={[typography.dayLabel, { color: palette.muted }]}>{readerMeta}</Text> : null}
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: readerLayout ? spacing.xxl : spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
+          <Text accessibilityRole={readerLayout ? 'header' : undefined}
+            style={readerLayout ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text>
+          {readerLayout && readerMeta ? <Text style={[typography.dayLabel, { color: palette.muted }]}>{readerMeta}</Text> : null}
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          {!android && (complete || isOpenAI) || isOpenAI && !complete ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
+          {!readerLayout && (complete || isOpenAI) || isOpenAI && !complete ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
             {isOpenAI ? <>
               <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
@@ -581,7 +582,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {complete ? (
             <>
-              {android ? showSummaryTools ? null : editingReader ? <>
+              {readerLayout ? showSummaryTools ? null : editingReader ? <>
                 <Text style={[typography.caption, { color: palette.muted }]}>
                   {dirty ? 'Unsaved changes' : revision.exists ? 'Saved revision' : 'New revision'}
                 </Text>
@@ -635,7 +636,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
               <ActionButton title={showOriginal ? 'Show revision' : 'Show original'} disabled={busy} onPress={() => setShowOriginal(!showOriginal)} />
               {!showOriginal && !hasDraftEditor ? <ActionButton title="Save revision" variant="primary" disabled={busy || revisionReadFailed} onPress={save} /> : null}
               </>}
-              {!android || showSummaryTools ? hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
+              {!readerLayout || showSummaryTools ? hasDraftEditor ? <DraftSummary key={recordingUri} recordingUri={recordingUri} original={original}
                 output={summaryFile} hasRevision={canSummarizeRevision} readRevision={readCommittedRevision}
                 readRevisionWithId={async () => {
                   if (revisionReadFailed) throw new Error('The saved transcript is not ready.');
@@ -646,7 +647,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                 }}
                 save={saveText} onLockChange={setSummaryLocked} /> : <TranscriptSummary original={original} hasRevision={canSummarizeRevision}
                 readRevision={readCommittedRevision} output={summaryFile} save={saveText} onLockChange={setSummaryLocked}
-                startOpen={android} /> : null}
+                startOpen={readerLayout} /> : null}
             </>
           ) : revisionOnly ? (
             <>
