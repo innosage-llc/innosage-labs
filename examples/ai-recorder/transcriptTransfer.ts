@@ -9,3 +9,5 @@ export type TransferOutcome = 'saved' | 'cancelled' | 'dismissed' | 'occupied' |
 export async function transferTranscript(_filename: string, _markdown: string, _save: boolean): Promise<TransferOutcome> {
   throw new Error('Markdown transfer requires Android.');
 }
+
+export const markdownTransfer: 'share-and-save' | 'share-sheet' | 'unavailable' = 'unavailable';

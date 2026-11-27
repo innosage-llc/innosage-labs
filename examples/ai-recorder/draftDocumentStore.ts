@@ -7,3 +7,5 @@ export const draftEditorIsBundled = () => false;
 export async function createDraftDocument(_recording:File, _kind:DraftKind):Promise<ReturnType<typeof draftStore>> {
   throw new Error('The bundled Draft editor is available only on Android.');
 }
+
+export const storesDraftDocuments = false;

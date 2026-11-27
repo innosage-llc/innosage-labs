@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Scroll
 import { supportsProUpload } from './NativeUpload';
 import { recordingDurationMillis } from './libraryDuration';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { readTranscriptSidecar, transferTranscript } from './transcriptTransfer';
+import { readTranscriptSidecar, transferTranscript, markdownTransfer } from './transcriptTransfer';
 import { randomUUID } from 'expo-crypto';
 import { draftTranscriptMarkdown, transcriptMarkdown } from './transcriptExport';
 import { prepareRecorderOpen } from './recorderDraftProtocol';
@@ -16,7 +16,7 @@ import { TranscriptSetup } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
-import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
+import { draftEditorIsBundled, createDraftDocument, storesDraftDocuments } from './draftDocumentStore';
 import { draftText } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
 
@@ -495,7 +495,10 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       const { filename, markdown } = await transcriptMarkdown(recordingTitle, recording.name, {
         readDraft: async () => {
           // The on-disk page can outlive a build's optional editor assets.
-          if (!draftDocument) throw new Error();
+          if (!draftDocument) {
+            if (storesDraftDocuments) throw new Error('Saved Draft content could not be read.');
+            return undefined;
+          }
           const snapshot = await draftDocument.recover();
           return snapshot && { text: draftTranscriptMarkdown(snapshot), revision: snapshot.revision };
         },
@@ -552,12 +555,12 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   };
   const exportDisabled = busy || dirty || revisionReadFailed || summaryLocked;
   const canSummarizeRevision = !revisionReadFailed && (draftRevision > 0 || revision.exists);
-  const exportActions = android ? <>
+  const exportActions = markdownTransfer !== 'unavailable' ? <>
     {dirty ? <Text style={{ color: palette.muted }}>Save your revision to export it.</Text> : null}
     <ActionButton title="Share transcript (.md)" disabled={exportDisabled}
       onPress={() => { void exportTranscript(false); }} />
-    <ActionButton title="Save Markdown file" variant="outlined" disabled={exportDisabled}
-      onPress={() => { void exportTranscript(true); }} />
+    {markdownTransfer === 'share-and-save' ? <ActionButton title="Save Markdown file" variant="outlined" disabled={exportDisabled}
+      onPress={() => { void exportTranscript(true); }} /> : null}
   </> : null;
   const input = { color: palette.text, borderColor: palette.border, borderWidth: 1, padding: spacing.sm };
   const originalText = job?.transcript ?? '';

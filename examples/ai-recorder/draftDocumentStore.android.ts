@@ -24,3 +24,5 @@ export async function createDraftDocument(recording: File, kind: DraftKind) {
     write: contents => disk.writeDocument(pageId, contents),
   });
 }
+
+export const storesDraftDocuments = true;
