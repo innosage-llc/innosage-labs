@@ -10,6 +10,7 @@ import { Transcript } from './Transcript';
 import { recordingDurationMillis } from './libraryDuration';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
+import { SettingsEntry } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
@@ -490,6 +491,8 @@ function RecorderScreen() {
             </ListItem>
           </Host>
         </ScrollView>
+      ) : Platform.OS === 'ios' ? (
+        <SettingsEntry serviceLabel={serviceLabel} disabled={phase !== 'idle'} onOpen={() => setShowPro(true)} />
       ) : <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>

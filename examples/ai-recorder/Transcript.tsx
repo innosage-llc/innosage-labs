@@ -11,6 +11,7 @@ import { prepareRecorderOpen } from './recorderDraftProtocol';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { AppHeader } from './ui/AppChrome';
+import { TranscriptSetup } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
@@ -226,7 +227,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
     void restore().catch(error => {
       if (active) setMessage(error instanceof Error && error.message === 'The original transcript needs recovery. It has not been changed.'
-        ? error.message : 'Could not connect. Retry when online.');
+        ? error.message : Platform.OS === 'ios' ? 'Could not read the transcription settings.' : 'Could not connect. Retry when online.');
     })
       .finally(() => { if (active) setConnecting(false); });
     return () => { active = false; submission.current?.abort(); };
@@ -567,9 +568,51 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     : [];
   const readerMeta = [...recordingMeta, showDocument ? 'Saved on this device' : knownRecordingDuration(recordingSummary?.durationSeconds)]
     .filter(Boolean).join(' · ');
+  const iosSetup = Platform.OS === 'ios' && !showDocument && !revisionOnly;
   const screenTitle = readerLayout && showOriginal ? 'Original transcript'
     : readerLayout && editingReader ? 'Edit transcript' : readerLayout && showSummaryTools ? 'Summary setup'
-      : android && !complete && operation ? 'Transcription status' : 'Transcript';
+      : (android && !complete || iosSetup) && operation ? 'Transcription status'
+        : iosSetup ? 'Transcribe' : 'Transcript';
+  const providerAction = isOpenAI ? (
+    <>
+      {iosSetup ? <>
+        <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services.openai.label}</Text>
+        <Text style={{ color: palette.text }}>Transcribing sends this M4A directly to your OpenAI Platform project.</Text>
+        <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change your default service in Settings for new transcriptions.'}</Text>
+      </> : null}
+      <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
+      {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
+        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
+      ) : (
+        <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
+      )}
+    </>
+  ) : (
+    <InnoSageTranscriptAction
+      serviceLabel={services[service].label}
+      loading={connecting}
+      serviceReady={serviceReady}
+      canUseFree={canUseFree}
+      supportsPro={supportsProUpload}
+      usePro={usePro}
+      canChoosePro={canChangeInnoSagePlan}
+      proDenied={proDenied}
+      isProduction={service === 'production'}
+      hasOperation={!!operation}
+      jobState={job && (stateLabels[job.state] ?? job.state)}
+      operationEnded={operationEnded}
+      operationPending={!!operation && (!job || pending.has(job.state))}
+      statusUnknown={statusUnknown}
+      identifySpeakers={identifySpeakers}
+      canChooseSpeakers={canChooseSpeakers}
+      busy={busy}
+      onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
+      onIdentifySpeakers={setIdentifySpeakers}
+      onRetryService={retryService}
+      onCheckStatus={checkOperationStatus}
+      onTranscribe={submit}
+    />
+  );
   return (
     <Modal onRequestClose={requestClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
@@ -578,19 +621,19 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           backDisabled={!canGoBack} />
         <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: readerLayout ? spacing.xxl : spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md }}>
-          <Text accessibilityRole={readerLayout ? 'header' : undefined}
-            style={readerLayout ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text>
+          {!iosSetup ? <Text accessibilityRole={readerLayout ? 'header' : undefined}
+            style={readerLayout ? [typography.title, { color: palette.text }] : { color: palette.text }}>{recordingTitle}</Text> : null}
           {readerLayout && readerMeta ? <Text style={[typography.dayLabel, { color: palette.muted }]}>{readerMeta}</Text> : null}
           {!canGoBack ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted }}>Finish the current operation or save its result before leaving.</Text> : null}
-          {!readerLayout && (complete || isOpenAI) || isOpenAI && !complete ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
+          {!iosSetup && (!readerLayout && (complete || isOpenAI) || isOpenAI && !complete) ? <View style={!android ? [styles.serviceCard, { backgroundColor: palette.surface }] : { gap: spacing.xs }}>
             <Text style={{ color: palette.text, fontWeight: '600' }}>{services[service].label}</Text>
             {isOpenAI ? <>
               <Text style={{ color: palette.muted }}>Transcription sends this M4A recording directly to OpenAI Platform and uses your project quota.</Text>
               <Text style={{ color: palette.muted }}>Limit: M4A under 25 MB.</Text>
             </> : null}
           </View> : null}
-          {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
-          {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
+          {!iosSetup && isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
+          {!iosSetup && message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
           {showDocument ? (
             <>
               {readerLayout ? showSummaryTools ? null : editingReader ? <>
@@ -665,41 +708,13 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
               {!revisionReadFailed ? <Text style={{ color: palette.text }}>Your saved edit is available to export. The original transcript is unavailable.</Text> : null}
               {exportActions}
             </>
-          ) : isOpenAI ? (
-            <>
-              <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
-              {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
-                <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
-              ) : (
-                <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
-              )}
-            </>
-          ) : (
-            <InnoSageTranscriptAction
-              serviceLabel={services[service].label}
-              loading={connecting}
-              serviceReady={serviceReady}
-              canUseFree={canUseFree}
-              supportsPro={supportsProUpload}
-              usePro={usePro}
-              canChoosePro={canChangeInnoSagePlan}
-              proDenied={proDenied}
-              isProduction={service === 'production'}
-              hasOperation={!!operation}
-              jobState={job && (stateLabels[job.state] ?? job.state)}
-              operationEnded={operationEnded}
-              operationPending={!!operation && (!job || pending.has(job.state))}
-              statusUnknown={statusUnknown}
-              identifySpeakers={identifySpeakers}
-              canChooseSpeakers={canChooseSpeakers}
-              busy={busy}
-              onUsePro={value => { setUsePro(value); setProDenied(false); setMessage(''); }}
-              onIdentifySpeakers={setIdentifySpeakers}
-              onRetryService={retryService}
-              onCheckStatus={checkOperationStatus}
-              onTranscribe={submit}
-            />
-          )}
+          ) : iosSetup ? (
+            <TranscriptSetup title={recordingTitle}
+              metadata={[...recordingMeta, knownRecordingDuration(recordingSummary?.durationSeconds)].filter(Boolean).join(' · ')}
+              message={message}>
+              {providerAction}
+            </TranscriptSetup>
+          ) : providerAction}
         </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

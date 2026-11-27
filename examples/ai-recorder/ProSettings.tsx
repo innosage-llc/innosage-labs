@@ -9,6 +9,7 @@ import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
 import { DetailShell } from "./ui/DetailShell";
 import { ActionButton } from "./ui/ActionButton";
+import { ServiceSettingsLayout } from "./ui/service-flow";
 import { useTheme } from "./ui/theme";
 
 function accessFor(id: ServiceId) {
@@ -104,6 +105,67 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     setMessage('');
     setManagingKeys(false);
   }
+  function openKeys() {
+    setMessage('');
+    setManagingKeys(true);
+  }
+
+  const keyControls = <>
+    {android ? <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Service keys</Text> : null}
+    <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services[service].label}</Text>
+    <Text style={{ color: palette.muted }}>
+      {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.'
+        : !supportsProUpload ? service === 'production'
+          ? 'Production Pro is unavailable on iOS. Select Staging Free access or OpenAI direct.'
+          : gatewayAvailable(service)
+            ? 'Free access is available for staging transcriptions. Pro uploads are unavailable on iOS.'
+            : 'Staging Free access is unavailable in this build. Pro uploads are unavailable on iOS.'
+        : gatewayAvailable(service)
+          ? `Free guest access is available. Add and verify an optional ${environment} Pro key.`
+          : `${environment} Free access is unavailable in this build. A ${environment} Pro key is required.`}
+      {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
+    </Text>
+    <Text style={{ color: palette.text }}>
+      {configured ? "Key saved" : "No key saved for this service"}
+    </Text>
+    {canConfigureKey ? <>
+      <Text style={{ color: palette.text }}>
+        {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}
+      </Text>
+      <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
+        <TextInput
+          accessibilityLabel={isOpenAI ? "OpenAI API key" : `${service} InnoSage Pro API key`}
+          placeholder={isOpenAI ? "OpenAI API key" : `${service === "production" ? "Production" : "Staging"} Pro API key`}
+          value={key}
+          onChangeText={(text) => setHasKey(!!text.trim())}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+          textStyle={{ color: palette.text }}
+          style={{
+            width: "100%",
+            borderColor: palette.border,
+            borderWidth: 1,
+            padding: spacing.md,
+          }}
+        />
+      </Host>
+      <ActionButton title={busy ? "Checking…" : "Verify and save key"} variant="primary"
+        disabled={busy || !hasKey} onPress={save} />
+    </> : null}
+    {configured ? (
+      <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
+    ) : null}
+  </>;
+
+  if (Platform.OS === 'ios') {
+    return <ServiceSettingsLayout service={service} serviceLabel={services[service].label}
+      stagingAvailable={gatewayAvailable('staging')} managingKeys={managingKeys} canConfigureKey={canConfigureKey}
+      busy={busy} message={message} keys={keyControls} onChange={id => { void changeService(id); }}
+      onOpenKeys={openKeys} onBack={goBack} />;
+  }
+
   return (
     <Modal onRequestClose={goBack}>
       <DetailShell title={android ? managingKeys ? 'Transcription service' : 'Settings' : 'Transcription service'}
@@ -123,55 +185,12 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           {android && !managingKeys ? (
             <Host matchContents={{ vertical: true }} colorScheme={mode}>
               <ListItem colors={{ containerColor: palette.background, contentColor: palette.text }}
-                onPress={!busy ? () => { setMessage(''); setManagingKeys(true); } : undefined}>
+                onPress={!busy ? openKeys : undefined}>
                 <NativeText>Manage service keys</NativeText>
               </ListItem>
             </Host>
           ) : <>
-          {android ? <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Service keys</Text> : null}
-          <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services[service].label}</Text>
-          <Text style={{ color: palette.muted }}>
-            {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.'
-              : !supportsProUpload ? service === 'production'
-                ? 'Production Pro is unavailable on iOS. Select Staging Free access or OpenAI direct.'
-                : 'Use Free access for staging transcriptions. Pro uploads are unavailable on iOS.'
-              : gatewayAvailable(service)
-                ? `Free guest access is available. Add and verify an optional ${environment} Pro key.`
-                : `${environment} Free access is unavailable in this build. A ${environment} Pro key is required.`}
-            {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
-          </Text>
-          <Text style={{ color: palette.text }}>
-            {configured ? "Key saved" : "No key saved for this service"}
-          </Text>
-          {canConfigureKey ? <>
-          <Text style={{ color: palette.text }}>
-            {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}
-          </Text>
-          <Host matchContents={{ vertical: true }} style={{ width: "100%" }}>
-            <TextInput
-              accessibilityLabel={isOpenAI ? "OpenAI API key" : `${service} InnoSage Pro API key`}
-              placeholder={isOpenAI ? "OpenAI API key" : `${service === "production" ? "Production" : "Staging"} Pro API key`}
-              value={key}
-              onChangeText={(text) => setHasKey(!!text.trim())}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!busy}
-              textStyle={{ color: palette.text }}
-              style={{
-                width: "100%",
-                borderColor: palette.border,
-                borderWidth: 1,
-                padding: spacing.md,
-              }}
-            />
-          </Host>
-          <ActionButton title={busy ? "Checking…" : "Verify and save key"} variant="primary"
-            disabled={busy || !hasKey} onPress={save} />
-          </> : null}
-          {configured ? (
-            <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
-          ) : null}
+            {keyControls}
           </>}
           {message ? (
             <Text
