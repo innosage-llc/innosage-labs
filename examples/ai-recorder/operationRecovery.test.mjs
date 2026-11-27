@@ -159,7 +159,7 @@ test('Free submission checks known limits and binds access before upload', async
       submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
       operation: resumed ? operationId : undefined, freeOperation: resumed ? prior : undefined,
       paidOperation: undefined, job: state ? { state } : undefined, identifySpeakers: false,
-      committedResult: async () => undefined, recording: { size },
+      committedResult: async () => undefined, recording: { name: 'fixture.m4a', size },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
       gatewayAvailable: id => id === service && available, freeRecordingLimit,
       recordingDurationMillis: async () => duration,
@@ -214,7 +214,7 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
       connecting: false, supportsProUpload: true, usePro: true, serviceReady: true,
       submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
       operation: prior?.id, paidOperation: prior, job, identifySpeakers: false,
-      committedResult: async () => undefined, recording: { size: 1234 },
+      committedResult: async () => undefined, recording: { name: 'fixture.m4a', size: 1234 },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
       proClient: {
         workerURL: 'https://worker.test',

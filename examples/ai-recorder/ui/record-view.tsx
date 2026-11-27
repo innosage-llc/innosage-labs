@@ -101,9 +101,7 @@ export function RecordView({
         </View>
       ) : android && recording ? null : (
         <Text style={[typography.body, { color: palette.muted, textAlign: 'center' }]}>
-          {Platform.OS === 'web'
-            ? 'Recording and file import are available in the Android and iOS apps. This browser supports Record, Library and Settings navigation.'
-            : 'Recordings are stored on this device.'}
+          Recordings are stored on this device.
         </Text>
       )}
     </ScrollView>

@@ -1,7 +1,8 @@
+import { confirmDiscard } from './discardRevision';
 import { DraftSummary } from './DraftSummary';
 import { SavedRecordingSummary, TranscriptSummary } from './TranscriptSummary';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { supportsProUpload } from './NativeUpload';
 import { recordingDurationMillis } from './libraryDuration';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,8 +10,9 @@ import { readTranscriptSidecar, transferTranscript, markdownTransfer } from './t
 import { randomUUID } from 'expo-crypto';
 import { draftTranscriptMarkdown, transcriptMarkdown } from './transcriptExport';
 import { prepareRecorderOpen } from './recorderDraftProtocol';
-import { File } from 'expo-file-system';
-import * as SecureStore from 'expo-secure-store';
+import { File } from './localFiles';
+import { saveText } from './saveRecordingText';
+import * as SecureStore from './credentialStore';
 import { AppHeader } from './ui/AppChrome';
 import { TranscriptSetup } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
@@ -46,11 +48,6 @@ const terminal = new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']);
 const speakerUnavailable = (error: unknown) => error instanceof GuestSpeakerUnavailable ||
   (error instanceof ProServiceError && error.code === 'speaker_unavailable');
 
-async function saveText(file: File, text: string) {
-  const temporary = new File(file.parentDirectory, file.name + '.pending');
-  await temporary.write(text);
-  await temporary.move(file, { overwrite: true });
-}
 
 type TranscriptProps = {
   recording: File;
@@ -121,7 +118,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     writeOriginal: (text: string) => saveText(original, text),
     writeSpeakers: async (speakers: SpeakerResult | undefined) => {
       if (speakers) await saveText(speakerFile, JSON.stringify(speakers));
-      else if (speakerFile.exists) speakerFile.delete();
+      else if (speakerFile.exists) await speakerFile.delete();
     },
   };
   const committedResult = () => readCommittedTranscript(original.uri, completionFiles);
@@ -158,7 +155,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       if (!active) return;
       if (committed) {
         await showCompletion(committed);
-      } else if (android || Platform.OS === 'ios') {
+      } else {
         // Older recordings can retain a committed edit after losing their original.
         // Recover it for export without starting a transcription or inventing an original.
         try {
@@ -183,12 +180,12 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         }
       }
       if (originalFailure) throw originalFailure;
-      const localIOSDocument = committed && Platform.OS === 'ios';
+      const localDocument = committed && !android;
       const savedOperation = await SecureStore.getItemAsync(operationKey).catch(error => {
-        if (localIOSDocument) return null;
+        if (localDocument) return null;
         throw error;
       });
-      if (localIOSDocument && !savedOperation) return;
+      if (localDocument && !savedOperation) return;
       // Persisted jobs take precedence over the new-job preference, including old Free UUIDs.
       const saved = savedOperation?.startsWith('{') ? JSON.parse(savedOperation) : savedOperation;
       const paid: StoredProOperation | undefined = saved?.lane === 'pro' ? saved : undefined;
@@ -237,7 +234,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined, onTransfer?: () => void) {
     let result: Job;
     if (paid) {
-      if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
+      if (upload && !supportsProUpload) throw new Error('Pro uploads are unavailable on this platform.');
       const operationClient = clientForOperation(paid);
       result = upload
         ? await operationClient.upload(paid, recording.name, recording, () => hashRecording(recording, signal), signal, onTransfer)
@@ -271,9 +268,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   }
 
   const complete = job?.state === 'COMPLETED';
-  const recoveredIOSRevision = Platform.OS === 'ios' && revisionOnly && !revisionReadFailed;
-  const showDocument = complete || recoveredIOSRevision;
-  const readerLayout = android || (Platform.OS === 'ios' && showDocument);
+  const recoveredRevision = !android && revisionOnly && !revisionReadFailed;
+  const showDocument = complete || recoveredRevision;
+  const readerLayout = android || showDocument;
   const operationEnded = terminal.has(job?.state ?? '');
   useEffect(() => {
     if (!android && complete && !busy && hasDraftEditor && draftDocument && !revisionReadFailed && !autoOpened.current) {
@@ -345,6 +342,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
 
   async function submit() {
     if ((!supportsProUpload && (usePro || service === 'production')) || connecting || !serviceReady || submission.current || busy) return;
+    if (!/\.m4a$/i.test(recording.name)) return;
     const terminalJob = !!job && terminal.has(job.state);
     if (isOpenAI ? !openAIConfigured && !unsavedOpenAI
       : statusUnknown || (!!operation && job?.state !== 'RESERVED' && !terminalJob)) return;
@@ -384,7 +382,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       let paid = terminalJob ? undefined : paidOperation;
       let free: FreeOperation | undefined;
       if (startingPro) {
-        if (!supportsProUpload) throw new Error('Pro uploads are unavailable on iOS.');
+        if (!supportsProUpload) throw new Error('Pro uploads are unavailable on this platform.');
         if (!proClient) throw new Error('Pro is not configured for this build.');
         const profile = await proClient.profile();
         if (!profile) throw new Error('Configure your InnoSage Pro API key first.');
@@ -538,10 +536,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       } else onClose();
     };
     if (dirty) {
-      Alert.alert('Discard unsaved revision?', 'Your saved transcript will not change.', [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: goBack },
-      ]);
+      confirmDiscard(goBack);
     } else goBack();
   }
 
@@ -577,7 +572,10 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     : readerLayout && editingReader ? 'Edit transcript' : readerLayout && showSummaryTools ? 'Summary setup'
       : (android && !complete || iosSetup) && operation ? 'Transcription status'
         : iosSetup ? 'Transcribe' : 'Transcript';
-  const providerAction = isOpenAI ? (
+  const supportedInput = /\.m4a$/i.test(recording.name);
+  const providerAction = !supportedInput && !operation ? (
+    <Text style={{ color: palette.text }}>This recording can be played and shared locally. Import an M4A to transcribe with this service.</Text>
+  ) : isOpenAI ? (
     <>
       {iosSetup ? <>
         <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{services.openai.label}</Text>
@@ -663,7 +661,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   ))}
                 </View>
                 {!showOriginal ? <>
-                  {recoveredIOSRevision ? <Text style={{ color: palette.muted }}>The original transcript is unavailable.</Text> : <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />}
+                  {recoveredRevision ? <Text style={{ color: palette.muted }}>The original transcript is unavailable.</Text> : <ActionButton title="View original" variant="text" fullWidth={false} disabled={busy} onPress={() => setShowOriginal(true)} />}
                   <ActionButton title="Edit transcript" variant="text" fullWidth={false}
                     disabled={busy || revisionReadFailed || (hasDraftEditor && !draftDocument)}
                     onPress={() => {
@@ -673,7 +671,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                   {summaryAvailable ? <ActionButton title="Open summary" variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
                     onPress={() => { if (!exportPending.current) setShowSavedSummary(true); }} /> : null}
-                  {!recoveredIOSRevision ? <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
+                  {!recoveredRevision ? <ActionButton title={summaryAvailable ? 'Summary options' : 'Summarize'} variant="text" fullWidth={false}
                     disabled={busy || summaryLocked}
                     onPress={() => { if (!exportPending.current) setShowSummaryTools(true); }} /> : null}
                 </> : null}

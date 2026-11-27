@@ -76,11 +76,11 @@ test('Web uses the shared app/navigation with isolated browser adapters and no n
     assert.ok(!/\.(?:android|ios)\.tsx?$/.test(file), file);
   }
   for (const name of ['App.tsx', 'captureOwner.web.ts', 'ui/RootShell.tsx', 'ui/AppChrome.web.tsx', 'ui/RecordControl.web.tsx',
-    'ui/recording-detail.tsx', 'ProSettings.web.tsx', 'Transcript.web.tsx']) assert.ok(files.has(resolve(root, name)), name);
+    'ui/recording-detail.tsx', 'ProSettings.tsx', 'Transcript.tsx', 'localFiles.web.ts', 'credentialStore.web.ts', 'mediaLibrary.web.ts']) assert.ok(files.has(resolve(root, name)), name);
   const app = files.get(resolve(root, 'App.tsx'));
-  assert.match(app, /Platform\.OS === 'web' \? undefined : new Directory/);
+  assert.ok(!files.has(resolve(root, 'mediaLibrary.ts')));
   assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new AudioRecorderWeb/);
-  assert.doesNotMatch(files.get(resolve(root, 'captureOwner.web.ts')), /getUserMedia|requestRecordingPermissionsAsync/);
+  assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new CaptureSession/);
 });
 
 test('only the native entry graphs can load the local audio sharing service', () => {

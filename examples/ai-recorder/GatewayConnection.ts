@@ -1,6 +1,6 @@
 import { fetch } from 'expo/fetch';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './credentialStore';
 import { createGatewayGuests, provisionedGuestToken, type FreeOperation, type GatewayGuest } from './GatewayGuest';
 import type { File } from 'expo-file-system';
 import { KnownServiceFailure } from './operationRecovery';

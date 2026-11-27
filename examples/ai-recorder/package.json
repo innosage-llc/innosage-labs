@@ -22,7 +22,8 @@
     "export:web": "expo export --platform web --output-dir dist-web",
     "verify:release": "node scripts/verify-release.mjs",
     "verify:release:staging": "node scripts/verify-staging.mjs",
-    "test:verify-release": "node --test scripts/verify-release.test.mjs"
+    "test:verify-release": "node --test scripts/verify-release.test.mjs",
+    "test:browser-parity": "node scripts/browser-parity.mjs"
   },
   "dependencies": {
     "@expo/material-symbols": "^0.1.1",

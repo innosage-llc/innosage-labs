@@ -16,6 +16,7 @@ type Dependencies = {
   prepare?: () => Promise<void>;
   recover?: () => Promise<unknown>;
   save: (url: string) => Promise<string>;
+  startErrorMessage?: (error: unknown) => string | undefined;
   permissionMessage: (canAskAgain: boolean) => string;
   savedMessage: string;
 };
@@ -95,9 +96,9 @@ export class CaptureSession {
       this.activeCapture = true;
       this.recorder.record();
       this.setPhase('recording');
-    } catch {
+    } catch (error) {
       this.activeCapture = false;
-      this.setMessage('Could not start recording. Return to the app and try again.');
+      this.setMessage(this.dependencies.startErrorMessage?.(error) ?? 'Could not start recording. Return to the app and try again.');
       this.setPhase('idle');
     }
   }

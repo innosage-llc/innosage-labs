@@ -1,0 +1,12 @@
+import { services } from './ServiceConfig';
+import type { ServiceChoiceProps } from './ServiceChoice';
+export function ServiceChoice({ service, busy, onChange }: ServiceChoiceProps) {
+  return <select aria-label="Transcription service" disabled={busy} value={service} onChange={event => {
+    const value = event.target.value;
+    if (value === 'staging' || value === 'openai') onChange(value);
+  }}>
+    {service === 'production' ? <option value="production" disabled>Production access unavailable in this browser</option> : null}
+    <option value="staging">{services.staging.label}</option>
+    <option value="openai">{services.openai.label}</option>
+  </select>;
+}

@@ -119,10 +119,10 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     <Text style={{ color: palette.muted }}>
       {isOpenAI ? 'Use your OpenAI Platform project key. Recordings go directly to OpenAI and use your project’s API quota.'
         : !supportsProUpload ? service === 'production'
-          ? 'Production Pro is unavailable on iOS. Select Staging Free access or OpenAI direct.'
+          ? 'Production uploads are unavailable on this platform.'
           : gatewayAvailable(service)
-            ? 'Free access is available for staging transcriptions. Pro uploads are unavailable on iOS.'
-            : 'Staging Free access is unavailable in this build. Pro uploads are unavailable on iOS.'
+            ? 'Free access is available for staging transcriptions. Pro uploads are unavailable on this platform.'
+            : 'Staging Free access is unavailable in this build. Pro uploads are unavailable on this platform.'
         : gatewayAvailable(service)
           ? `Free guest access is available. Add and verify an optional ${environment} Pro key.`
           : `${environment} Free access is unavailable in this build. A ${environment} Pro key is required.`}

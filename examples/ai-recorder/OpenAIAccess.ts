@@ -1,6 +1,6 @@
 import type { SummaryOptions } from './OpenAIClient';
 import { fetch } from 'expo/fetch';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './credentialStore';
 import { listSummaryModels, openAIKey, summarizeOpenAI, transcribeOpenAI, verifyOpenAI } from './OpenAIClient';
 
 const storageKey = 'recorder.openai.key';

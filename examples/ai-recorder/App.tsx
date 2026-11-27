@@ -24,23 +24,11 @@ import { canSwitchDestination, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
 import { services } from './ServiceConfig';
-import { Directory, File, Paths } from 'expo-file-system';
-import { getDocumentAsync } from 'expo-document-picker';
-import { randomUUID } from 'expo-crypto';
+import { File } from './localFiles';
+import { listRecordings, pickAudio, playbackSource } from './mediaLibrary';
 import { Host, Icon, ListItem, Text as NativeText } from '@expo/ui';
 import ChevronIcon from '@expo/material-symbols/chevron_right.xml';
 import { getCaptureSession } from './captureOwner';
-
-// Web launch/navigation is supported; native filesystem capture/import is not.
-// Never construct the native Directory at Web module initialization.
-const recordings = Platform.OS === 'web' ? undefined : new Directory(Paths.document, 'recordings');
-
-function listRecordings() {
-  if (!recordings?.exists) return [];
-  return recordings.list()
-    .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.m4a'))
-    .sort((a, b) => Number(b.name.split('-')[1]) - Number(a.name.split('-')[1]));
-}
 
 function recordingLabel(file: File) {
   if (file.name.startsWith('Import-')) {
@@ -100,7 +88,6 @@ function RecorderScreen() {
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const latestCapture = capture.savedUri;
   useEffect(() => {
-    if (Platform.OS === 'web') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
     const latest = pending.find(file => file.uri === latestCapture);
@@ -145,6 +132,8 @@ function RecorderScreen() {
   const library = useRef<LibraryViewHandle>(null);
   const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
   const player = useAudioPlayer();
+  const releasePlayback = useRef<() => void>(undefined);
+  useEffect(() => () => releasePlayback.current?.(), []);
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
   useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
@@ -221,7 +210,7 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
-    if (Platform.OS !== 'web' && playingFile !== uri) {
+    if (playingFile !== uri) {
       ++playRequest.current;
       try {
         preparePlayback(file);
@@ -282,51 +271,23 @@ function RecorderScreen() {
 
 
   async function importAudio() {
-    if (!recordings) return;
     if (session.getSnapshot().phase !== 'idle') return;
     setCapturePhase('importing');
     dispatchHandoff({ type: 'reset' });
     setMessage('');
-    let cached: File | undefined;
-    let label: File | undefined;
-    let imported = false;
     try {
-      const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-      if (selection.canceled) return;
-      const asset = selection.assets[0];
-      cached = new File(asset.uri);
-      if (!asset.name.toLowerCase().endsWith('.m4a')) {
-        setMessage('Choose an M4A audio file.');
-        return;
-      }
-      if (!cached.exists || !cached.size) {
-        setMessage('The selected audio file is empty or unavailable.');
-        return;
-      }
-      recordings.create({ idempotent: true });
-      const name = `Import-${Date.now()}-${randomUUID()}.m4a`;
-      label = new File(recordings, name + '.name');
-      await label.write(asset.name);
-      await cached.move(new File(recordings, name));
-      cached = undefined;
-      imported = true;
+      const result = await pickAudio();
+      if (result) setMessage(result);
       setFiles(listRecordings());
-      setMessage('Audio imported to this device.');
     } catch {
       setMessage('Could not import the audio. Check available storage and try again.');
     } finally {
-      try {
-        if (cached?.exists) cached.delete();
-        if (!imported && label?.exists) label.delete();
-      } catch {
-        // A cache cleanup failure must not leave the import controls disabled.
-      }
       setCapturePhase('idle');
     }
   }
 
   async function shareAudio(file: File, label: string) {
-    if (!recordings || sharing.current || session.getSnapshot().phase !== 'idle') return;
+    if (sharing.current || session.getSnapshot().phase !== 'idle') return;
     sharing.current = true;
     setSharePending(true);
     setMessage('');
@@ -368,7 +329,10 @@ function RecorderScreen() {
     pausePlayback();
     pendingSeek.current = undefined;
     setSeekPosition(undefined);
-    player.replace(file.uri);
+    const source = playbackSource(file);
+    try { player.replace(source.uri); } catch (error) { source.release(); throw error; }
+    releasePlayback.current?.();
+    releasePlayback.current = source.release;
     setPlayingFile(file.uri);
   }
 
@@ -432,7 +396,7 @@ function RecorderScreen() {
 
   return (
     <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
-      libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle' || !recordings, onPress: importAudio }}>
+      libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle', onPress: importAudio }}>
       {detailRecording && detailFile && !transcriptRoute ? <RecordingDetail
         key={detailUri}
         recording={detailRecording}

@@ -101,7 +101,7 @@ export function InnoSageTranscriptAction({
               {isProduction ? 'Free transcription is unavailable in Production.' : 'Free transcription is unavailable in this build.'}
             </Text>
           ) : null}
-          {proUnavailable ? <Text style={body}>Pro uploads are unavailable on iOS.</Text> : null}
+          {proUnavailable ? <Text style={body}>Pro uploads are unavailable on this platform.</Text> : null}
           {isProduction && !proUnavailable ? <Text style={muted}>A Production Pro key is required.</Text> : null}
         </View>
       ) : null}
