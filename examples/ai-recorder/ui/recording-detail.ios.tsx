@@ -66,7 +66,10 @@ export function RecordingDetail({
   const { title, time } = recordingRowText(recording.label, date);
   const dateLabel = date && recordingDayLabel(date, new Date());
   const activeSeek = seek && Number.isFinite(seek.max) && seek.max > 0 ? seek : undefined;
-  const duration = activeSeek?.max ?? recording.durationSeconds;
+  const movieDuration = recording.durationSeconds;
+  const duration = movieDuration !== undefined && Number.isFinite(movieDuration) && movieDuration > 0
+    ? movieDuration
+    : activeSeek?.max;
   const knownDuration = knownRecordingDuration(duration);
   const elapsed = formatRecordingTime(activeSeek?.value ?? 0);
   const action = playing ? 'Pause' : 'Play';

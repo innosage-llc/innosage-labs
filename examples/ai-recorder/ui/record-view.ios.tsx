@@ -18,6 +18,8 @@ export function RecordView({
   const savedDuration = knownRecordingDuration(savedItem?.durationSeconds);
   const elapsed = formatRecordingTime(durationMillis / 1000);
   const muted = [typography.body, { color: palette.muted, textAlign: 'center' as const }];
+  // Keep the 144-point circle at its existing anchor when the status fits above it.
+  const spaceAboveControl = Math.max(0, viewportHeight * 0.45 - 72 - spacing.sm - spacing.xxl);
 
   useEffect(() => {
     if (saved) AccessibilityInfo.announceForAccessibility('Last recording saved');
@@ -30,26 +32,35 @@ export function RecordView({
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{
         paddingHorizontal: spacing.xxl,
-        // Center the existing 144-point circle just above the middle of the viewport.
-        paddingTop: Math.max(spacing.xxl, viewportHeight * 0.45 - 72 - spacing.sm),
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.xxl,
         gap: spacing.lg,
       }}
     >
-      <View style={{ alignItems: 'center' }}>
-        <RecordControl phase={phase} onPress={onPressRecord} />
-      </View>
-      {recording ? (
-        <View style={{ alignItems: 'center', gap: spacing.xs }}>
-          <Text style={muted}>Recording</Text>
-          <Text
-            accessibilityLabel={`Recording duration ${elapsed}`}
-            style={[typography.title, { color: palette.text, fontVariant: ['tabular-nums'], textAlign: 'center' }]}
-          >
-            {elapsed}
-          </Text>
+      <View>
+        <View style={{
+          minHeight: spaceAboveControl,
+          justifyContent: 'flex-end',
+          paddingBottom: recording ? spacing.lg : 0,
+          gap: spacing.xs,
+        }}>
+          {recording ? (
+            <>
+              <Text style={muted}>Recording</Text>
+              <Text
+                accessibilityLabel={`Recording duration ${elapsed}`}
+                style={[typography.title, { color: palette.text, fontVariant: ['tabular-nums'], textAlign: 'center' }]}
+              >
+                {elapsed}
+              </Text>
+              {message ? <Text selectable style={muted}>{message}</Text> : null}
+            </>
+          ) : null}
         </View>
-      ) : null}
+        <View style={{ alignItems: 'center' }}>
+          <RecordControl phase={phase} onPress={onPressRecord} />
+        </View>
+      </View>
       {saved ? (
         <Pressable
           testID="last-recording-saved"
@@ -77,7 +88,7 @@ export function RecordView({
           ) : null}
           <Text style={[typography.body, { color: palette.accent }]}>View in Library</Text>
         </Pressable>
-      ) : message ? (
+      ) : !recording && message ? (
         <Text selectable style={muted}>{message}</Text>
       ) : phase === 'idle' ? (
         <Text style={muted}>Recordings are stored on this device.</Text>
