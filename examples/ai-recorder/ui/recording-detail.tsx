@@ -1,4 +1,5 @@
 import { Modal, ScrollView, Text, View } from 'react-native';
+import type { File } from 'expo-file-system';
 import { PlaybackSeek } from '../PlaybackSeek';
 import type { PlaybackSeekProps } from '../PlaybackSeek.types';
 import { ActionButton } from './ActionButton';
@@ -9,6 +10,7 @@ import { useTheme } from './theme';
 
 export type RecordingDetailProps = {
   recording: RecordingSummary;
+  file: File;
   playing: boolean;
   seek?: Omit<PlaybackSeekProps, 'enabled' | 'label'>;
   message?: string;
@@ -18,6 +20,7 @@ export type RecordingDetailProps = {
   onTogglePlayback: () => void;
   onShare: () => void;
   onTranscript: () => void;
+  onSummary: () => void;
 };
 
 export function RecordingDetail({

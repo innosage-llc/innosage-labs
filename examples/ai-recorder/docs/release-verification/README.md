@@ -1,5 +1,7 @@
 # Android staging release verification
 
+For the Markdown handoff, use the [Experiment A Android and Codex checks](experiment-a/README.md).
+
 ## Run the automated staging trust-buster
 
 From `examples/ai-recorder` on the qualified Apple silicon macOS emulator setup, run:

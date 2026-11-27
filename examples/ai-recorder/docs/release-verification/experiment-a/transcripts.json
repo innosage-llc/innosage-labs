@@ -1,0 +1,11 @@
+{
+  "meeting": {
+    "title": "Experiment A meeting",
+    "original": "[00:03] Alba: The pilot target is 21 seats.\n\n[00:12] Bo: I suggest trying Friday. We have not decided.\n\n会议结束 · FIN-M13",
+    "edited": "[00:03] Alba: The pilot target is 12 seats.\n\n[00:12] Bo: I suggest trying Friday. We have not decided.\n\n会议结束 · FIN-M13"
+  },
+  "note": {
+    "title": "Experiment A voice note",
+    "original": "Reminder to check the blue notebook.\n\nMañana revisaré la última página.\n\nNota completa · FIN-N07"
+  }
+}

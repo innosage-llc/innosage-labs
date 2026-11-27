@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { RecorderSwitch } from '../RecorderSwitch';
 import { ActionButton } from './ActionButton';
 import { useTheme } from './theme';
@@ -35,6 +35,7 @@ export function InnoSageTranscriptAction({
   onUsePro, onIdentifySpeakers, onRetryService, onCheckStatus, onTranscribe,
 }: Props) {
   const { palette, spacing, typography } = useTheme();
+  const android = Platform.OS === 'android';
   const body = { ...typography.body, color: palette.text };
   const muted = { ...typography.body, color: palette.muted };
   const row = { flexDirection: 'row', alignItems: 'center', gap: spacing.sm } as const;
@@ -72,10 +73,13 @@ export function InnoSageTranscriptAction({
     <View style={{ gap: spacing.md }}>
       {serviceReady || hasOperation ? (
         <View style={{ gap: spacing.xs }}>
-          <Text accessibilityRole="header" style={[typography.heading, { color: palette.text }]}>{serviceLabel}</Text>
+          {android && hasOperation ? <Text accessibilityRole="header" accessibilityLiveRegion="polite"
+            style={[typography.heading, { color: palette.text }]}>{savedStatus}</Text> : null}
+          <Text accessibilityRole={android && hasOperation ? undefined : 'header'}
+            style={android ? muted : [typography.heading, { color: palette.text }]}>{serviceLabel}</Text>
           {hasOperation ? (
             <>
-              <Text accessibilityLiveRegion="polite" style={body}>{savedStatus}</Text>
+              {!android ? <Text accessibilityLiveRegion="polite" style={body}>{savedStatus}</Text> : null}
               <Text style={muted}>This job keeps its original service.</Text>
             </>
           ) : null}

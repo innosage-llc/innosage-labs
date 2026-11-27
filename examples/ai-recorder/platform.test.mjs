@@ -60,7 +60,8 @@ test('iOS seek uses a 0-to-duration range rather than SwiftUI default 0-to-1', (
 
 test('Android retains its Compose controls and bounded native uploader', () => {
   const files = graph('android');
-  for (const name of ['ProSettings.tsx', 'PlaybackSeek.tsx', 'RecorderSwitch.tsx', 'NativeUpload.android.ts', 'ui/RecordControl.android.tsx']) {
+  for (const name of ['ProSettings.tsx', 'PlaybackSeek.tsx', 'RecorderSwitch.tsx', 'NativeUpload.android.ts', 'ui/RecordControl.android.tsx',
+    'ui/recording-detail.android.tsx']) {
     assert.ok(files.has(resolve(root, name)), name);
   }
   assert.match(files.get(resolve(root, 'NativeUpload.android.ts')), /supportsProUpload = true/);
@@ -74,7 +75,8 @@ test('Web uses the shared app/navigation with isolated browser adapters and no n
     assert.doesNotMatch(source, /requireNativeModule/);
     assert.ok(!/\.(?:android|ios)\.tsx?$/.test(file), file);
   }
-  for (const name of ['App.tsx', 'captureOwner.web.ts', 'ui/RootShell.tsx', 'ui/AppChrome.web.tsx', 'ui/RecordControl.web.tsx', 'ProSettings.web.tsx', 'Transcript.web.tsx']) assert.ok(files.has(resolve(root, name)), name);
+  for (const name of ['App.tsx', 'captureOwner.web.ts', 'ui/RootShell.tsx', 'ui/AppChrome.web.tsx', 'ui/RecordControl.web.tsx',
+    'ui/recording-detail.tsx', 'ProSettings.web.tsx', 'Transcript.web.tsx']) assert.ok(files.has(resolve(root, name)), name);
   const app = files.get(resolve(root, 'App.tsx'));
   assert.match(app, /Platform\.OS === 'web' \? undefined : new Directory/);
   assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new AudioRecorderWeb/);

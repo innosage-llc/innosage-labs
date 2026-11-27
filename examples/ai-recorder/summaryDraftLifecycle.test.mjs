@@ -10,6 +10,16 @@ const { readSummaryInput, generateSummaryCandidate, acceptSummaryCandidate, load
 );
 import { draftStore } from './draftDocumentModel.ts';
 import { prepareRecorderOpen } from './recorderDraftProtocol.ts';
+import { summaryReaderSections } from './ui/document-content.ts';
+
+test('summary sections use saved headings and preserve Unicode citation offsets', () => {
+  const value = '🙂 Intro\n\n## Key decisions\nUse the gate.\n\n**Open questions:**\nWhen?';
+  const chars = Array.from(value);
+  assert.deepEqual(summaryReaderSections(value).map(section => [
+    section.heading, chars.slice(section.start, section.end).join('').trim(),
+  ]), [[undefined, '🙂 Intro'], ['Key decisions', 'Use the gate.'], ['Open questions', 'When?']]);
+  assert.deepEqual(summaryReaderSections('An unstructured summary.'), [{ heading: undefined, start: 0, end: 24 }]);
+});
 
 test('source is selected just before generation and there is no implicit fallback', async () => {
   let original = 0;
