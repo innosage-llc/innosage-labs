@@ -30,19 +30,20 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   const environment = service === "production" ? "Production" : "Staging";
   const canConfigureKey = isOpenAI || supportsProUpload;
   const [hasKey, setHasKey] = useState(false);
-  const [configured, setConfigured] = useState(false);
+  const [configured, setConfigured] = useState<boolean>();
+  const [readAttempt, setReadAttempt] = useState(0);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
   useEffect(() => {
     let active = true;
     void selectedService().then(async id => {
-      if (active && ios) setService(id);
+      if (active) setService(id);
       const profile = await accessFor(id).profile();
       if (active) { setService(id); setConfigured(!!profile); }
     }).catch(() => { if (active) setMessage("Could not read the transcription settings."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [ios]);
+  }, [readAttempt]);
   async function changeService(id: ServiceId) {
     if (busy || working.current || id === (ios ? knownService : service)) return;
     working.current = true;
@@ -109,7 +110,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     setManagingKeys(false);
   }
   function openKeys() {
-    setMessage('');
+    if (configured !== undefined) setMessage('');
     setManagingKeys(true);
   }
 
@@ -129,8 +130,13 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
       {' '}Keys are saved separately. Changing service does not transfer your key or restart existing jobs.
     </Text>
     <Text style={{ color: palette.text }}>
-      {configured ? "Key saved" : "No key saved for this service"}
+      {configured === undefined ? busy ? "Reading saved key status…" : "Saved key status is unavailable." : configured ? "Key saved" : "No key saved for this service"}
     </Text>
+    {configured === undefined && !busy ? <ActionButton title="Retry reading settings" onPress={() => {
+      setBusy(true);
+      setMessage('');
+      setReadAttempt(attempt => attempt + 1);
+    }} /> : null}
     {canConfigureKey ? <>
       <Text style={{ color: palette.text }}>
         {isOpenAI ? "M4A recordings under 25 MB." : "Pro supports recordings up to 4 hours and 512 MiB."}

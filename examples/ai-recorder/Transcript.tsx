@@ -28,7 +28,7 @@ import { ProServiceError, type ProOperation } from './ProClient';
 import { readableSpeakerTranscript } from './speakerTranscript';
 import { persistTranscriptCompletion, readCommittedTranscript, parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
 import { connectGateway, gatewayAvailable, GuestSpeakerUnavailable, requestGuestJob, restoreGateway } from './GatewayConnection';
-import { freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
+import { freeSizeLimit, freeRecordingLimit, readFreeOperation, type FreeOperation, type LegacyFreeOperation } from './GatewayGuest';
 import { InnoSageTranscriptAction } from './ui/InnoSageTranscriptAction';
 import { KnownServiceFailure, readOperationWithDeadline, statusRecoveryMessage } from './operationRecovery';
 import { readSavedRecordingSummary, readSavedTranscriptEdit, type RecordingDocumentDestination } from './savedRecordingDocuments';
@@ -395,7 +395,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         freshPaid = paid;
       } else if (!paid) {
         if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
-        const sizeLimit = freeRecordingLimit(recording.size);
+        const sizeLimit = freeSizeLimit(recording.size);
         if (sizeLimit) throw new KnownServiceFailure(sizeLimit);
         const limit = freeRecordingLimit(recording.size, await recordingDurationMillis(recording).catch(() => undefined));
         if (limit) throw new KnownServiceFailure(limit);
