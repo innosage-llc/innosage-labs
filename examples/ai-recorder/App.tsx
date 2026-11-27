@@ -7,6 +7,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
+import { useTranscriptShareCleanup } from './useTranscriptShareCleanup';
 import { recordingDurationMillis } from './libraryDuration';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
@@ -73,6 +74,7 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
 }
 
 function RecorderScreen() {
+  useTranscriptShareCleanup();
   const { mode, palette, spacing, typography } = useTheme();
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
