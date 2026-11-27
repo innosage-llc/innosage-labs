@@ -154,3 +154,15 @@ test('iOS distribution icon is 1024px opaque RGB, not the transparent template f
   const { expo } = JSON.parse(readFileSync(resolve(root, 'app.json'), 'utf8'));
   assert.equal(expo.ios.icon, './assets/ios-icon.png');
 });
+
+test('native entries reach the shared provider, capture and document contracts', () => {
+  for (const platform of ['android', 'ios']) {
+    const files = graph(platform);
+    for (const file of ['captureSession.ts', 'ServiceConfig.ts', 'GatewayGuest.ts', 'freeTargets.ts',
+      'transcriptCompletion.ts', 'operationRecovery.ts', 'transcriptExport.ts']) {
+      assert.ok(files.has(resolve(root, file)), platform + ' disconnected from ' + file);
+    }
+    const rollout = platform === 'android' ? 'productionFreeEligible.android.ts' : 'productionFreeEligible.ts';
+    assert.ok(files.has(resolve(root, rollout)), platform + ' missing its protected rollout adapter');
+  }
+});
