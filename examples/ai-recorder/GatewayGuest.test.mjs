@@ -96,7 +96,10 @@ test('unconfigured services fail closed and a staging release rejects invalid bu
   try {
     for (const variable of variables) delete process.env[variable];
     assert.equal(configureApp({ config }), config);
-    process.env[iosFlag] = '1';
+    const profileEnv = createRequire(import.meta.url)('./eas.json').build.testflight.env;
+    assert.equal(profileEnv[iosFlag], '1');
+    assert.equal(profileEnv[stagingInput], approved.staging);
+    process.env[iosFlag] = profileEnv[iosFlag];
     assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
     process.env[stagingInput] = approved.staging;
     assert.equal(configureApp({ config }), config);
@@ -135,7 +138,9 @@ test('the same Free limits apply with exact inclusive decimal byte and duration 
   assert.match(freeRecordingLimit(50_000_001), /50 MB/);
   assert.match(freeRecordingLimit(50_000_000, 900_001), /15 minutes/);
   assert.match(freeRecordingLimit(0), /empty/);
-  assert.equal(freeRecordingLimit(1), undefined);
+  for (const duration of [undefined, 0, -1, NaN, Infinity]) {
+    assert.match(freeRecordingLimit(1, duration), /Could not verify the recording duration/);
+  }
 });
 
 

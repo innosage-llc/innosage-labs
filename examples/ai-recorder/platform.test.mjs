@@ -118,6 +118,16 @@ test('iOS offers only usable defaults and routes a remembered Production choice 
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });
 
+test('the iOS Settings entry distinguishes unknown key status and can retry the stored preference', () => {
+  const files = graph('ios');
+  const settings = files.get(resolve(root, 'ProSettings.tsx'));
+  const layout = files.get(resolve(root, 'ui/service-flow.ios.tsx'));
+  assert.match(settings, /<ServiceSettingsLayout service=\{knownService\}/);
+  assert.match(layout, /showKeyScreen \? keys/);
+  assert.match(settings, /configured === undefined \? busy [^\n]*Saved key status is unavailable/);
+  assert.match(settings, /Retry reading settings[\s\S]*?setReadAttempt\(attempt => attempt \+ 1\)/);
+});
+
 test('iOS Free transcription preflights local duration before recovering or provisioning upload access', () => {
   const files = graph('ios');
   const transcript = files.get(resolve(root, 'Transcript.tsx'));

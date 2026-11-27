@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ProServiceError } from './ProClient.ts';
-import { freeRecordingLimit, readFreeOperation } from './GatewayGuest.ts';
+import { freeSizeLimit, freeRecordingLimit, readFreeOperation } from './GatewayGuest.ts';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 // Resolve the app's extensionless import for Node without changing Expo/Metro settings.
@@ -161,7 +161,7 @@ test('Free submission checks known limits and binds access before upload', async
       paidOperation: undefined, job: state ? { state } : undefined, identifySpeakers: false,
       committedResult: async () => undefined, recording: { name: 'fixture.m4a', size },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
-      gatewayAvailable: id => id === service && available, freeRecordingLimit,
+      gatewayAvailable: id => id === service && available, freeSizeLimit, freeRecordingLimit,
       recordingDurationMillis: async () => duration,
       connectGateway: async id => { assert.equal(id, service); events.push('guest'); return guest; },
       restoreGateway: async existing => { assert.deepEqual(existing, prior); events.push('restore'); return guest; },
@@ -183,6 +183,7 @@ test('Free submission checks known limits and binds access before upload', async
     assert.deepEqual((await run({ service, size: 50_000_001 })).events, ['This recording is larger than the Free limit of 50 MB.']);
     assert.deepEqual((await run({ service, duration: 900_001 })).events, ['This recording is longer than the Free limit of 15 minutes.']);
     assert.deepEqual((await run({ service, available: false })).events, ['Free transcription is unavailable for this environment in this build.']);
+    assert.deepEqual((await run({ service, duration: NaN })).events, ['Could not verify the recording duration for Free transcription. Check that the recording plays, then retry.']);
     const fresh = await run({ service });
     const freshOperation = { lane: 'free', id: 'new-operation', identifySpeakers: false, ...fresh.guest };
     assert.deepEqual(fresh.events, ['guest', ['save', freshOperation], ['upload', freshOperation]]);
