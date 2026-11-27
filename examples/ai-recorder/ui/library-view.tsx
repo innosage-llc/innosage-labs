@@ -1,3 +1,4 @@
+import { Host } from '@expo/ui';
 import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
 import { FlatList, Platform, Pressable, Text, View } from 'react-native';
 import { LibraryAudioIcon } from './library-icons';
@@ -23,6 +24,21 @@ export type LibraryViewProps = {
   onOpenRecording: (uri: string) => void;
 };
 
+function IOSLibraryAudioIcon({ highlighted }: { highlighted: boolean }) {
+  // This component is only rendered on iOS. Keep SwiftUI out of the shared module's initialization.
+  const { Image } = require('@expo/ui/swift-ui') as typeof import('@expo/ui/swift-ui');
+  const { font, foregroundStyle } = require('@expo/ui/swift-ui/modifiers') as typeof import('@expo/ui/swift-ui/modifiers');
+  const { mode, palette, spacing } = useTheme();
+
+  return (
+    <View pointerEvents="none" accessibilityElementsHidden style={{ width: 24, alignItems: 'center', paddingTop: spacing.xs }}>
+      <Host matchContents colorScheme={mode}>
+        <Image systemName="waveform" modifiers={[font({ size: 20 }), foregroundStyle(highlighted ? palette.accent : palette.muted)]} />
+      </Host>
+    </View>
+  );
+}
+
 function groupByDay(recordings: readonly RecordingSummary[]): LibraryItem[] {
   const sorted = recordings
     .map(recording => ({ recording, date: recordingDate(recording.createdAt) }))
@@ -46,6 +62,7 @@ export function LibraryView({
   ref, recordings, phase, highlightedUri, onOpenRecording,
 }: LibraryViewProps) {
   const { palette, spacing, typography } = useTheme();
+  const ios = Platform.OS === 'ios';
   const data = useMemo(() => groupByDay(recordings), [recordings]);
   const today = new Date();
   const list = useRef<FlatList<LibraryItem>>(null);
@@ -122,7 +139,7 @@ export function LibraryView({
             disabled={disabled}
             onPress={() => onOpenRecording(uri)}
             android_ripple={{ color: palette.border }}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'flex-start',
               gap: spacing.md,
@@ -130,11 +147,11 @@ export function LibraryView({
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               borderRadius: spacing.md,
-              backgroundColor: highlighted ? palette.surface : undefined,
+              backgroundColor: ios && pressed ? palette.border : highlighted ? palette.surface : undefined,
               overflow: 'hidden',
-            }}
+            })}
           >
-            <LibraryAudioIcon highlighted={highlighted} />
+            {ios ? <IOSLibraryAudioIcon highlighted={highlighted} /> : <LibraryAudioIcon highlighted={highlighted} />}
             <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
               <Text
                 textBreakStrategy="simple"
