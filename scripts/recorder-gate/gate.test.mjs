@@ -220,9 +220,9 @@ test('compiled iOS sampling contract rejects runner pause, stalled query, disapp
   }
   assert.throws(()=>parseAccessibility(`LABS85_OBSERVATION_JSON ${JSON.stringify({...healthy,samples_ms:[100,200,6200],stable_ms:6100})}`),/coverage gap/);
 });
-test('required Mac CI stages each prevent the real controller merge, with complete failed-command evidence',async()=>{
+test('required local CI stages each prevent the real controller merge, with complete failed-command evidence',async()=>{
   const { localCI }=await import('./local-ci.mjs');
-  for(const stage of ['tests/check_runtime_boundary.py','required-mac-fixtures.py','unittest']) {
+  for(const stage of ['tests/check_runtime_boundary.py','required-mac-fixtures.py','unittest','test:browser-parity']) {
     let output;
     const f=await fixture({paths:['examples/is-clean-my-mac/scripts/change.py'],deps:{ci:(source,paths,dir)=>{
       output=dir;return localCI(source,paths,dir,{clean:()=>{},run:(command,args,opts)=>{

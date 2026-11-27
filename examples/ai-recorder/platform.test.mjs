@@ -77,7 +77,6 @@ test('Web uses the shared app/navigation with isolated browser adapters and no n
   }
   for (const name of ['App.tsx', 'captureOwner.web.ts', 'ui/RootShell.tsx', 'ui/AppChrome.web.tsx', 'ui/RecordControl.web.tsx',
     'ui/recording-detail.tsx', 'ProSettings.tsx', 'Transcript.tsx', 'localFiles.web.ts', 'credentialStore.web.ts', 'mediaLibrary.web.ts']) assert.ok(files.has(resolve(root, name)), name);
-  const app = files.get(resolve(root, 'App.tsx'));
   assert.ok(!files.has(resolve(root, 'mediaLibrary.ts')));
   assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new AudioRecorderWeb/);
   assert.match(files.get(resolve(root, 'captureOwner.web.ts')), /new CaptureSession/);
@@ -155,14 +154,48 @@ test('iOS distribution icon is 1024px opaque RGB, not the transparent template f
   assert.equal(expo.ios.icon, './assets/ios-icon.png');
 });
 
-test('native entries reach the shared provider, capture and document contracts', () => {
-  for (const platform of ['android', 'ios']) {
+test('every app entry reaches the shared provider, capture, document and summary contracts', () => {
+  for (const platform of ['android', 'ios', 'web']) {
     const files = graph(platform);
     for (const file of ['captureSession.ts', 'ServiceConfig.ts', 'GatewayGuest.ts', 'freeTargets.ts',
-      'transcriptCompletion.ts', 'operationRecovery.ts', 'transcriptExport.ts']) {
+      'transcriptCompletion.ts', 'operationRecovery.ts', 'transcriptExport.ts', 'OpenAIClient.ts',
+      'summaryDraftLifecycle.ts', 'savedRecordingDocuments.ts', 'Transcript.tsx', 'ProSettings.tsx', 'TranscriptSummary.tsx']) {
       assert.ok(files.has(resolve(root, file)), platform + ' disconnected from ' + file);
     }
     const rollout = platform === 'android' ? 'productionFreeEligible.android.ts' : 'productionFreeEligible.ts';
     assert.ok(files.has(resolve(root, rollout)), platform + ' missing its protected rollout adapter');
   }
+});
+
+test('shared document export selects the approved OS transfer on every entry', () => {
+  for (const [platform, capability] of Object.entries({ android: 'share-and-save', ios: 'share-sheet', web: 'share-and-save' })) {
+    const files = graph(platform);
+    const transfer = files.get(resolve(root, 'transcriptTransfer.' + platform + '.ts'));
+    assert.match(transfer, new RegExp("markdownTransfer[^\n]*= '" + capability + "'"));
+    const transcript = files.get(resolve(root, 'Transcript.tsx'));
+    assert.match(transcript, /await transcriptMarkdown\(recordingTitle, recording\.name/);
+    assert.match(transcript, /await transferTranscript\(filename, markdown, saveFile\)/);
+  }
+});
+
+test('reviewed service rollout exceptions match the adapters actually selected by Metro', () => {
+  const matrix = readFileSync(resolve(root, 'docs/platform-parity.md'), 'utf8');
+  const reviewed = matrix.split('<!-- rollout-exceptions -->')[1]?.split('<!-- end-rollout-exceptions -->')[0];
+  assert.ok(reviewed, 'Missing reviewed rollout exceptions');
+  const entries = reviewed.trim().split('\n').slice(2).map(line => line.split('|').slice(1, -1).map(cell => cell.trim()));
+  const expected = [];
+  for (const [id, adapter, exported, ticket] of [
+    ['production-free', 'productionFreeEligible', 'productionFreeEligible', '#143'],
+    ['large-audio-pro', 'NativeUpload', 'supportsProUpload', '#142'],
+  ]) {
+    const ineligible = ['android', 'ios', 'web'].filter(platform => {
+      const selected = [...graph(platform)].filter(([file]) => new RegExp('/' + adapter + '(?:\\.(?:android|ios|web|native))?\\.ts$').test(file));
+      assert.equal(selected.length, 1, platform + ' must select a single ' + adapter);
+      const declaration = selected[0][1].match(new RegExp('export const ' + exported + ' = (true|false);'));
+      assert.ok(declaration, 'Review ' + exported + ' policy and its matrix assertion');
+      return declaration[1] === 'false';
+    });
+    if (ineligible.length) expected.push([id, ineligible.join(', '), ticket]);
+  }
+  assert.deepEqual(entries, expected, 'An undocumented or stale rollout exception requires review');
 });

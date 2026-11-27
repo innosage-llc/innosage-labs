@@ -26,7 +26,7 @@ For a suspected vulnerability, **do not disclose exploitation details or secrets
 
 ## Recorder changes
 
-For Recorder work, use the [cross-platform acceptance matrix](examples/ai-recorder/docs/platform-parity.md). Update the affected outcome, run the normal user entry on Android, iOS and Web, and attach exact-revision local evidence. Keep provider admission, recovery and original/revision policy shared. Document OS capability differences and explicit release exceptions. The local Recorder premerge gate runs the parity contracts.
+For Recorder work, use the [cross-platform acceptance matrix](examples/ai-recorder/docs/platform-parity.md). Update the affected outcome, run the normal user entry on Android, iOS and Web, and attach exact-revision local evidence. Keep provider admission, recovery and original/revision policy shared. Document OS capability differences and explicit release exceptions. The local Recorder premerge gate runs the shared parity contracts and the synthetic Chromium outcome scenario against a clean local release export. Review changed release exceptions in the matrix alongside the selected adapters.
 
 ## PR handoff
 
