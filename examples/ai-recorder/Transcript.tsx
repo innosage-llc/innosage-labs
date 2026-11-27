@@ -582,7 +582,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change your default service in Settings for new transcriptions.'}</Text>
       </> : null}
       <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
-      {busy || connecting ? <ActivityIndicator accessibilityLabel="Connecting to OpenAI" /> : (openAIConfigured || unsavedOpenAI) ? (
+      {busy || connecting ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
+        <ActionButton title="Retry" variant="primary" onPress={retryService} />
+      ) : (openAIConfigured || unsavedOpenAI) ? (
         <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
       ) : (
         <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>

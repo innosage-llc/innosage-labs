@@ -19,6 +19,7 @@ function accessFor(id: ServiceId) {
 export function ProSettings({ onClose }: { onClose: () => void }) {
   const { mode, palette, spacing, typography } = useTheme();
   const android = Platform.OS === 'android';
+  const ios = Platform.OS === 'ios';
   const [managingKeys, setManagingKeys] = useState(false);
   const working = useRef(false);
   const key = useNativeState("");
@@ -35,14 +36,15 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let active = true;
     void selectedService().then(async id => {
+      if (active && ios) setService(id);
       const profile = await accessFor(id).profile();
       if (active) { setService(id); setConfigured(!!profile); }
     }).catch(() => { if (active) setMessage("Could not read the transcription settings."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, []);
+  }, [ios]);
   async function changeService(id: ServiceId) {
-    if (busy || working.current || id === (Platform.OS === 'ios' ? knownService : service)) return;
+    if (busy || working.current || id === (ios ? knownService : service)) return;
     working.current = true;
     setBusy(true);
     setMessage("");
@@ -160,7 +162,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     ) : null}
   </>;
 
-  if (Platform.OS === 'ios') {
+  if (ios) {
     return <ServiceSettingsLayout service={knownService} serviceLabel={services[service].label}
       stagingAvailable={gatewayAvailable('staging')} managingKeys={managingKeys} canConfigureKey={canConfigureKey}
       busy={busy} message={message} keys={keyControls} onChange={id => { void changeService(id); }}
