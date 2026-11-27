@@ -24,6 +24,10 @@ Before opening a PR:
 
 For a suspected vulnerability, **do not disclose exploitation details or secrets in a public issue or PR**. Use the relevant upstream project's private security-reporting channel, if available, or contact its maintainer privately through an officially published contact route.
 
+## Recorder changes
+
+For Recorder work, use the [cross-platform acceptance matrix](examples/ai-recorder/docs/platform-parity.md). Update the affected outcome, run the normal user entry on Android, iOS and Web, and attach exact-revision local evidence. Keep provider admission, recovery and original/revision policy shared. Document OS capability differences and explicit release exceptions. The local Recorder premerge gate runs the parity contracts.
+
 ## PR handoff
 
 Provide a concise summary, affected files, verification evidence, manual review steps, and risk notes. A maintainer decides whether to merge. Unless separately authorized, a contribution does not trigger a deployment or a publish-to-social action.
