@@ -117,7 +117,7 @@ type ObservedVoiceResult = Exclude<VoiceIdentification, { status: 'pending' }>;
 function confirmedContext(operation: ProOperation) {
   if (!supportsProUpload || !voiceProfileStageEnabled('staging') ||
       operation.workerURL !== services.staging.workerURL || operation.lane !== 'pro' ||
-      operation.identifySpeakers !== true || operation.voiceIdentification === undefined)
+      operation.identifySpeakers !== true || operation.voiceIdentification === undefined || operation.voiceIdentification.receiptOnly)
     return;
   const candidateProfileIds = operation.voiceIdentification.candidateProfileIds;
   const boundOperation = Object.freeze({ ...operation, voiceIdentification: Object.freeze(

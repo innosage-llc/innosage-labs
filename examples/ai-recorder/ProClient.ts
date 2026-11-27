@@ -2,7 +2,7 @@ export type ProProfile = { key: string; accountScope: string };
 export type ProOperation = {
   id: string;
   identifySpeakers: boolean;
-  voiceIdentification?: { candidateProfileIds?: readonly string[] };
+  voiceIdentification?: { candidateProfileIds?: readonly string[]; receiptOnly?: true };
   lane: "pro";
   workerURL: string;
   accountScope: string;
@@ -188,6 +188,11 @@ function voiceOptions(operation: ProOperation) {
   if (!operation.identifySpeakers)
     throw new ProServiceError("Voice matching requires speaker labels.", "voice_options_invalid");
   const ids = operation.voiceIdentification.candidateProfileIds;
+  if ("receiptOnly" in operation.voiceIdentification) {
+    if (operation.workerURL !== stageWorker || operation.voiceIdentification.receiptOnly !== true || ids !== undefined)
+      throw new ProServiceError("Invalid saved recording operation.", "voice_options_invalid");
+    return { contract: VOICE_CONTRACT, receiptOnly: true as const };
+  }
   if (ids === undefined) return { contract: VOICE_CONTRACT };
   if (!Array.isArray(ids) || ids.length > 64 || new Set(ids).size !== ids.length ||
       ids.some(id => typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id)))
@@ -195,9 +200,10 @@ function voiceOptions(operation: ProOperation) {
   return { contract: VOICE_CONTRACT, candidateProfileIds: [...ids].sort() };
 }
 
-function hasVoiceAcknowledgement(value: unknown) {
+function hasVoiceAcknowledgement(value: unknown, receiptOnly = false) {
   if (value === null || typeof value !== "object") return false;
-  return Object.keys(value).length === 1 && "contract" in value && value.contract === VOICE_CONTRACT;
+  if (receiptOnly && (!("receiptOnly" in value) || value.receiptOnly !== true)) return false;
+  return Object.keys(value).length === (receiptOnly ? 2 : 1) && "contract" in value && value.contract === VOICE_CONTRACT;
 }
 
 
@@ -602,7 +608,7 @@ export class ProClient {
       },
     );
     const value = await response.json();
-    if (voice ? !hasVoiceAcknowledgement(value.voiceIdentification) : value.voiceIdentification !== undefined)
+    if (voice ? !hasVoiceAcknowledgement(value.voiceIdentification, voice.receiptOnly) : value.voiceIdentification !== undefined)
       throw new ProServiceError("Voice matching is not available for this operation.", "voice_unavailable");
     if (
       !["created", "idempotent"].includes(value.decision) ||
@@ -783,6 +789,51 @@ export class ProClient {
   // Read only after the caller has saved the usable original. No upload or
   // implicit retry; callers parse the optional payload and keep their transcript
   // even on unavailable/malformed results.
+  async savedMatchEvidence(operation: ProOperation, recording: string, signal?: AbortSignal) {
+    if (!operation.voiceIdentification?.receiptOnly || operation.workerURL !== stageWorker ||
+        this.workerURL !== stageWorker) throw new Error("Stage speaker matching is unavailable.");
+    const session = await this.session(operation, recording, signal);
+    const proofKey = this.originalProofKey(operation);
+    if (!proofKey || (await this.profile())?.accountScope !== operation.accountScope) return;
+    await this.writeOriginalProof(operation, session.sessionId);
+    const proof = await this.loadOriginalProof(proofKey, operation);
+    if (!proof?.completed || proof.sessionId !== session.sessionId) return;
+    const headers = {Authorization: "Bearer " + session.controlCapability};
+    const budget = AbortSignal.timeout(30_000);
+    const checkSignal = signal ? AbortSignal.any([budget,signal]) : budget;
+    let value;
+    while (true) {
+      const response = await this.request(this.path(session)+"/voice-identification", {headers, signal:checkSignal});
+      value = await response.json();
+      if (response.status !== 202) break;
+      if (value?.contract !== "recorder-device-speaker-match/v1" || value.status !== "pending" ||
+          response.headers.get("Retry-After") !== "2") throw new Error("Invalid pending match receipt.");
+      await new Promise<void>((resolve,reject) => {
+        checkSignal.throwIfAborted();
+        const stop = () => {clearTimeout(timer); reject(new Error("Match setup interrupted."));};
+        const timer = setTimeout(() => {checkSignal.removeEventListener("abort",stop);resolve();},2000);
+        checkSignal.addEventListener("abort",stop,{once:true});
+      });
+    }
+    if (value?.contract !== "recorder-device-speaker-match/v1" || value.status !== "completed" ||
+        typeof value.receipt !== "string" || !/^v1\.[A-Za-z0-9_-]{1,1536}(?:\.[A-Za-z0-9_-]{43}){2}$/.test(value.receipt)) return;
+    const raw = await this.request(this.path(session)+"/speakers", {headers,signal});
+    const length = Number(raw.headers.get("Content-Length"));
+    if (!Number.isSafeInteger(length) || length <= 0 || length > 16*1024*1024) return;
+    const bytes = new Uint8Array(await raw.arrayBuffer());
+    if (bytes.byteLength !== length) return;
+    return {bytes, recordingId:session.sessionId, receipt:value.receipt as string, originalSha256:proof.sha256};
+  }
+
+  async matchControl(operation: ProOperation, action: "reserve" | "status" | "abandon", body: object, signal?: AbortSignal) {
+    if (operation.workerURL !== stageWorker || this.workerURL !== stageWorker || !operation.voiceIdentification?.receiptOnly)
+      throw new Error("Stage speaker matching is unavailable.");
+    const response = await this.voiceProfileRequest(operation, "/device-matches/"+action, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), signal,
+    });
+    return response.json();
+  }
+
   async readVoiceIdentification(
     operation: ProOperation,
     recording: string,

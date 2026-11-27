@@ -78,3 +78,23 @@ export async function clipConfirmedRecording(
     native.release(id);
   }
 }
+
+export async function uploadMatch(tap:string,capability:string,uri:string,
+  source:import('./DeviceSpeakerMatch').MatchSource, signal:AbortSignal): Promise<void> {
+  const native = requireNativeModule<UploadModule & {
+    matchUpload(id:string,tap:string,capability:string,uri:string,metadata:string):Promise<number>;
+  }>('RecorderUpload');
+  signal.throwIfAborted();
+  const id = randomUUID();
+  const cancel = () => native.cancel(id);
+  signal.addEventListener('abort',cancel,{once:true});
+  const timeout = setTimeout(cancel,120_000);
+  try {
+    if (await native.matchUpload(id,tap,capability,uri,JSON.stringify(source)) !== 200)
+      throw new Error('Check match status.');
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener('abort',cancel);
+    native.release(id);
+  }
+}

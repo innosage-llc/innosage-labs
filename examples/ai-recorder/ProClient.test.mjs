@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { ProClient } from './ProClient.ts';
+import { matchOnTap } from './DeviceSpeakerMatch.ts';
 import { VoiceProfileIntents } from './VoiceProfileIntents.ts';
 import { voiceProfileManagement } from './VoiceProfileManagement.ts';
 
@@ -57,7 +58,7 @@ function fixture(clipVoiceSample, track = false, worker = "https://worker.test")
         controlExpiresAt: Math.floor(Date.now() / 1000) + 86400, maxBytes: 4 * 1024 ** 3,
         allowedContentTypes: ['audio/mp4'],
         ...(state.mode ? { diarization: { enabled: true }, speakerResultContract: 'draft-speaker-attribution/v1' } : {}),
-        ...(state.voiceOptions && !state.omitVoiceAck ? { voiceIdentification: { contract: state.voiceOptions.contract } } : {}),
+        ...(state.voiceOptions && !state.omitVoiceAck ? { voiceIdentification: { contract: state.voiceOptions.contract, ...(state.voiceOptions.receiptOnly && !state.downgrade ? {receiptOnly:true} : {}) } } : {}),
       });
     }
     assert.ok(url.startsWith(router));
@@ -508,4 +509,53 @@ test('missing and unknown enrollment source tags cannot reach auth or send as di
     }, 'Fixture'), {code:'voice_options_invalid'});
     assert.equal(f.calls.length,before);
   }
+});
+
+
+test('receipt-only Stage transcription refuses silent legacy matching and keeps modes distinct', async () => {
+  const f = fixture(undefined,true,'https://api-staging.draft.innosage.co');
+  await f.client.configure('synthetic-pro-key');
+  const op = {...f.operation,identifySpeakers:true,voiceIdentification:{receiptOnly:true}};
+  f.state.downgrade=true;
+  await assert.rejects(f.client.read(op,'saved.m4a'),/Voice matching is not available/);
+  f.state.downgrade=false;
+  assert.equal((await f.client.read(op,'saved.m4a')).state,'RESERVED');
+  assert.deepEqual(f.state.voiceOptions,{contract:'recorder-voice-profile/v1',receiptOnly:true});
+  await assert.rejects(f.client.read({...op,voiceIdentification:{}},'saved.m4a'),/another operation/);
+  await assert.rejects(f.client.read({...op,voiceIdentification:{receiptOnly:true,candidateProfileIds:[]}},'saved.m4a'));
+  assert.equal(f.state.uploads,0);
+});
+
+test('duplicate taps, a lost acknowledgement and a restarted match only send audio once', async () => {
+  const f=fixture();
+  let uploads=0;
+  let checks=0;
+  const input={key:'fixture.tap',source:{},store:f.store,uuid:randomUUID,
+    control:async (action)=>action==='reserve' ? {state:'reserved',uploadCapability:'a'.repeat(64)}
+      : (++checks,{state:'completed',decisions:{}}),
+    upload:async ()=>{uploads++;throw Error('lost acknowledgement');}};
+  const replies=await Promise.all([matchOnTap(input),matchOnTap(input)]);
+  assert.deepEqual(replies[0],replies[1]);
+  assert.equal(uploads,1);
+  assert.equal(checks,1);
+  await matchOnTap(input);
+  assert.equal(uploads,1);
+  assert.equal(checks,2);
+});
+
+test('a failed transfer needs a fresh explicit tap and stored intent precedes network', async () => {
+  const f=fixture();
+  let uploads=0;
+  const taps=[];
+  const input={key:'fixture.tap',source:{},store:f.store,uuid:randomUUID,
+    control:async (action,{tap})=>{
+      assert.equal(JSON.parse(f.values.get('fixture.tap')).tap,tap);
+      if(action==='status') return {state:'failed'};
+      taps.push(tap);return {state:'reserved',uploadCapability:'a'.repeat(64)};
+    }, upload:async ()=>{assert.equal(JSON.parse(f.values.get('fixture.tap')).sent,true);uploads++;}};
+  await matchOnTap(input);
+  assert.equal(uploads,1);
+  await matchOnTap(input);
+  assert.equal(uploads,2);
+  assert.notEqual(taps[0],taps[1]);
 });

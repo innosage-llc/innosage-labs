@@ -14,7 +14,7 @@ import { AppHeader } from './ui/AppChrome';
 import { ActionButton } from './ui/ActionButton';
 import { canEditTranscript, canLeaveTranscript } from './ui/navigation';
 import { useTheme } from './ui/theme';
-import { RecorderSwitch } from './RecorderSwitch';
+import { SavedSpeakerMatch, saveMatchBeforeCleanup } from './SavedSpeakerMatch';
 import { draftEditorIsBundled, createDraftDocument } from './draftDocumentStore';
 import { draftText } from './draftDocumentModel';
 import { RecorderDraftHost } from './RecorderDraftHost';
@@ -144,7 +144,6 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const [proDenied, setProDenied] = useState(false);
   const submission = useRef<AbortController | null>(null);
   const [identifySpeakers, setIdentifySpeakers] = useState(false);
-  const [matchVoiceProfiles, setMatchVoiceProfiles] = useState(false);
   const [voiceProfileResult, setVoiceProfileResult] = useState<{
     operation: ProOperation; review?: VoiceProfileReview; expanded?: boolean;
   }>();
@@ -279,7 +278,11 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       }
       if (committed) {
         setServiceReady(true);
-        if (paid && (!paid.voiceIdentification || !voiceProfileStageEnabled(restoredService))) {
+        if (paid?.voiceIdentification?.receiptOnly && voiceProfileStageEnabled(restoredService)) {
+          await saveMatchBeforeCleanup(paid,recording).catch(() => {
+            if (active) setMessage('Transcript saved. Match setup will retry when reopened.');
+          });
+        } else if (paid && (!paid.voiceIdentification || !voiceProfileStageEnabled(restoredService))) {
           await clientForOperation(paid).cleanup(paid, recording.name).catch(() => {
             if (active) setMessage('Saved locally. Service cleanup will retry when reopened.');
           });
@@ -324,7 +327,11 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       const shouldCleanup = cleanupOnly
         ? local.state === 'COMPLETED' && !signal?.aborted
         : !paid.voiceIdentification && result.state === 'COMPLETED';
-      if (shouldCleanup) {
+      if (!cleanupOnly && paid.voiceIdentification?.receiptOnly && local.state === 'COMPLETED') {
+        await saveMatchBeforeCleanup(paid,recording,signal).catch(() => {
+          if (!signal?.aborted) setMessage('Transcript saved. Match setup will retry when reopened.');
+        });
+      } else if (shouldCleanup) {
         await operationClient.cleanup(paid, recording.name).catch(() => {
           if (!cleanupOnly || !signal?.aborted) setMessage('Saved locally. Service cleanup will retry when reopened.');
         });
@@ -358,7 +365,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const canOfferVoiceProfiles = voiceProfilesEnabled && supportsProUpload && usePro &&
     serviceReady && !connecting && !statusUnknown && (!operation || operationEnded);
   const voiceProfileOperation = paidOperation?.workerURL === services.staging.workerURL &&
-    paidOperation.voiceIdentification ? paidOperation : undefined;
+    paidOperation.voiceIdentification && !paidOperation.voiceIdentification.receiptOnly ? paidOperation : undefined;
   const showOriginal = originalChoice ?? ((complete && !!voiceProfileOperation) || (!android && connecting));
   const voiceLookup = voiceProfileResult?.operation === voiceProfileOperation ? voiceProfileResult : undefined;
   const voiceReview = voiceLookup?.review;
@@ -592,7 +599,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         controller.signal.throwIfAborted();
         paid = { lane: 'pro', id: `recorder-transcription-v2-${Math.floor(Date.now() / 1000) + 86400}-${randomUUID()}`,
           identifySpeakers, workerURL: proClient.workerURL, accountScope, sourceBytes: recording.size,
-          ...(canOfferVoiceProfiles && identifySpeakers && matchVoiceProfiles ? { voiceIdentification: {} } : {}) };
+          ...(canOfferVoiceProfiles && identifySpeakers ? { voiceIdentification: {receiptOnly:true as const} } : {}) };
         freshPaid = paid;
       } else if (!paid) {
         if (!gatewayAvailable(service)) throw new KnownServiceFailure('Free transcription is unavailable for this environment in this build.');
@@ -615,7 +622,6 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       setJob({ state: 'RESERVED' });
       if (startingPro) {
         setProDenied(false);
-        setMatchVoiceProfiles(false);
       }
       controller.signal.throwIfAborted();
       const timeout = paid ? undefined : setTimeout(() => controller.abort(), 60_000);
@@ -797,19 +803,11 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           </View> : null}
           {isOpenAI && !complete ? <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change the default in Transcription service, then reopen this recording.'}</Text> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>{message}</Text> : null}
-          {!complete && canOfferVoiceProfiles ? <View style={{ gap: spacing.xs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Text style={{ ...typography.body, color: palette.text, flex: 1 }}>Match saved voice profiles</Text>
-              <RecorderSwitch label="Match saved voice profiles" value={matchVoiceProfiles}
-                enabled={!busy && identifySpeakers} onCheckedChange={setMatchVoiceProfiles} />
-            </View>
-            <Text style={{ ...typography.body, color: palette.muted }}>
-              {identifySpeakers ? 'Check this recording for matches with saved voice profiles.' : 'Turn on Identify speakers to use saved voice profiles.'}
-            </Text>
-          </View> : null}
           {complete ? (
             <>
               {(!android || (!editingReader && !showSummaryTools)) && <>
+              {supportsProUpload && voiceProfilesEnabled && paidOperation?.voiceIdentification?.receiptOnly ?
+                <SavedSpeakerMatch key={paidOperation.id} operation={paidOperation} recording={recording} originalUri={originalUri}/> : null}
               {voiceProfilesEnabled && voiceProfileOperation ? <VoiceProfileStatus
                 pending={!voiceLookup} available={!!voiceReview}
                 matchedCount={voiceReview?.matchedCount ?? 0} reviewCount={voiceReview?.reviewCount ?? 0}
@@ -929,11 +927,9 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
                 setUsePro(value);
                 setProDenied(false);
                 setMessage('');
-                if (!value) setMatchVoiceProfiles(false);
               }}
               onIdentifySpeakers={value => {
                 setIdentifySpeakers(value);
-                if (!value) setMatchVoiceProfiles(false);
               }}
               onRetryService={retryService}
               onCheckStatus={checkOperationStatus}
