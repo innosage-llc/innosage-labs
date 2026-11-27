@@ -143,7 +143,7 @@ function RecorderScreen() {
   const [sharePending, setSharePending] = useState(false);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
   const library = useRef<LibraryViewHandle>(null);
-  const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
+  const [serviceLabel, setServiceLabel] = useState("Reading saved service…");
   const player = useAudioPlayer();
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
@@ -198,7 +198,9 @@ function RecorderScreen() {
 
   useEffect(() => {
     let current = true;
-    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); }).catch(() => {});
+    setServiceLabel('Reading saved service…');
+    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); })
+      .catch(() => { if (current) setServiceLabel('Saved service unavailable'); });
     return () => { current = false; };
   }, [showPro]);
 

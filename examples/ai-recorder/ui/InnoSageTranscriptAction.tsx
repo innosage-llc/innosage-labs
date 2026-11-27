@@ -109,6 +109,7 @@ export function InnoSageTranscriptAction({
       {canUpload ? (
         <View style={{ gap: spacing.xs }}>
           <Text style={body}>Transcribing uploads this M4A recording to InnoSage.</Text>
+          {!isProduction && !usePro ? <Text style={muted}>The Staging Gateway keeps the original transcript on its server.</Text> : null}
           <Text style={muted}>{limit}</Text>
         </View>
       ) : null}
