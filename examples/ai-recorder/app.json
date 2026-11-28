@@ -12,7 +12,7 @@
       "package": "co.innosage.labs.airecorder",
       "userInterfaceStyle": "automatic",
       "allowBackup": false,
-      "versionCode": 10
+      "versionCode": 11
     },
     "plugins": [
       [
@@ -27,7 +27,7 @@
     ],
     "ios": {
       "bundleIdentifier": "co.innosage.labs.airecorder",
-      "buildNumber": "10",
+      "buildNumber": "19",
       "supportsTablet": false,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Record audio clips you choose to save on this device."

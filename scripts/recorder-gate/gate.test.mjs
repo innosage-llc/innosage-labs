@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
@@ -183,8 +183,10 @@ test('HTTP 200 index alone cannot mask a missing critical entry; only optional f
 });
 test('actual platform entry points fail closed for absent native targets and unavailable Web build tool',async()=>{
   const {source,g}=repository();const app=join(source,'examples/ai-recorder');mkdirSync(app,{recursive:true});
+  const base=g('rev-parse','HEAD');
   for(const name of ['app.json','package.json','package-lock.json'])writeFileSync(join(app,name),'{}');
-  g('add','.');g('commit','-m','synthetic build inputs');const candidate={...c,tested:g('rev-parse','HEAD'),tree:g('rev-parse','HEAD^{tree}')};
+  g('add','.');g('commit','-m','synthetic build inputs');const head=g('rev-parse','HEAD');
+  const candidate={...c,base,head,...integrationRevision(base,head,source)};g('switch','--detach',candidate.tested);
   for(const platform of ['android','ios','web']) {
     const output=mkdtempSync(join(tmpdir(),'labs-platform-missing-'));
     await assert.rejects(platformGate({platform,source,candidate,output,targets:{}}));
@@ -192,6 +194,29 @@ test('actual platform entry points fail closed for absent native targets and una
     assert.equal(result.status,'FAIL');assert.equal(result.stage,platform==='web'?'build':'preflight');
     if(platform!=='web')assert.deepEqual(result.commands,[]);
   }
+});
+test('standalone iOS rejects an inconsistent integration manifest before starting a Simulator', async () => {
+  const {source,g}=repository();const base=g('rev-parse','HEAD');
+  try {
+    writeFileSync(join(source,'head'),'topic');g('add','.');g('commit','-m','synthetic topic');const head=g('rev-parse','HEAD');
+    const candidate={...c,base,head,...integrationRevision(base,head,source)};
+    g('switch','--detach',candidate.tested);
+    const forgedTree=g('rev-parse',`${base}^{tree}`);
+    const forged=g('commit-tree',forgedTree,'-p',base,'-p',head,'-m','different integration tree');
+    for(const [manifest, revision, reason] of [
+      [{...candidate,tree:forgedTree},candidate.tested,/revision\/tree changed/],
+      [{...candidate,base:head,head:base},candidate.tested,/exact base\/head integration/],
+      [{...candidate,tree:forgedTree,tested:forged},forged,/integration result drift/],
+    ]) {
+      g('switch','--detach',revision);
+      const output=mkdtempSync(join(tmpdir(),'labs-ios-manifest-'));
+      try {
+        await assert.rejects(platformGate({platform:'ios',source,candidate:manifest,output,targets:{iosRuntime:'com.apple.CoreSimulator.SimRuntime.iOS-27-2'}}),reason);
+        const result=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));
+        assert.equal(result.status,'FAIL');assert.equal(result.stage,'preflight');assert.deepEqual(result.commands,[]);
+      } finally { rmSync(output,{recursive:true,force:true}); }
+    }
+  } finally { rmSync(source,{recursive:true,force:true}); }
 });
 
 test('synchronous callbacks cannot beat a delayed timeout timer; final probe is also bounded', async()=>{
@@ -220,9 +245,9 @@ test('compiled iOS sampling contract rejects runner pause, stalled query, disapp
   }
   assert.throws(()=>parseAccessibility(`LABS85_OBSERVATION_JSON ${JSON.stringify({...healthy,samples_ms:[100,200,6200],stable_ms:6100})}`),/coverage gap/);
 });
-test('required Mac CI stages each prevent the real controller merge, with complete failed-command evidence',async()=>{
+test('required local CI stages each prevent the real controller merge, with complete failed-command evidence',async()=>{
   const { localCI }=await import('./local-ci.mjs');
-  for(const stage of ['tests/check_runtime_boundary.py','required-mac-fixtures.py','unittest']) {
+  for(const stage of ['tests/check_runtime_boundary.py','required-mac-fixtures.py','unittest','test:browser-parity']) {
     let output;
     const f=await fixture({paths:['examples/is-clean-my-mac/scripts/change.py'],deps:{ci:(source,paths,dir)=>{
       output=dir;return localCI(source,paths,dir,{clean:()=>{},run:(command,args,opts)=>{
@@ -259,12 +284,12 @@ test('over-budget synchronous probes and slow final probes make zero controller 
   }
 });
 
-test('generated XCTest project has named products, both Swift sources, application dependency and shared test scheme',()=>{
+test('generated XCTest project has named products, startup and Markdown sources, application dependency and shared test scheme',()=>{
   const dir=mkdtempSync(join(tmpdir(),'labs-xcode-fixture-'));const project=join(dir,'AIRecorder.xcodeproj');const ruby=process.env.LABS85_RUBY??'ruby';
   run(ruby,['-rxcodeproj','-e','p=Xcodeproj::Project.new(ARGV[0]);a=p.new_target(:application,"AIRecorder",:ios,"16.4");p.save;s=Xcodeproj::XCScheme.new;s.add_build_target(a);s.save_as(ARGV[0],"AIRecorder",true)',project]);
   run(ruby,[new URL('add-ios-test.rb',import.meta.url).pathname,project,new URL('StartupGateTests.swift',import.meta.url).pathname]);
   const inspected=JSON.parse(run(ruby,['-rxcodeproj','-rjson','-e','p=Xcodeproj::Project.open(ARGV[0]);t=p.targets.find{|x|x.name=="StartupGateUITests"};puts JSON.generate({products:t.build_configurations.map{|c|c.build_settings["PRODUCT_NAME"]},sources:t.source_build_phase.files_references.map(&:display_name).sort,dependencies:t.dependencies.size,scheme:File.read(File.join(ARGV[0],"xcshareddata/xcschemes/AIRecorder.xcscheme")).include?(t.uuid)})',project]));
-  assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
+  assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['LibraryImportTests.swift','MarkdownGateTests.swift','StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
 });
 
 

@@ -6,6 +6,7 @@ __pycache__/
 *.sqlite3*
 
 ios/
+!modules/recorder-media-probe/ios/
 dist-ios/
 dist-android/
 dist-web/

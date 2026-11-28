@@ -18,7 +18,7 @@ node scripts/auto-merge-ci.mjs --repo innosage-llc/innosage-labs --pr <PR> --hea
 
 Preparation requires a clean checkout at that PR head. It verifies GitHub's PR/current-main identities, fetches into this repository, and uses Git's real merge-tree result. Conflicts fail. The deterministic local integration commit has exactly `[current-main, PR-head]` as parents. It is a local test commit, not a published PR head or an actual merge. No old green receipt is imported or reused. Reconcile the PR if base changes the gate scripts, or if head/base advances; prepare and review the updated candidate.
 
-Run the canonical CI/startup-only command (it has no merge capability):
+Run the canonical CI/startup-only command from the clean PR head. It loads the applicable CI and platform observers from the retained integration checkout.
 
 ```sh
 node scripts/recorder-gate/run.mjs --candidate /tmp/labs-candidate.json --output /tmp/labs-gate-new-run --android emulator-5554 --ios-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
@@ -59,14 +59,24 @@ Each fresh output directory retains platform `result.json`, complete artifact-fi
 
 Recorder source/dependencies/build inputs/gates and unknown paths run all three. Rename/deletion handling includes both path names. Only paths wholly within known other examples can skip Recorder startup, with an explicit reason; they still run their existing applicable local CI. The local CI registry covers Recorder typecheck/unit/helper tests, changed Recorder server tests, Studio tests/typecheck, existing CMO checks, and Python tests for the two Python examples. For is-clean-my-mac it additionally runs the documented standalone runtime-boundary check and native lsof/execution discovery with both opt-ins enabled against disposable fixtures only. Unavailable, empty or skipped native coverage blocks the gate. Failed CI preserves stdout, stderr, exit/signal and duration in applicable-ci.json plus the enclosing controller receipt. Unknown new example owners block until their local CI is added. Git diff checks and gate fixtures always run. No optional GitHub checks stand in for this CI.
 
+Changes affecting iOS Markdown also require a native Files receipt. With dependencies cached, replay the iOS portion offline against the retained detached integration worktree and its candidate manifest. The command checks the worktree tree, ordered base/head parents and recomputed merge tree before using the diff to select cases.
+
+```sh
+source=/absolute/path/to/retained-integration-checkout
+node "$source/scripts/recorder-gate/platform.mjs" --platform ios --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/ios-markdown-new --ios-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
+```
+
+The Files test targets iPhone 17 Pro with the iOS 27.2 Simulator runtime and English (United States) accessibility labels. Run on a host whose fresh Simulator uses those labels. Other runtime and locale combinations are unqualified. The test cancels and retries the native sheet, saves to On My iPhone and reads the resulting Markdown bytes from the system Files provider. It uses only the repository’s synthetic data.
+
 ## Red controls and preview
 
 After the canonical command creates/installs dependencies in its retained exact candidate worktree, single-platform diagnostics can use:
 
 ```sh
-node scripts/recorder-gate/platform.mjs --platform android --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/android-red-new --android emulator-5554 --fault terminate
-node scripts/recorder-gate/platform.mjs --platform ios --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/ios-red-new --ios-runtime <runtime> --fault terminate
-node scripts/recorder-gate/platform.mjs --platform web --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/web-red-new --fault missing-entry
+source=/absolute/path/to/retained-integration-checkout
+node "$source/scripts/recorder-gate/platform.mjs" --platform android --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/android-red-new --android emulator-5554 --fault terminate
+node "$source/scripts/recorder-gate/platform.mjs" --platform ios --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/ios-red-new --ios-runtime <runtime> --fault terminate
+node "$source/scripts/recorder-gate/platform.mjs" --platform web --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/web-red-new --fault missing-entry
 ```
 
 Termination is scheduled within the ready observation window. Web returns HTTP 200 for the real index but intercepts the entry script with HTTP 404. A valid red-control receipt must be nonzero/FAIL **and** `fault.applied: true`; a generic missing-target failure is not proof of an injected red control. The merge path accepts no fault/skip options and always runs fresh positive checks.
@@ -77,6 +87,6 @@ For the first human preview, after a successful Web receipt:
 node scripts/recorder-gate/preview.mjs --receipt /tmp/labs-gate-new-run/web/result.json
 ```
 
-This serves the identical digest-pinned export on loopback and prints tested revision/digest/URL. Stop with Ctrl-C. It creates no public exposure. Any remotely accessible preview requires separate applicable authorization. Browser scope is Record/Library/Settings navigation and explicit capability messages; recording, file import, transcription and key storage remain native-only. The genuine shared app and state are used, with platform adapters and existing theme/labels; there is no readiness-only substitute app.
+This serves the identical digest-pinned export on loopback and prints the tested revision, digest and URL. Stop with Ctrl-C. Any remotely accessible preview requires separate applicable authorization. The startup receipt covers app readiness and navigation. The local browser parity tests exercise capture, file import, local persistence, sharing and provider recovery with synthetic inputs. Consult the Recorder acceptance matrix for the verified outcomes and service limits. [Recorder acceptance matrix](../../examples/ai-recorder/docs/platform-parity.md)
 
 Run offline regression/spy fixtures with `node --test scripts/recorder-gate/gate.test.mjs`. They call the actual CLI controller with in-memory synthetic dependencies; production CLI has no fixture/skip hook. No test makes a real merge request.

@@ -6,6 +6,7 @@ type Snapshot = {
   message: string;
   savedUri?: string;
   saveVersion: number;
+  retrySave?: boolean;
 };
 
 type Dependencies = {
@@ -16,8 +17,10 @@ type Dependencies = {
   prepare?: () => Promise<void>;
   recover?: () => Promise<unknown>;
   save: (url: string) => Promise<string>;
+  startErrorMessage?: (error: unknown) => string | undefined;
   permissionMessage: (canAskAgain: boolean) => string;
   savedMessage: string;
+  retainFailedSave?: boolean;
 };
 
 /** Owns one capture independently of React surfaces within the current JS runtime. */
@@ -27,6 +30,7 @@ export class CaptureSession {
   private snapshot: Snapshot = { phase: 'idle', message: '', saveVersion: 0 };
   private listeners = new Set<() => void>();
   private activeCapture = false;
+  private unsavedURL?: string;
   private finishedUrls = new Set<string>();
   // Keep the completion subscription with the owner, including between screen mounts.
   private completionSubscription;
@@ -78,6 +82,10 @@ export class CaptureSession {
 
   async start() {
     if (this.snapshot.phase !== 'idle') return;
+    if (this.unsavedURL) {
+      await this.saveFinished(this.unsavedURL);
+      return;
+    }
     this.update({ phase: 'starting', message: '', savedUri: undefined });
     try {
       const permission = await this.dependencies.microphone();
@@ -95,9 +103,9 @@ export class CaptureSession {
       this.activeCapture = true;
       this.recorder.record();
       this.setPhase('recording');
-    } catch {
+    } catch (error) {
       this.activeCapture = false;
-      this.setMessage('Could not start recording. Return to the app and try again.');
+      this.setMessage(this.dependencies.startErrorMessage?.(error) ?? 'Could not start recording. Return to the app and try again.');
       this.setPhase('idle');
     }
   }
@@ -117,13 +125,24 @@ export class CaptureSession {
     if (!status.isFinished || !this.activeCapture || (status.url && this.finishedUrls.has(status.url))) return;
     this.activeCapture = false;
     if (status.url) this.finishedUrls.add(status.url);
+    if (status.hasError || !status.url) {
+      this.update({ phase: 'idle', savedUri: undefined, message: 'Could not save the recording.' });
+      return;
+    }
+    await this.saveFinished(status.url);
+  }
+
+  private async saveFinished(url: string) {
     this.setPhase('saving');
     try {
-      if (status.hasError || !status.url) throw new Error('Recording did not finish.');
-      const savedUri = await this.dependencies.save(status.url);
-      this.update({ savedUri, saveVersion: this.snapshot.saveVersion + 1, message: this.dependencies.savedMessage });
+      const savedUri = await this.dependencies.save(url);
+      this.unsavedURL = undefined;
+      this.update({ savedUri, ...(this.dependencies.retainFailedSave ? { retrySave: false } : {}), saveVersion: this.snapshot.saveVersion + 1, message: this.dependencies.savedMessage });
     } catch {
-      this.update({ savedUri: undefined, message: 'Could not save the recording.' });
+      if (this.dependencies.retainFailedSave) this.unsavedURL = url;
+      this.update({ savedUri: undefined, ...(this.unsavedURL ? { retrySave: true } : {}), message: this.unsavedURL
+        ? 'Could not save this recording. Keep this tab open, free browser storage and retry saving.'
+        : 'Could not save the recording.' });
     } finally {
       this.setPhase('idle');
     }

@@ -1,5 +1,5 @@
 import { fetch } from "expo/fetch";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./credentialStore";
 import { File, FileMode } from "expo-file-system";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ProClient } from "./ProClient";

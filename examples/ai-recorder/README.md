@@ -16,7 +16,11 @@ the system offers a Files destination. Sharing uses the original M4A bytes
 and works offline without a transcript or account. The receiving app controls
 what it saves. The original remains in Recorder.
 
-## Share a saved transcript with Draft on Android
+## Share a saved transcript
+
+Open the transcript and save your edit before choosing **Share transcript (.md)**. The iOS system share sheet offers compatible recipients and **Save to Files**. The browser uses file sharing where supported, with a download alternative. **Save Markdown file** downloads the saved revision directly on Web. A receiving app confirms whether it retained the attachment. The original recording and its transcript stay in Recorder.
+
+### Draft on Android
 
 1. Open the recording’s transcript. In the bundled editor, go Back after editing and wait for the local save to finish. In the text editor, tap **Save revision**.
 2. Tap **Share transcript (.md)**. In Android’s receiving-app list, choose the installed **Draft** PWA. Recorder shares one UTF-8 Markdown attachment with its recording or import date and the saved revision used.
@@ -44,6 +48,8 @@ needed for that request. This is hybrid capture and AI processing, not fully
 offline AI. There is no cross-device sync or backup promise. Uninstall removes
 app-private files and saved results; it does not delete an original transcript
 already retained by the staging Gateway.
+
+The [versioned cross-platform acceptance matrix](docs/platform-parity.md) records the current product contract, known gaps, approved release exceptions and required local evidence for #139. The dated Android and prototype status below supplies historical context.
 
 ### Available in the current Android `main`
 
@@ -86,7 +92,7 @@ commitment.
 | Runtime observed | Android API 36 emulator evidence covers background/screen-asleep capture, saved local playback after relaunch, and Library/navigation states. PR #61's bounded six-run main-versus-candidate control check was 5 PASS / 1 PARTIAL; its original Start error was NOT_REPRODUCED / NOT_FIXED. A later, separate PR #62 run observed a new native Start failure with unknown cause and stage. |
 | In development | [PR #62](https://github.com/innosage-llc/innosage-labs/pull/62) is a draft UI refinement: one native action for the circle and label, shared disabled behavior, removal of the competing idle “Ready to record” line, and clearer saved copy. It is not in `main` and is not a released feature. |
 | Not established | PR #61's original Start error remains NOT_REPRODUCED / NOT_FIXED; this describes only that bounded check. PR #62 later observed a separate Start failure (“Could not start recording…”) with no successful output and unknown cause/stage. A separately authorized one-Start production Saved proof passed at 320 dp / 200% text for top/bottom reachability, native bounds, and Library handoff; lower Start activation was NOT_TESTED ([immutable report at `14fa865`](https://github.com/innosage-llc/innosage-labs/blob/14fa865f95d2d7ed61bc603d2e63c9c9069e7df2/examples/ai-recorder/docs/single-action/production-small-30m/README.md)). The fresh Start failure and config-transition interrupted capture remain unresolved. Physical-phone spoken-marker continuity, audible TalkBack, controlled native save failures, and live provider acceptance remain separate checks. |
-| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; the original candidate was signed, installed and launched on a USB test iPhone; the reconciled source and the complete physical-device journey remain distinct checks. TestFlight delivery is not established. Web is unsupported. |
+| Platform boundary | Android is the verified platform. [iOS PR #52](https://github.com/innosage-llc/innosage-labs/pull/52) is a draft development candidate; the original candidate was signed, installed and launched on a USB test iPhone; the reconciled source and the complete physical-device journey remain distinct checks. TestFlight delivery is not established. This historical release did not qualify Web. The current candidate outcomes and exceptions are in the [versioned parity matrix](docs/platform-parity.md). |
 
 The merged [PR #61](https://github.com/innosage-llc/innosage-labs/pull/61)
 centers the Android recording control. Its merge records source integration, not

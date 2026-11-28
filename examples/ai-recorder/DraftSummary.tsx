@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Share, Text, View } from 'react-native';
-import { File } from 'expo-file-system';
+import { File } from './localFiles';
 import { randomUUID } from 'expo-crypto';
 import { draftText, editedSummaryCitations, type DraftSnapshot } from './draftDocumentModel';
 import { createDraftDocument } from './draftDocumentStore';

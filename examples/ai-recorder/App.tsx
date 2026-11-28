@@ -7,9 +7,11 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
-import { recordingDurationMillis } from './NativeUpload';
+import { useTranscriptShareCleanup } from './useTranscriptShareCleanup';
+import { recordingDurationMillis } from './libraryDuration';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
+import { SettingsEntry } from './ui/service-flow';
 import { ActionButton } from './ui/ActionButton';
 import { LibraryView, type LibraryViewHandle } from './ui/library-view';
 import { RecordView } from './ui/record-view';
@@ -23,23 +25,13 @@ import { canSwitchDestination, type RootDestination } from './ui/navigation';
 import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
 import { services } from './ServiceConfig';
-import { Directory, File, Paths } from 'expo-file-system';
-import { getDocumentAsync } from 'expo-document-picker';
+import { File } from './localFiles';
+import { importLibraryAudio, importMessages, importActionState } from './libraryImport';
 import { randomUUID } from 'expo-crypto';
+import { listRecordings, pickAudio, playbackSource } from './mediaLibrary';
 import { Host, Icon, ListItem, Text as NativeText } from '@expo/ui';
 import ChevronIcon from '@expo/material-symbols/chevron_right.xml';
 import { getCaptureSession } from './captureOwner';
-
-// Web launch/navigation is supported; native filesystem capture/import is not.
-// Never construct the native Directory at Web module initialization.
-const recordings = Platform.OS === 'web' ? undefined : new Directory(Paths.document, 'recordings');
-
-function listRecordings() {
-  if (!recordings?.exists) return [];
-  return recordings.list()
-    .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.m4a'))
-    .sort((a, b) => Number(b.name.split('-')[1]) - Number(a.name.split('-')[1]));
-}
 
 function recordingLabel(file: File) {
   if (file.name.startsWith('Import-')) {
@@ -84,6 +76,7 @@ function summarizeRecordings(files: File[]): RecordingSummary[] {
 }
 
 function RecorderScreen() {
+  useTranscriptShareCleanup();
   const { mode, palette, spacing, typography } = useTheme();
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
@@ -99,7 +92,6 @@ function RecorderScreen() {
   const capture = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const latestCapture = capture.savedUri;
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
     const pending = files.filter(file => !recordingDurations.has(file.uri));
     if (!pending.length) return;
     const latest = pending.find(file => file.uri === latestCapture);
@@ -142,8 +134,10 @@ function RecorderScreen() {
   const [sharePending, setSharePending] = useState(false);
   const [handoff, dispatchHandoff] = useReducer(handoffReducer, initialHandoff);
   const library = useRef<LibraryViewHandle>(null);
-  const [serviceLabel, setServiceLabel] = useState<string>(services.staging.label);
+  const [serviceLabel, setServiceLabel] = useState("Reading saved service…");
   const player = useAudioPlayer();
+  const releasePlayback = useRef<() => void>(undefined);
+  useEffect(() => () => releasePlayback.current?.(), []);
   const playback = useAudioPlayerStatus(player);
   // Clear before the old player's deferred release; old cleanup cannot clear a newer binding.
   useLayoutEffect(() => session.bindPlayback(() => player.pause()), [session, player]);
@@ -197,7 +191,9 @@ function RecorderScreen() {
 
   useEffect(() => {
     let current = true;
-    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); }).catch(() => {});
+    setServiceLabel('Reading saved service…');
+    void selectedService().then(id => { if (current) setServiceLabel(services[id].label); })
+      .catch(() => { if (current) setServiceLabel('Saved service unavailable'); });
     return () => { current = false; };
   }, [showPro]);
 
@@ -220,7 +216,7 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'leave' });
     setMessage('');
     setDetailUri(uri);
-    if (Platform.OS === 'android' && playingFile !== uri) {
+    if (playingFile !== uri) {
       ++playRequest.current;
       try {
         preparePlayback(file);
@@ -281,51 +277,23 @@ function RecorderScreen() {
 
 
   async function importAudio() {
-    if (!recordings) return;
     if (session.getSnapshot().phase !== 'idle') return;
     setCapturePhase('importing');
     dispatchHandoff({ type: 'reset' });
     setMessage('');
-    let cached: File | undefined;
-    let label: File | undefined;
-    let imported = false;
     try {
-      const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-      if (selection.canceled) return;
-      const asset = selection.assets[0];
-      cached = new File(asset.uri);
-      if (!asset.name.toLowerCase().endsWith('.m4a')) {
-        setMessage('Choose an M4A audio file.');
-        return;
-      }
-      if (!cached.exists || !cached.size) {
-        setMessage('The selected audio file is empty or unavailable.');
-        return;
-      }
-      recordings.create({ idempotent: true });
-      const name = `Import-${Date.now()}-${randomUUID()}.m4a`;
-      label = new File(recordings, name + '.name');
-      await label.write(asset.name);
-      await cached.move(new File(recordings, name));
-      cached = undefined;
-      imported = true;
-      setFiles(listRecordings());
-      setMessage('Audio imported to this device.');
+      const result = await importLibraryAudio(pickAudio, () => `Import-${Date.now()}-${randomUUID()}.m4a`);
+      setMessage(importMessages[result.kind]);
+      if (result.kind === 'saved') setFiles(listRecordings());
     } catch {
       setMessage('Could not import the audio. Check available storage and try again.');
     } finally {
-      try {
-        if (cached?.exists) cached.delete();
-        if (!imported && label?.exists) label.delete();
-      } catch {
-        // A cache cleanup failure must not leave the import controls disabled.
-      }
       setCapturePhase('idle');
     }
   }
 
   async function shareAudio(file: File, label: string) {
-    if (!recordings || sharing.current || session.getSnapshot().phase !== 'idle') return;
+    if (sharing.current || session.getSnapshot().phase !== 'idle') return;
     sharing.current = true;
     setSharePending(true);
     setMessage('');
@@ -367,7 +335,10 @@ function RecorderScreen() {
     pausePlayback();
     pendingSeek.current = undefined;
     setSeekPosition(undefined);
-    player.replace(file.uri);
+    const source = playbackSource(file);
+    try { player.replace(source.uri); } catch (error) { source.release(); throw error; }
+    releasePlayback.current?.();
+    releasePlayback.current = source.release;
     setPlayingFile(file.uri);
   }
 
@@ -431,7 +402,7 @@ function RecorderScreen() {
 
   return (
     <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
-      libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle' || !recordings, onPress: importAudio }}>
+      libraryImport={importActionState(phase, importAudio)}>
       {detailRecording && detailFile && !transcriptRoute ? <RecordingDetail
         key={detailUri}
         recording={detailRecording}
@@ -475,6 +446,7 @@ function RecorderScreen() {
         phase={phase}
         message={message}
         durationMillis={durationMillis}
+        retrySave={capture.retrySave}
         savedUri={handoff.savedUri}
         savedRecording={summaries.find(item => item.uri === handoff.savedUri)}
         onPressRecord={phase === 'recording' ? stop : start}
@@ -490,6 +462,8 @@ function RecorderScreen() {
             </ListItem>
           </Host>
         </ScrollView>
+      ) : Platform.OS === 'ios' ? (
+        <SettingsEntry serviceLabel={serviceLabel} disabled={phase !== 'idle'} onOpen={() => setShowPro(true)} />
       ) : <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <Text accessibilityRole="header" style={[typography.title, { color: palette.text }]}>Services and access</Text>
         <Text style={[styles.copy, { color: palette.muted }]}>Recordings and saved results stay on this device. Services are used only when you request transcription or a summary.</Text>
