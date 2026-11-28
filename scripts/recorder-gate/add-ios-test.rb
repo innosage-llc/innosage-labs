@@ -10,6 +10,11 @@ folder = File.join(File.dirname(project_path), 'StartupGateUITests')
 FileUtils.mkdir_p(folder)
 sources = ['StartupGateTests.swift', 'StabilityWindow.swift', 'MarkdownGateTests.swift', 'LibraryImportTests.swift']
 sources.each { |name| FileUtils.cp(File.join(File.dirname(swift_source), name), File.join(folder, name)) }
+# This target is generated exclusively for Release Simulator verification.
+offline_fixture = 'LibraryOfflineFixture.mm'
+FileUtils.cp(File.join(File.dirname(swift_source), 'import-test', offline_fixture), File.join(folder, offline_fixture))
+fixture_group = project.main_group.new_group('LocalSimulatorFixture', 'StartupGateUITests')
+app.add_file_references([fixture_group.new_file(offline_fixture)])
 target = project.new_target(:ui_test_bundle, 'StartupGateUITests', :ios, '16.4')
 target.add_dependency(app)
 group = project.main_group.new_group('StartupGateUITests', 'StartupGateUITests')

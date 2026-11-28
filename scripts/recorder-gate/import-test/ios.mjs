@@ -15,43 +15,51 @@ export function observeIOSImport({ command, uuid, output, derived, fixture, forg
   const files = join(groups,providers[0],'File Provider Storage');
   mkdirSync(files, {recursive:true});
   for (const [name, bytes] of [['Labs146Tone.m4a',fixture], ['Labs146Forged.m4a',forged], ['Labs146Damaged.m4a',join(output,'damaged.m4a')]]) {
-    copyFileSync(bytes, join(files,name), 1);
+    const destination = join(files,name);
+    if (existsSync(destination)) requireThat(readFileSync(destination).equals(readFileSync(bytes)), 'unrelated Files fixture at target');
+    else copyFileSync(bytes,destination,1);
   }
   const products = join(derived,'Build/Products');
   const config = readdirSync(products).find(name => name.endsWith('.xctestrun'));
-  const recordings = join(sim('get_app_container',uuid,BUNDLE,'data'),'Documents/recordings');
-  const listing = () => existsSync(recordings) ? readdirSync(recordings).sort() : [];
+  const recordings = () => join(sim('get_app_container',uuid,BUNDLE,'data'),'Documents/recordings');
+  const listing = () => existsSync(recordings()) ? readdirSync(recordings()).sort() : [];
   const before = listing();
+  const runs = new Set();
   const test = name => {
     const result = join(output, name + '.xcresult');
     command('xcodebuild',['test-without-building','-xctestrun',join(products,config),'-destination','id='+uuid,
       '-parallel-testing-enabled','NO','-only-testing:StartupGateUITests/LibraryImportTests/'+name,'-resultBundlePath',result],{timeout:160000});
     const summary = JSON.parse(command('xcrun',['xcresulttool','get','test-results','summary','--path',result]));
     requireThat(summary.passedTests === 1 && summary.failedTests === 0 && summary.skippedTests === 0, 'Library XCTest incomplete');
+    const container = sim('get_app_container',uuid,BUNDLE,'data');
+    const net = JSON.parse(readFileSync(join(container,'Library/Caches/labs-library-http-observation.json'),'utf8'));
+    requireThat(typeof net.run === 'string' && !runs.has(net.run) && net.sentinelBlocked === true &&
+      net.offlineErrorObserved === true && net.blockedRequests === 0, 'missing isolated offline launch or unexpected HTTP request');
+    runs.add(net.run);
   };
   test('testCancelRepeatAndReject');
   requireThat(JSON.stringify(listing()) === JSON.stringify(before), 'cancel/rejection left a recording or sidecar');
-  const backup = recordings + '.library-test';
-  const hadDirectory = existsSync(recordings);
-  requireThat(!existsSync(backup), 'unexpected existing storage fixture');
-  if (hadDirectory) renameSync(recordings,backup);
+  const backup = () => recordings() + '.library-test';
+  const hadDirectory = existsSync(recordings());
+  requireThat(!existsSync(backup()), 'unexpected existing storage fixture');
+  if (hadDirectory) renameSync(recordings(),backup());
   const marker = 'Library Import storage fixture';
   try {
-    writeFileSync(recordings,marker,{flag:'wx'});
+    writeFileSync(recordings(),marker,{flag:'wx'});
     test('testFailedSave');
   } finally {
-    if (existsSync(recordings) && readFileSync(recordings,'utf8') === marker) unlinkSync(recordings);
-    if (hadDirectory) renameSync(backup,recordings);
+    if (existsSync(recordings()) && readFileSync(recordings(),'utf8') === marker) unlinkSync(recordings());
+    if (hadDirectory) renameSync(backup(),recordings());
   }
   test('testRetry');
   const additions = listing().filter(name => !before.includes(name));
   const id = additions.find(name => /^Import-.+\.m4a$/.test(name));
   requireThat(id && additions.length === 2 && additions.includes(id + '.name'), 'expected exactly one new audio/label pair');
   const digest = sha(readFileSync(fixture));
-  const verify = () => requireThat(sha(readFileSync(join(recordings,id))) === digest &&
-    readFileSync(join(recordings,id + '.name'),'utf8') === 'Labs146Tone.m4a','import identity or bytes changed');
+  const verify = () => requireThat(sha(readFileSync(join(recordings(),id))) === digest &&
+    readFileSync(join(recordings(),id + '.name'),'utf8') === 'Labs146Tone.m4a','import identity or bytes changed');
   verify();
   test('testColdPlayback');
   verify();
-  return {id,sha256:digest,cases:['cancel','repeat','forged','save-failure','retry','cold-playback']};
+  return {id,sha256:digest,offline:'Simulator Recorder HTTP transport',offlineLaunches:runs.size,cases:['cancel','repeat','forged','save-failure','retry','offline-playback']};
 }

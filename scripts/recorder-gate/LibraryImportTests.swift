@@ -7,6 +7,7 @@ final class LibraryImportTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        app.launchEnvironment["RECORDER_LIBRARY_OFFLINE_RUN"] = UUID().uuidString
         app.launch()
         let tab = app.buttons.matching(NSPredicate(format: "label IN %@", ["Library", "folder"])).firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 12))

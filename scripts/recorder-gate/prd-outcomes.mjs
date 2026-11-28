@@ -15,9 +15,9 @@ export const contracts = {
       'scripts/fixtures/library-import.mjs','scripts/fixtures/recorder-test-tone.m4a','package.json','package-lock.json','app.config.js','app.json',
       'modules/recorder-media-probe/','scripts/library-import-web.mjs'],
     adapters: {
-      android:['ui/AppChrome.tsx','mediaLibrary.ts','modules/recorder-media-probe/android/'],
+      android:['ui/RootShell.tsx','ui/AppChrome.tsx','mediaLibrary.ts','modules/recorder-media-probe/android/'],
       ios:['ui/RootShell.ios.tsx','mediaLibrary.ts','modules/recorder-media-probe/ios/'],
-      web:['ui/AppChrome.web.tsx','mediaLibrary.web.ts','localFiles.web.ts'],
+      web:['ui/RootShell.tsx','ui/AppChrome.web.tsx','mediaLibrary.web.ts','localFiles.web.ts'],
     },
   },
 };
@@ -87,6 +87,8 @@ export function verifyOutcome(receipt, platform, candidate, artifact) {
     receipt.artifact === artifact?.sha256 && /^[0-9a-f]{64}$/.test(receipt.artifact), 'outcome evidence missing or stale');
   requireThat(receipt.outcome === 'library-import' && /^Import-\d+-[a-f0-9-]+\.m4a$/.test(receipt.id) &&
     receipt.sha256 === '07b0d24a10e960aa9b45bfff066318cd946da98d521d39b2ad2e51f8575fecb7', 'Library identity or fixture digest missing');
-  const cases = ['cancel','repeat','forged','save-failure','retry', platform === 'ios' ? 'cold-playback' : 'offline-playback'];
+  if (platform === 'ios') requireThat(receipt.offline === 'Simulator Recorder HTTP transport' && receipt.offlineLaunches === 4,
+    'missing Simulator network failure controls');
+  const cases = ['cancel','repeat','forged','save-failure','retry', 'offline-playback'];
   requireThat(cases.every(test => receipt.cases?.includes(test)), 'incomplete Library entry scenarios');
 }
