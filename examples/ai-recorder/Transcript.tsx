@@ -1,3 +1,4 @@
+import { clearPendingOpenAI, readPendingOpenAI, stagePendingOpenAI } from './pendingOpenAI';
 import { commitCompletion } from './completionStorage';
 import { withRecordingSubmission } from './recordingCoordination';
 import { verifyTranscriptionMedia } from './mediaLibrary';
@@ -81,6 +82,8 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const [usePro, setUsePro] = useState(false);
   const [proAvailable, setProAvailable] = useState(false);
   const [proDenied, setProDenied] = useState(false);
+  const preparation = useRef<AbortController | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const submission = useRef<AbortController | null>(null);
   const [identifySpeakers, setIdentifySpeakers] = useState(false);
   const [job, setJob] = useState<Job>();
@@ -222,6 +225,16 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         return;
       }
       if (restoredService === 'openai') {
+        let pendingText: string | undefined;
+        try { pendingText = saved?.id && await readPendingOpenAI(recording, saved.id); }
+        catch (error) {
+          if (active) setMessage(error instanceof Error ? error.message : 'Could not recover the returned transcript.');
+          return;
+        }
+        if (pendingText) {
+          if (active) { setUnsavedOpenAI(pendingText); setServiceReady(true); setMessage('Transcript received. Retry saving it on this device.'); }
+          return;
+        }
         const configured = await openAIAccess.profile();
         if (active) { setOpenAIConfigured(configured); setServiceReady(true); }
       } else {
@@ -238,7 +251,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         ? error.message : Platform.OS === 'ios' ? 'Could not read the transcription settings.' : 'Could not connect. Retry when online.');
     })
       .finally(() => { if (active) setConnecting(false); });
-    return () => { active = false; submission.current?.abort(); };
+    return () => { active = false; preparation.current?.abort(); submission.current?.abort(); };
   }, [operationKey, restoreAttempt]);
 
   async function request(free: FreeOperation | LegacyFreeOperation | undefined, upload: boolean, signal: AbortSignal | undefined, paid: ProOperation | undefined, onTransfer?: () => void) {
@@ -359,7 +372,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     const startingPro = !isOpenAI && usePro && (!operation || terminalJob);
     setBusy(true);
     setMessage('');
-    const controller = new AbortController();
+    const controller = preparation.current ?? new AbortController();
     submission.current = controller;
     let openAIRequestStarted = false;
     let serviceRequestStarted = false;
@@ -367,6 +380,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     let paidTransferStarted = false;
     try {
       const alreadySaved = await committedResult();
+      controller.signal.throwIfAborted();
       if (alreadySaved) {
         await showCompletion(alreadySaved);
         return;
@@ -376,16 +390,25 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           throw new Error('Choose a non-empty M4A recording smaller than 25 MB.');
         }
         const id = operation ?? randomUUID();
-        await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
+        const pendingText = unsavedOpenAI ?? await readPendingOpenAI(recording, id);
+        controller.signal.throwIfAborted();
+        if (!pendingText) {
+          await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
+          controller.signal.throwIfAborted();
+        }
         setOperation(id);
-        openAIRequestStarted = !unsavedOpenAI;
-        const transcript = unsavedOpenAI ?? await openAIAccess.transcribe(recording, controller.signal);
+        openAIRequestStarted = !pendingText;
+        const transcript = pendingText ?? await openAIAccess.transcribe(recording, controller.signal);
+        // Once the provider returns text, finish local persistence even if the view closes.
+        openAIRequestStarted = false;
         setUnsavedOpenAI(transcript);
         try {
+          await stagePendingOpenAI(recording, id, transcript);
           await persistResult({ state: 'COMPLETED', transcript });
         } catch {
           throw new Error('Transcription is ready. Retry saving before closing this screen.');
         }
+        await clearPendingOpenAI(recording);
         setUnsavedOpenAI(undefined);
         return;
       }
@@ -422,6 +445,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           }
         }
         const existing = terminalJob ? undefined : freeOperation;
+        controller.signal.throwIfAborted();
         const guest = existing ? await restoreGateway(existing) : await connectGateway(service);
         controller.signal.throwIfAborted();
         free = { lane: 'free', id: existing?.id ?? randomUUID(), identifySpeakers: existing?.identifySpeakers ?? identifySpeakers,
@@ -510,16 +534,26 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   }
 
   async function requestSubmission() {
+    if (preparation.current || submission.current || busy || connecting || !serviceReady) return;
+    const controller = new AbortController();
+    preparation.current = controller;
+    setPreparing(true);
     try {
       await withRecordingSubmission(operationKey, operation, async () => {
-        if (!await verifyTranscriptionMedia(recording)) {
+        controller.signal.throwIfAborted();
+        if (!unsavedOpenAI && !await verifyTranscriptionMedia(recording, controller.signal)) {
+          controller.signal.throwIfAborted();
           setMessage('Choose a supported M4A audio file to transcribe.');
           return;
         }
+        controller.signal.throwIfAborted();
+        setPreparing(false);
         await submit();
       });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not prepare the recording for transcription.');
+      if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'Could not prepare the recording for transcription.');
+    } finally {
+      if (preparation.current === controller) { preparation.current = null; setPreparing(false); }
     }
   }
 
@@ -562,7 +596,8 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
 
   const canGoBack = canLeaveTranscript(busy, summaryLocked, !!unsavedOpenAI);
   function requestClose() {
-    if (!canGoBack) return;
+    if (!canGoBack || submission.current) return;
+    preparation.current?.abort();
     const goBack = () => {
       if (readerLayout && showSummaryTools) setShowSummaryTools(false);
       else if (readerLayout && showOriginal) setShowOriginal(false);
@@ -622,7 +657,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         <Text style={{ color: palette.muted }}>{operation ? 'This job keeps its original service.' : 'Change your default service in Settings for new transcriptions.'}</Text>
       </> : null}
       <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
-      {busy || connecting ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
+      {busy || connecting || preparing ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
         <ActionButton title="Retry" variant="primary" onPress={retryService} />
       ) : (openAIConfigured || unsavedOpenAI) ? (
         <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={requestSubmission} />
@@ -633,7 +668,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   ) : (
     <InnoSageTranscriptAction
       serviceLabel={services[service].label}
-      loading={connecting}
+      loading={connecting || preparing}
       serviceReady={serviceReady}
       canUseFree={canUseFree}
       supportsPro={supportsProUpload}

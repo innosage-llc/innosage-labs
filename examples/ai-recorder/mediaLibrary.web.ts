@@ -2,9 +2,11 @@ import { hasMP4AudioTrack } from './m4aDuration';
 import { getDocumentAsync } from 'expo-document-picker';
 import { File, recordings, storeAudio } from './localFiles.web';
 
-export async function verifyTranscriptionMedia(file: Blob) {
+export async function verifyTranscriptionMedia(file: Blob, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const audioTrack = await hasMP4AudioTrack(file.size, async (offset, length) =>
     new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()));
+  signal?.throwIfAborted();
   if (!audioTrack) return false;
   // A movie header can declare an audio track and positive duration while the
   // payload has no readable samples. Verify local muted decode, without ever
@@ -15,7 +17,8 @@ export async function verifyTranscriptionMedia(file: Blob) {
   const uri = URL.createObjectURL(file);
   try {
     return await new Promise<boolean>(resolve => {
-      const finish = (valid: boolean) => { clearTimeout(timeout); clearInterval(interval); resolve(valid); };
+      const abort = () => finish(false);
+      const finish = (valid: boolean) => { clearTimeout(timeout); clearInterval(interval); signal?.removeEventListener('abort', abort); resolve(valid); };
       const check = () => {
         const decoded = (media as HTMLAudioElement & { webkitAudioDecodedByteCount?: number }).webkitAudioDecodedByteCount;
         const hasSamples = decoded === undefined ? media.buffered.length > 0 : decoded > 0;
@@ -24,6 +27,8 @@ export async function verifyTranscriptionMedia(file: Blob) {
       };
       const timeout = setTimeout(() => finish(false), 5000);
       const interval = setInterval(check, 50);
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) { abort(); return; }
       media.onended = check;
       media.onerror = () => finish(false);
       media.src = uri;

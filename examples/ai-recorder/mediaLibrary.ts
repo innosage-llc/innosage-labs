@@ -5,7 +5,7 @@ import { randomUUID } from 'expo-crypto';
 const recordings = new Directory(Paths.document, 'recordings');
 
 // Native Recorder sources are managed by the platform file adapter.
-export async function verifyTranscriptionMedia(_file: File) { return true; }
+export async function verifyTranscriptionMedia(_file: File, _signal?: AbortSignal) { return true; }
 
 export function listRecordings() {
   if (!recordings.exists) return [];

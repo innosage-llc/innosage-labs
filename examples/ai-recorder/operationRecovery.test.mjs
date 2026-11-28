@@ -62,7 +62,7 @@ test('status reads retain authorization guidance and treat speaker denial as ter
     const state = { busy: false, message: '', unknown: false, job: undefined };
     const dependencies = {
       freeOperation: undefined, paidOperation: { id: 'synthetic-operation' },
-      busy: false, submission: { current: null },
+      busy: false, preparation: { current: null }, submission: { current: null },
       request: async () => { throw denied; }, pending: new Set(),
       setBusy: value => { state.busy = value; },
       setMessage: value => { state.message = value; },
@@ -156,7 +156,7 @@ test('Free submission checks known limits and binds access before upload', async
     const prior = { lane: 'free', id: operationId, identifySpeakers: true, ...guest };
     const dependencies = {
       service, connecting: false, supportsProUpload: true, usePro: false, serviceReady: true,
-      submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
+      preparation: { current: null }, submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
       operation: resumed ? operationId : undefined, freeOperation: resumed ? prior : undefined,
       paidOperation: undefined, job: state ? { state } : undefined, identifySpeakers: false,
       committedResult: async () => undefined, recording: { name: 'fixture.m4a', size },
@@ -219,7 +219,7 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
     const prior = previous ? { lane: 'pro', id: 'original-operation' } : undefined;
     const dependencies = {
       connecting: false, supportsProUpload: true, usePro: true, serviceReady: true,
-      submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
+      preparation: { current: null }, submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
       operation: prior?.id, paidOperation: prior, job, identifySpeakers: false,
       committedResult: async () => undefined, recording: { name: 'fixture.m4a', size: 1234 },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
