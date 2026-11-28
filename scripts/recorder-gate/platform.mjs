@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { artifact, sha, changedPaths, requireThat, writeJSON } from './core.mjs';
-import { run, runAsync, validateIntegration, sourceIdentity, cli, loadCandidate, outDir, appPath } from './host.mjs';
+import { root, run, runAsync, validateIntegration, sourceIdentity, cli, loadCandidate, outDir, appPath } from './host.mjs';
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
 import { observeNativeMarkdown, requiresNativeMarkdown } from './native-markdown.mjs';
@@ -102,5 +102,7 @@ export async function platformGate({ platform, source, candidate, output, target
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const o = cli(process.argv.slice(2), ['platform', 'source', 'candidate', 'output', 'android', 'ios-runtime', 'fault']);
-  platformGate({ platform: o.platform, source: resolve(o.source), candidate: loadCandidate(o.candidate), output: outDir(o.output), targets: { android: o.android, iosRuntime: o['ios-runtime'] }, fault: o.fault }).catch(e => { console.error(e.message); process.exitCode = 1; });
+  const source = realpathSync(resolve(o.source));
+  requireThat(source === realpathSync(root), 'run the platform observer from the retained integration checkout');
+  platformGate({ platform: o.platform, source, candidate: loadCandidate(o.candidate), output: outDir(o.output), targets: { android: o.android, iosRuntime: o['ios-runtime'] }, fault: o.fault }).catch(e => { console.error(e.message); process.exitCode = 1; });
 }

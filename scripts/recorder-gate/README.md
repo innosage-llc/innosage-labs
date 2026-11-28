@@ -62,7 +62,8 @@ Recorder source/dependencies/build inputs/gates and unknown paths run all three.
 Changes affecting iOS Markdown also require a native Files receipt. With dependencies cached, replay the iOS portion offline against the retained detached integration worktree and its candidate manifest. The command checks the worktree tree, ordered base/head parents and recomputed merge tree before using the diff to select cases.
 
 ```sh
-node scripts/recorder-gate/platform.mjs --platform ios --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/ios-markdown-new --ios-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
+source=/absolute/path/to/retained-integration-checkout
+node "$source/scripts/recorder-gate/platform.mjs" --platform ios --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/ios-markdown-new --ios-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
 ```
 
 The Files test targets iPhone 17 Pro with the iOS 27.2 Simulator runtime and English (United States) accessibility labels. Run on a host whose fresh Simulator uses those labels. Other runtime and locale combinations are unqualified. The test cancels and retries the native sheet, saves to On My iPhone and reads the resulting Markdown bytes from the system Files provider. It uses only the repository’s synthetic data.
@@ -72,9 +73,10 @@ The Files test targets iPhone 17 Pro with the iOS 27.2 Simulator runtime and Eng
 After the canonical command creates/installs dependencies in its retained exact candidate worktree, single-platform diagnostics can use:
 
 ```sh
-node scripts/recorder-gate/platform.mjs --platform android --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/android-red-new --android emulator-5554 --fault terminate
-node scripts/recorder-gate/platform.mjs --platform ios --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/ios-red-new --ios-runtime <runtime> --fault terminate
-node scripts/recorder-gate/platform.mjs --platform web --source <retained-candidate-source> --candidate /tmp/labs-candidate.json --output /tmp/web-red-new --fault missing-entry
+source=/absolute/path/to/retained-integration-checkout
+node "$source/scripts/recorder-gate/platform.mjs" --platform android --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/android-red-new --android emulator-5554 --fault terminate
+node "$source/scripts/recorder-gate/platform.mjs" --platform ios --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/ios-red-new --ios-runtime <runtime> --fault terminate
+node "$source/scripts/recorder-gate/platform.mjs" --platform web --source "$source" --candidate /tmp/labs-candidate.json --output /tmp/web-red-new --fault missing-entry
 ```
 
 Termination is scheduled within the ready observation window. Web returns HTTP 200 for the real index but intercepts the entry script with HTTP 404. A valid red-control receipt must be nonzero/FAIL **and** `fault.applied: true`; a generic missing-target failure is not proof of an injected red control. The merge path accepts no fault/skip options and always runs fresh positive checks.
