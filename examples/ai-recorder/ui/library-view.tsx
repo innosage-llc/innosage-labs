@@ -171,10 +171,10 @@ export function LibraryView({
                         {
                           color: palette.muted,
                           fontVariant: ['tabular-nums'],
-                          marginLeft: 'auto',
+                          marginLeft: ios ? undefined : 'auto',
                           flexShrink: 0,
                           maxWidth: '100%',
-                          textAlign: 'right',
+                          textAlign: ios ? 'left' : 'right',
                         },
                       ]}
                     >
