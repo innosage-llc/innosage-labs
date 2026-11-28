@@ -61,5 +61,5 @@ export function observeIOSImport({ command, uuid, output, derived, fixture, forg
   verify();
   test('testColdPlayback');
   verify();
-  return {id,sha256:digest,offline:'Simulator Recorder HTTP transport',offlineLaunches:runs.size,cases:['cancel','repeat','forged','save-failure','retry','offline-playback']};
+  return {id,sha256:digest,offline:'Simulator Recorder HTTP transport',offlineLaunches:runs.size,cases:['cancel','repeat','forged','damaged','save-failure','retry','offline-playback']};
 }

@@ -58,8 +58,7 @@ export function requiredOutcomes(source, candidate, paths) {
   for (const [key,contract] of Object.entries(contracts)) {
     const files = [contract.entry,...contract.policy,...contract.inputs,...Object.values(contract.adapters).flat()];
     if (paths.some(path => files.some(file => file.endsWith('/') ? path.startsWith(app+file) : path === app+file)) ||
-        paths.some(path => path.startsWith('scripts/recorder-gate/import-test/') || path.startsWith('scripts/recorder-gate/prd-outcomes') ||
-          path === 'scripts/recorder-gate/LibraryImportTests.swift')) required.add(key);
+        paths.some(path => path.startsWith('scripts/recorder-gate/') || path === 'scripts/auto-merge-ci.mjs')) required.add(key);
     for (const file of files) requireThat(existsSync(join(source,app,file)), 'missing outcome source: '+file);
     for (const [platform, adapters] of Object.entries(contract.adapters)) {
       for (const file of [contract.entry, ...adapters].filter(name => /\.tsx?$/.test(name))) {
@@ -89,6 +88,6 @@ export function verifyOutcome(receipt, platform, candidate, artifact) {
     receipt.sha256 === '07b0d24a10e960aa9b45bfff066318cd946da98d521d39b2ad2e51f8575fecb7', 'Library identity or fixture digest missing');
   if (platform === 'ios') requireThat(receipt.offline === 'Simulator Recorder HTTP transport' && receipt.offlineLaunches === 4,
     'missing Simulator network failure controls');
-  const cases = ['cancel','repeat','forged','save-failure','retry', 'offline-playback'];
+  const cases = ['cancel','repeat','forged','damaged','save-failure','retry', 'offline-playback'];
   requireThat(cases.every(test => receipt.cases?.includes(test)), 'incomplete Library entry scenarios');
 }

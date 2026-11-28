@@ -129,4 +129,4 @@ tap('Play '+label)
 find('Elapsed 0:03')
 assert storage('inspect') == first
 (out/'library-android.json').write_text(json.dumps({'id':first['id'],'sha256':expected,'airplaneMode':True,
-    'cases':['cancel','repeat','forged','save-failure','retry','offline-playback']}))
+    'cases':['cancel','repeat','forged','damaged','save-failure','retry','offline-playback']}))

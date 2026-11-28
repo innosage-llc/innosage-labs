@@ -99,5 +99,5 @@ try {
   assert.deepEqual(await saved(cold), rows);
   assert.deepEqual(outbound, []);
   await writeFile(join(out,'library-web.json'), JSON.stringify({id, sha256:digest, chooserCount:choosers,
-    artifact:server.artifact.sha256, browser:browser.version(), cases:['cancel','repeat','forged','save-failure','retry','offline-playback']}));
+    artifact:server.artifact.sha256, browser:browser.version(), cases:['cancel','repeat','forged','damaged','save-failure','retry','offline-playback']}));
 } finally { await browser.close(); await server.close(); }
