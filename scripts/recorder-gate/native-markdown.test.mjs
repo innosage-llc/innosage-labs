@@ -49,3 +49,15 @@ test('standalone replay rejects observers outside the retained source before rea
     assert.match(result.stderr, /run the platform observer from the retained integration checkout/);
   } finally { rmSync(source, { recursive: true, force: true }); }
 });
+
+test('canonical entry rejects a stale launcher before querying GitHub or running any observations', () => {
+  const temp = mkdtempSync(join(tmpdir(), 'recorder-stale-launch-'));
+  try {
+    const manifest = join(temp, 'candidate.json');
+    writeFileSync(manifest, JSON.stringify({ ...candidate, draft: true }));
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./run.mjs', import.meta.url)),
+      '--candidate', manifest, '--output', join(temp, 'receipt')], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /launch the local gate from the exact PR head/);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});

@@ -18,7 +18,7 @@ node scripts/auto-merge-ci.mjs --repo innosage-llc/innosage-labs --pr <PR> --hea
 
 Preparation requires a clean checkout at that PR head. It verifies GitHub's PR/current-main identities, fetches into this repository, and uses Git's real merge-tree result. Conflicts fail. The deterministic local integration commit has exactly `[current-main, PR-head]` as parents. It is a local test commit, not a published PR head or an actual merge. No old green receipt is imported or reused. Reconcile the PR if base changes the gate scripts, or if head/base advances; prepare and review the updated candidate.
 
-Run the canonical CI/startup-only command (it has no merge capability):
+Run the canonical CI/startup-only command from the clean PR head. It loads the applicable CI and platform observers from the retained integration checkout.
 
 ```sh
 node scripts/recorder-gate/run.mjs --candidate /tmp/labs-candidate.json --output /tmp/labs-gate-new-run --android emulator-5554 --ios-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-2
