@@ -3,6 +3,9 @@ const { staging, production } = require('./recorder-free-targets.json');
 module.exports = ({ config }) => {
   const parityRelease = process.env.RECORDER_PARITY_ANDROID_RELEASE === '1';
   const stagingRelease = process.env.RECORDER_STAGING_ANDROID_RELEASE === '1';
+  if (process.env.EXPO_PUBLIC_RECORDER_VOICE_PROFILES === 'true' && !stagingRelease) {
+    throw new Error('Voice profiles require an explicitly staged Recorder Android candidate.');
+  }
   if (stagingRelease && (parityRelease || process.env.EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL)) {
     throw new Error('The Recorder Staging-only Android release must exclude the Production Free gateway.');
   }

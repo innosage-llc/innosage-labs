@@ -13,3 +13,15 @@ export async function uploadRecording(
 ): Promise<void> {
   throw new Error('InnoSage Pro uploads require Android. On iOS, choose OpenAI direct or the Free gateway.');
 }
+
+export async function clipConfirmedRecording(
+  _original: { uri: string; size: number; sha256: string },
+  _startMs: number, _endMs: number, _signal?: AbortSignal,
+): Promise<{bytes: Uint8Array; mimeType: "audio/wav"}> {
+  throw new Error('Confirmed voice clips are only available on Android.');
+}
+
+export async function uploadMatch(_tap:string,_capability:string,_uri:string,
+  _source:import('./DeviceSpeakerMatch').MatchSource, _signal:AbortSignal): Promise<void> {
+  throw new Error('Saved recording matching requires the Stage Android build.');
+}

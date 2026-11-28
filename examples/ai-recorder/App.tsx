@@ -7,6 +7,7 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { Transcript } from './Transcript';
+import { removeOrphanedMatchFiles } from './SavedSpeakerMatch';
 import { recordingDurationMillis } from './NativeUpload';
 import { ProSettings } from './ProSettings';
 import { RootShell } from './ui/RootShell';
@@ -88,6 +89,11 @@ function RecorderScreen() {
   const [destination, setDestination] = useState<RootDestination>('record');
   const [showPro, setShowPro] = useState(false);
   const [files, setFiles] = useState(listRecordings);
+  useEffect(() => {
+    if (Platform.OS === 'android' && recordings?.exists) {
+      try { removeOrphanedMatchFiles(recordings); } catch { /* Retry on the next library refresh. */ }
+    }
+  }, [files]);
   const [recordingDurations, setRecordingDurations] = useState(() => new Map<string, number | undefined>());
   const durationRequests = useRef(new Map<string, Promise<number | undefined>>());
   const fileSummaries = useMemo(() => summarizeRecordings(files), [files]);

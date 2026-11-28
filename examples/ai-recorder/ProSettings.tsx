@@ -1,18 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from "react-native";
 import { Host, ListItem, Text as NativeText, TextInput, useNativeState } from "@expo/ui";
 import { ServiceChoice } from "./ServiceChoice";
 import { gatewayAvailable } from "./GatewayConnection";
 import { supportsProUpload } from "./NativeUpload";
-import { clientForService, selectedService, selectService } from "./ProAccess";
+import { clientForService, selectedService, selectService, voiceProfileManagerForStage } from "./ProAccess";
 import { openAIAccess } from "./OpenAIAccess";
 import { services, type ServiceId } from "./ServiceConfig";
+import { voiceProfileStageEnabled } from "./VoiceProfileFlow";
 import { DetailShell } from "./ui/DetailShell";
 import { ActionButton } from "./ui/ActionButton";
 import { useTheme } from "./ui/theme";
+import { VoiceProfileManager } from "./ui/voice-profile/voice-profile-manager";
 
 function accessFor(id: ServiceId) {
   return id === 'openai' ? openAIAccess : clientForService(id);
+}
+
+function canManageVoiceProfiles(service: ServiceId) {
+  return Platform.OS === "android" && service === "staging" && supportsProUpload && voiceProfileStageEnabled(service);
+}
+
+function voiceProfileScope(service: ServiceId, profile: unknown) {
+  if (!canManageVoiceProfiles(service) || !profile || typeof profile !== "object" || !("accountScope" in profile)) return;
+  const { accountScope } = profile;
+  if (typeof accountScope === "string" && /^[a-f0-9]{64}$/.test(accountScope)) return accountScope;
 }
 
 export function ProSettings({ onClose }: { onClose: () => void }) {
@@ -28,17 +40,31 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   const canConfigureKey = isOpenAI || supportsProUpload;
   const [hasKey, setHasKey] = useState(false);
   const [configured, setConfigured] = useState(false);
+  const [accountScope, setAccountScope] = useState<string>();
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
+  const voiceProfiles = useMemo(() => {
+    if (accountScope && canManageVoiceProfiles(service)) return voiceProfileManagerForStage(accountScope);
+  }, [accountScope, service]);
   useEffect(() => {
     let active = true;
     void selectedService().then(async id => {
       const profile = await accessFor(id).profile();
-      if (active) { setService(id); setConfigured(!!profile); }
+      if (active) {
+        setService(id);
+        setConfigured(!!profile);
+        setAccountScope(voiceProfileScope(id, profile));
+      }
     }).catch(() => { if (active) setMessage("Could not read the transcription settings."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, []);
+  async function refreshAccountScope() {
+    if (canManageVoiceProfiles(service)) {
+      const profile = await access.profile().catch(() => undefined);
+      setAccountScope(voiceProfileScope(service, profile));
+    }
+  }
   async function changeService(id: ServiceId) {
     if (busy || working.current || id === service) return;
     working.current = true;
@@ -51,6 +77,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
       await selectService(id);
       setService(id);
       setConfigured(!!profile);
+      setAccountScope(voiceProfileScope(id, profile));
       setMessage("Default saved for new transcriptions. Existing jobs keep their service.");
     } catch {
       setMessage("Could not change service. Previous selection retained.");
@@ -61,6 +88,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     working.current = true;
     setBusy(true);
     setMessage("");
+    setAccountScope(undefined);
     try {
       await access.configure(key.get());
       key.set("");
@@ -74,6 +102,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
           : "Could not validate transcription access.",
       );
     } finally {
+      await refreshAccountScope();
       working.current = false;
       setBusy(false);
     }
@@ -82,12 +111,14 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     if (busy || working.current) return;
     working.current = true;
     setBusy(true);
+    setAccountScope(undefined);
     try {
       await access.remove();
       setConfigured(false);
       setMessage("Key removed from this device.");
     } catch {
       setMessage("Could not remove the saved key.");
+      await refreshAccountScope();
     } finally {
       working.current = false;
       setBusy(false);
@@ -96,6 +127,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
   function goBack() {
     if (busy || working.current) return;
     if (!managingKeys) {
+      setAccountScope(undefined);
       onClose();
       return;
     }
@@ -181,7 +213,10 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
               {message}
             </Text>
           ) : null}
-
+          {!busy && configured && voiceProfiles ? (
+            <VoiceProfileManager key={accountScope} onRestore={voiceProfiles.restore} onList={voiceProfiles.list}
+              onEnroll={voiceProfiles.enroll} onDelete={voiceProfiles.delete} />
+          ) : null}
         </ScrollView>
         </KeyboardAvoidingView>
       </DetailShell>

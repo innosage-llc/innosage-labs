@@ -3,11 +3,13 @@ package co.innosage.recorderupload
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import expo.modules.kotlin.functions.Coroutine
+import expo.modules.kotlin.jni.NativeArrayBuffer
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.ByteBuffer
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -17,6 +19,7 @@ class RecorderUploadModule : Module() {
   private val destroyed = AtomicBoolean(false)
   private val connections = ConcurrentHashMap<String, HttpURLConnection>()
   private val cancelled = ConcurrentHashMap.newKeySet<String>()
+  private val clipping = AtomicBoolean(false)
 
   private fun localRecording(uri: String): File {
     val parsed = Uri.parse(uri)
@@ -66,6 +69,103 @@ class RecorderUploadModule : Module() {
           null // No reliable local duration. The server still validates the decoded audio.
         } finally {
           metadata.release()
+        }
+      }
+    }
+
+    AsyncFunction("clipConfirmedRecording") Coroutine { id: String, uri: String, expectedBytes: Double,
+                                                        expectedSha256: String, startMs: Double, endMs: Double ->
+      withContext(Dispatchers.IO) {
+        require(Regex("^[a-f0-9-]{36}$").matches(id))
+        require(listOf(expectedBytes, startMs, endMs).all { it.isFinite() && it.toLong().toDouble() == it })
+        check(clipping.compareAndSet(false, true))
+        try {
+          val clip = ExactVoiceClip.read(requireNotNull(appContext.reactContext).filesDir, uri, expectedBytes.toLong(),
+            expectedSha256, startMs.toLong(), endMs.toLong()) { destroyed.get() || cancelled.contains(id) }
+          NativeArrayBuffer.copyOf(ByteBuffer.wrap(clip))
+        } catch (_: Exception) {
+          throw IllegalStateException("Could not clip the selected recording interval")
+        } finally {
+          clipping.set(false)
+        }
+      }
+    }
+
+    AsyncFunction("matchUpload") Coroutine { id: String, tap: String, capability: String, uri: String, metadata: String ->
+      withContext(Dispatchers.IO) {
+        require(Regex("dm_[0-9]{10}_[a-f0-9]{32}").matches(tap) && Regex("[a-f0-9]{64}").matches(capability))
+        val root = File(requireNotNull(appContext.reactContext).filesDir.canonicalFile, "recordings")
+        val source = localRecording(uri)
+        require(root.canonicalFile == root && source.parentFile == root &&
+          Regex("(?:Recording|Import)-[0-9]+-[a-f0-9-]{36}\\.m4a").matches(source.name))
+        val sidecar = File(root, source.name + ".match.sidecar")
+        val data = org.json.JSONObject(metadata)
+        val digest = Regex("[a-f0-9]{64}")
+        val originalBytes = data.getLong("originalBytes")
+        val sidecarBytes = data.getLong("sidecarBytes")
+        require(originalBytes in 1..512L*1024*1024 && sidecarBytes in 1..16L*1024*1024)
+        require(digest.matches(data.getString("originalSha256")) && digest.matches(data.getString("sidecarSha256")))
+        require(Regex("tx_[A-Za-z0-9_-]{16,64}").matches(data.getString("recordingId")))
+        require(Regex("v1\\.[A-Za-z0-9_-]{1,1536}(?:\\.[A-Za-z0-9_-]{43}){2}").matches(data.getString("receipt")))
+        val url = URL("https://rd.innosage.co:8443/v1/device-speaker-matches/$tap/upload")
+        val connection = url.openConnection() as HttpURLConnection
+        fun checkpoint() = check(!destroyed.get() && !cancelled.contains(id))
+        fun openPrivate(file: File, bytes: Long): java.io.FileInputStream {
+          val fd = android.system.Os.open(file.path, android.system.OsConstants.O_RDONLY or
+            android.system.OsConstants.O_NOFOLLOW or android.system.OsConstants.O_NONBLOCK, 0)
+          try {
+            val stat = android.system.Os.fstat(fd)
+            require(android.system.OsConstants.S_ISREG(stat.st_mode) && stat.st_nlink == 1L &&
+              stat.st_uid == android.os.Process.myUid() && stat.st_size == bytes)
+            return android.os.ParcelFileDescriptor.AutoCloseInputStream(android.os.ParcelFileDescriptor.dup(fd))
+          } finally {
+            android.system.Os.close(fd)
+          }
+        }
+        connections[id] = connection
+        try {
+          connection.instanceFollowRedirects = false
+          connection.requestMethod = "POST"
+          connection.connectTimeout = 10_000
+          connection.readTimeout = 120_000
+          connection.doOutput = true
+          connection.setFixedLengthStreamingMode(originalBytes + sidecarBytes)
+          connection.setRequestProperty("Content-Type","application/octet-stream")
+          connection.setRequestProperty("Authorization","Bearer $capability")
+          val fields = mapOf("recordingId" to "Recording-Id","receipt" to "Match-Receipt",
+            "originalBytes" to "Original-Bytes","sidecarBytes" to "Sidecar-Bytes",
+            "originalSha256" to "Original-Sha256","sidecarSha256" to "Sidecar-Sha256")
+          fields.forEach { (key, header) -> connection.setRequestProperty("X-Recorder-$header",data.get(key).toString()) }
+          openPrivate(sidecar,sidecarBytes).use { labels ->
+            openPrivate(source,originalBytes).use { audio ->
+              val buffer = ByteArray(64*1024)
+              // Bind both open files before sending any bytes, including after local replacement.
+              fun copy(input: java.io.FileInputStream, output: java.io.OutputStream?, expected: String) {
+                val hash = java.security.MessageDigest.getInstance("SHA-256")
+                while (true) {
+                  checkpoint()
+                  val n = input.read(buffer)
+                  if (n < 0) break
+                  hash.update(buffer,0,n)
+                  output?.write(buffer,0,n)
+                }
+                check(hash.digest().joinToString("") { "%02x".format(it) } == expected)
+              }
+              copy(labels,null,data.getString("sidecarSha256"))
+              copy(audio,null,data.getString("originalSha256"))
+              labels.channel.position(0)
+              audio.channel.position(0)
+              checkpoint()
+              connection.outputStream.use { output ->
+                copy(labels,output,data.getString("sidecarSha256"))
+                copy(audio,output,data.getString("originalSha256"))
+              }
+            }
+          }
+          connection.responseCode
+        } finally {
+          connections.remove(id)
+          connection.disconnect()
         }
       }
     }

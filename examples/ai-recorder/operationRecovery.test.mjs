@@ -214,6 +214,7 @@ test('Pro denial offers Free only before transfer on a fresh attempt', async () 
       connecting: false, supportsProUpload: true, usePro: true, serviceReady: true,
       submission: { current: null }, busy: false, isOpenAI: false, statusUnknown: false,
       operation: prior?.id, paidOperation: prior, job, identifySpeakers: false,
+      canOfferVoiceProfiles: false, matchVoiceProfiles: false, setMatchVoiceProfiles() {},
       committedResult: async () => undefined, recording: { size: 1234 },
       terminal: new Set(['FAILED', 'CANCELLED', 'CLEANED', 'EXPIRED']),
       proClient: {

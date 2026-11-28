@@ -4,6 +4,7 @@ import type { File } from "expo-file-system";
 
 type UploadModule = {
   recordingDurationMillis(uri: string): Promise<number | null>;
+  clipConfirmedRecording(id: string, uri: string, expectedBytes: number, expectedSha256: string, startMs: number, endMs: number): Promise<ArrayBuffer>;
   upload(
     id: string,
     url: string,
@@ -54,3 +55,46 @@ export async function uploadRecording(
 }
 
 export const supportsProUpload = true;
+
+
+/** App-owned original and confirmed source reference must already be bound by the calling flow. */
+export async function clipConfirmedRecording(
+  original: { uri: string; size: number; sha256: string }, startMs: number, endMs: number, signal?: AbortSignal,
+): Promise<{ bytes: Uint8Array; mimeType: "audio/wav" }> {
+  const native = requireNativeModule<UploadModule>("RecorderUpload");
+  signal?.throwIfAborted();
+  const id = randomUUID();
+  const cancel = () => native.cancel(id);
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    if (signal?.aborted) { cancel(); signal.throwIfAborted(); }
+    const clip = await native.clipConfirmedRecording(id, original.uri, original.size, original.sha256, startMs, endMs);
+    signal?.throwIfAborted();
+    if (!(clip instanceof ArrayBuffer) || clip.byteLength < 44 || clip.byteLength > 6 * 1024 * 1024)
+      throw new Error("Could not clip the selected recording interval");
+    return { bytes: new Uint8Array(clip), mimeType: "audio/wav" };
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    native.release(id);
+  }
+}
+
+export async function uploadMatch(tap:string,capability:string,uri:string,
+  source:import('./DeviceSpeakerMatch').MatchSource, signal:AbortSignal): Promise<void> {
+  const native = requireNativeModule<UploadModule & {
+    matchUpload(id:string,tap:string,capability:string,uri:string,metadata:string):Promise<number>;
+  }>('RecorderUpload');
+  signal.throwIfAborted();
+  const id = randomUUID();
+  const cancel = () => native.cancel(id);
+  signal.addEventListener('abort',cancel,{once:true});
+  const timeout = setTimeout(cancel,120_000);
+  try {
+    if (await native.matchUpload(id,tap,capability,uri,JSON.stringify(source)) !== 200)
+      throw new Error('Check match status.');
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener('abort',cancel);
+    native.release(id);
+  }
+}
