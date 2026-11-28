@@ -1,4 +1,5 @@
-import { transaction } from './browserDatabase.web';
+import { parseSpeakerResult, type CompletedTranscript, type SpeakerResult } from './transcriptCompletion';
+import { recorderDatabase, transaction } from './browserDatabase.web';
 
 // Mirror the Recorder's single local directory. Strings hold small document sidecars;
 // IndexedDB supplies Blob handles for audio so Library does not decode or copy media.
@@ -49,12 +50,12 @@ export class File extends Blob {
   }
 }
 
-export async function storeAudio(blob: Blob, importedName?: string) {
+export async function storeAudio(blob: Blob, importedName?: string, captureName?: string) {
   if (!blob.size) throw new Error('The selected audio is empty.');
   const extension = importedName || blob.type.startsWith('audio/mp4') ? 'm4a'
     : blob.type.startsWith('audio/webm') ? 'webm' : blob.type.startsWith('audio/ogg') ? 'ogg' : undefined;
   if (!extension) throw new Error('Unsupported browser recording format.');
-  const name = (importedName ? 'Import' : 'Recording') + '-' + Date.now() + '-' + crypto.randomUUID() + '.' + extension;
+  const name = (captureName ?? ((importedName ? 'Import' : 'Recording') + '-' + Date.now() + '-' + crypto.randomUUID())) + '.' + extension;
   const audio = { name, content: blob };
   const label = importedName ? { name: name + '.name', content: importedName } : undefined;
   await transaction('files', 'readwrite', store => {
@@ -66,20 +67,74 @@ export async function storeAudio(blob: Blob, importedName?: string) {
   return new File(recordings, name).uri;
 }
 
-// IndexedDB commits each sidecar in one transaction. add() keeps the first
-// original immutable even if two tabs receive completion at the same time.
-export async function saveText(file: File, content: string) {
+// Read the disk version when reopening a document. The display index is an
+// optimization and another tab can have saved an edit since it was populated.
+export async function readSidecar(file: File) {
+  const row: Entry | undefined = await transaction('files', 'readonly', store => store.get(file.name));
+  if (!row) { entries.delete(file.name); return; }
+  if (typeof row.content !== 'string') throw new Error('Local text is unreadable.');
+  entries.set(file.name, row);
+  return row.content;
+}
+
+export async function commitCompletion(recording: string, text: string, speakers?: SpeakerResult): Promise<CompletedTranscript> {
+  const original = recording + '.original.txt';
+  const metadata = recording + '.speakers.json';
+  const db = await recorderDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('files', 'readwrite');
+    const files = tx.objectStore('files');
+    const read = files.get(original);
+    const readMetadata = files.get(metadata);
+    let result: CompletedTranscript;
+    let failure: Error | undefined;
+    readMetadata.onsuccess = () => {
+      const previous = read.result as Entry | undefined;
+      let saved = text, labels = speakers;
+      if (previous) {
+        if (typeof previous.content !== 'string' || !previous.content.trim()) {
+          failure = new Error('The saved original transcript is unreadable.');
+          tx.abort();
+          return;
+        }
+        saved = previous.content;
+        try { labels = parseSpeakerResult(JSON.parse(readMetadata.result?.content)); }
+        catch { labels = undefined; }
+      } else {
+        files.add({ name: original, content: text }, original);
+        if (speakers) files.put({ name: metadata, content: JSON.stringify(speakers) }, metadata);
+        else files.delete(metadata);
+      }
+      result = { state: 'COMPLETED', transcript: saved, speakerLabeling: labels };
+    };
+    tx.oncomplete = () => {
+      entries.set(original, { name: original, content: result.transcript });
+      if (result.speakerLabeling) entries.set(metadata, { name: metadata, content: JSON.stringify(result.speakerLabeling) });
+      else entries.delete(metadata);
+      resolve(result);
+    };
+    tx.onabort = () => reject(failure ?? tx.error ?? new Error('Could not save the original.'));
+  });
+}
+
+export async function saveText(file: File, content: string, expectedRevision?: string) {
   const row = { name: file.name, content };
-  if (file.name.endsWith('.original.txt')) {
-    try {
-      await transaction('files', 'readwrite', store => store.add(row, file.name));
-    } catch (error) {
-      if (!(error instanceof DOMException) || error.name !== 'ConstraintError') throw error;
-      const existing: Entry | undefined = await transaction('files', 'readonly', store => store.get(file.name));
-      if (existing) entries.set(file.name, existing);
-      if (existing?.content !== content) throw new Error('An original transcript is already saved.');
-      return;
-    }
+  if (file.name.endsWith('.revision.txt')) {
+    const db = await recorderDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('files', 'readwrite');
+      const files = tx.objectStore('files');
+      const read = files.get(file.name);
+      let conflict = false;
+      read.onsuccess = () => {
+        if (read.result?.content !== expectedRevision) { conflict = true; tx.abort(); }
+        else files.put(row, file.name);
+      };
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(conflict
+        ? new DOMException('Another tab saved a different revision. Copy your edits, then reopen the transcript to compare.', 'RevisionConflict')
+        : tx.error ?? new Error('Could not save the revision.'));
+    });
   } else {
     await transaction('files', 'readwrite', store => store.put(row, file.name));
   }

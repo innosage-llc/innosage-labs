@@ -37,3 +37,38 @@ export async function m4aDurationMillis(size: number, read: ReadAt) {
     return ticks / scale * 1000;
   }
 }
+
+// A suffix or reported MIME type cannot distinguish renamed WebM, video MP4,
+// or arbitrary data. Walk bounded atom headers; never buffer media payloads.
+export async function hasMP4AudioTrack(size: number, read: ReadAt) {
+  if (!await atom(read, 0, size, 'ftyp')) return false;
+  const payload = await atom(read, 0, size, 'mdat');
+  if (!payload || payload.end <= payload.start) return false;
+  const movie = await atom(read, 0, size, 'moov');
+  if (!movie) return false;
+  let audio = false;
+  let offset = movie.start;
+  for (let n = 0; n < 64; n++) {
+    const track = await atom(read, offset, movie.end, 'trak');
+    if (!track) return audio;
+    const media = await atom(read, track.start, track.end, 'mdia');
+    const handler = media && await atom(read, media.start, media.end, 'hdlr');
+    if (handler && handler.end - handler.start >= 12) {
+      const type = String.fromCharCode(...await read(handler.start + 8, 4));
+      if (type === 'vide') return false;
+      if (type === 'soun' && media) {
+        const info = await atom(read, media.start, media.end, 'minf');
+        const table = info && await atom(read, info.start, info.end, 'stbl');
+        const samples = table && await atom(read, table.start, table.end, 'stsd');
+        if (samples && samples.end - samples.start >= 8) {
+          const prefix = await read(samples.start, 8);
+          if (prefix.length !== 8 || !new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength).getUint32(4)) return false;
+          const codec = await atom(read, samples.start + 8, samples.end, 'mp4a') ?? await atom(read, samples.start + 8, samples.end, 'alac');
+          if (codec && codec.end - codec.start >= 28) audio = true;
+        }
+      }
+    }
+    offset = track.end;
+  }
+  return false;
+}

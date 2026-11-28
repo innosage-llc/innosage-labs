@@ -38,8 +38,9 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     let active = true;
     void selectedService().then(async id => {
       if (active) setService(id);
+      if (active) setService(id);
       const profile = await accessFor(id).profile();
-      if (active) { setService(id); setConfigured(!!profile); }
+      if (active) setConfigured(!!profile);
     }).catch(() => { if (active) setMessage("Could not read the transcription settings."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
@@ -52,11 +53,11 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
     key.set("");
     setHasKey(false);
     try {
-      const profile = await accessFor(id).profile();
       await selectService(id);
+      const profile = await accessFor(id).profile().then(Boolean, () => undefined);
       setService(id);
-      setConfigured(!!profile);
-      setMessage("Default saved for new transcriptions. Existing jobs keep their service.");
+      setConfigured(profile);
+      setMessage(profile === undefined ? "Could not read the saved key. Replace or remove it to continue." : "Default saved for new transcriptions. Existing jobs keep their service.");
     } catch {
       setMessage("Could not change service. Previous selection retained.");
     } finally { working.current = false; setBusy(false); }
@@ -163,7 +164,7 @@ export function ProSettings({ onClose }: { onClose: () => void }) {
       <ActionButton title={busy ? "Checking…" : "Verify and save key"} variant="primary"
         disabled={busy || !hasKey} onPress={save} />
     </> : null}
-    {configured ? (
+    {canConfigureKey && configured !== false && !busy ? (
       <ActionButton title="Remove key" variant="outlined" disabled={busy} onPress={remove} />
     ) : null}
   </>;

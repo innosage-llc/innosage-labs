@@ -107,13 +107,12 @@ test('Pro upload cannot reserve an operation on unsupported platforms', () => {
   assert.match(transcript, /supportsPro=\{supportsProUpload\}/);
 });
 
-test('iOS offers only usable defaults and routes a remembered Production choice to a supported service', () => {
-  const choices = graph('ios').get(resolve(root, 'ServiceChoice.ios.tsx'));
+test('iOS Settings selects only Staging and OpenAI in its mounted native layout', () => {
+  const layout = graph('ios').get(resolve(root, 'ui/service-flow.ios.tsx'));
   const transcript = readFileSync(resolve(root, 'Transcript.tsx'), 'utf8');
   const settings = readFileSync(resolve(root, 'ProSettings.tsx'), 'utf8');
-  assert.match(choices, /const supported: ServiceId\[\] = \['staging', 'openai'\]/);
-  assert.match(choices, /service === 'production' [^\n]+unavailable on iOS/);
-  assert.match(choices, /if \(id !== 'production'\) onChange/);
+  assert.match(settings, /if \(ios\) \{\s+return <ServiceSettingsLayout/);
+  assert.deepEqual([...layout.matchAll(/onPress=\{\(\) => onChange\('([^']+)'\)\}/g)].map(match => match[1]), ['staging', 'openai']);
   assert.match(transcript, /isProduction=\{service === 'production'\}/);
   assert.match(settings, /const canConfigureKey = isOpenAI \|\| supportsProUpload/);
 });

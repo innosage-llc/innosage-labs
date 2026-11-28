@@ -1,3 +1,6 @@
+import { commitCompletion } from './completionStorage';
+import { withRecordingSubmission } from './recordingCoordination';
+import { verifyTranscriptionMedia } from './mediaLibrary';
 import { confirmDiscard } from './discardRevision';
 import { DraftSummary } from './DraftSummary';
 import { SavedRecordingSummary, TranscriptSummary } from './TranscriptSummary';
@@ -98,6 +101,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const [showSummaryTools, setShowSummaryTools] = useState(false);
   const [showSavedSummary, setShowSavedSummary] = useState(false);
   const [summaryAvailable, setSummaryAvailable] = useState(false);
+  const savedRevisionBase = useRef<string | undefined>(undefined);
   const beforeEdit = useRef('');
   const [draftRevision, setDraftRevision] = useState(0);
   const autoOpened = useRef(false);
@@ -109,11 +113,15 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const revision = new File(recording.parentDirectory, recording.name + '.revision.txt');
   const speakerFile = new File(recording.parentDirectory, recording.name + '.speakers.json');
   const operationKey = 'transcription.' + recording.name;
+  const commit = commitCompletion;
   const completionFiles = {
-    readOriginal: async () => original.exists ? original.text() : undefined,
+    commit: commit && ((text: string, speakers?: SpeakerResult) => commit(recording.name, text, speakers)),
+    readOriginal: () => readTranscriptSidecar(original),
     readSpeakers: async () => {
-      if (!speakerFile.exists) return;
-      try { return parseSpeakerResult(JSON.parse(await speakerFile.text())); } catch { return; }
+      const saved = await readTranscriptSidecar(speakerFile);
+      if (saved) {
+        try { return parseSpeakerResult(JSON.parse(saved)); } catch { return; }
+      }
     },
     writeOriginal: (text: string) => saveText(original, text),
     writeSpeakers: async (speakers: SpeakerResult | undefined) => {
@@ -127,6 +135,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     if (!seededRevision.current) {
       try {
         const { document, revisionNumber, text: savedRevision } = await readSavedTranscriptEdit(recording);
+        savedRevisionBase.current = savedRevision;
         // Once editors can accept input, even a replay with a clean draft cannot reseed the view.
         if (!seededRevision.current) {
           seededRevision.current = true;
@@ -162,6 +171,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
           const edit = await readSavedTranscriptEdit(recording);
           if (!active) return;
           if (edit.text !== undefined) {
+            savedRevisionBase.current = edit.text;
             setDraftDocument(edit.document);
             if (!android && !seededRevision.current) {
               setDraft(edit.text);
@@ -472,15 +482,30 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         const committed = await draftDocument.commit(draftRevision, updated.blocks);
         setDraftRevision(committed.revision);
       } else {
-        await saveText(revision, draft);
+        await saveText(revision, draft, savedRevisionBase.current);
+        savedRevisionBase.current = draft;
       }
       setDirty(false);
       setEditingReader(false);
       setMessage('Revision saved on this device.');
-    } catch {
-      setMessage('Could not save the revision.');
+    } catch (error) {
+      setMessage(error instanceof Error && error.name === 'RevisionConflict' ? error.message : 'Could not save the revision.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function requestSubmission() {
+    try {
+      await withRecordingSubmission(operationKey, operation, async () => {
+        if (!await verifyTranscriptionMedia(recording)) {
+          setMessage('Choose a supported M4A audio file to transcribe.');
+          return;
+        }
+        await submit();
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not prepare the recording for transcription.');
     }
   }
 
@@ -586,7 +611,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       {busy || connecting ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
         <ActionButton title="Retry" variant="primary" onPress={retryService} />
       ) : (openAIConfigured || unsavedOpenAI) ? (
-        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={submit} />
+        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={requestSubmission} />
       ) : (
         <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
       )}
@@ -614,7 +639,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       onIdentifySpeakers={setIdentifySpeakers}
       onRetryService={retryService}
       onCheckStatus={checkOperationStatus}
-      onTranscribe={submit}
+      onTranscribe={requestSubmission}
     />
   );
   return (

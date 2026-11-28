@@ -14,6 +14,7 @@ type ReadFiles = {
   readSpeakers(): Promise<SpeakerResult | undefined>;
 };
 type CompletionFiles = ReadFiles & {
+  commit?(transcript: string, speakers?: SpeakerResult): Promise<CompletedTranscript>;
   writeOriginal(transcript: string): Promise<void>;
   writeSpeakers(speakerLabeling: SpeakerResult | undefined): Promise<void>;
 };
@@ -62,6 +63,7 @@ export function persistTranscriptCompletion(
     const transcript = result.transcript;
     if (!isTranscriptText(transcript)) throw new Error('The service completed without a transcript.');
     const speakerLabeling = parseSpeakerResult(result.speakerLabeling);
+    if (files.commit) return files.commit(transcript, speakerLabeling);
     await files.writeSpeakers(speakerLabeling);
     // Write the completion marker last; metadata can be repaired after a failed write.
     await files.writeOriginal(transcript);

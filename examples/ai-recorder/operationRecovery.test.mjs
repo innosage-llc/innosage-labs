@@ -129,7 +129,7 @@ test('a surviving saved edit opens its export actions without starting or restor
     const owner = { pageId: 'selected-recording' };
     const recording = { name: 'selected-recording.m4a' };
     const dependencies = {
-      active: true, android: true, committedResult: readOriginal,
+      active: true, android: true, committedResult: readOriginal, savedRevisionBase: { current: undefined },
       recording,
       readSavedTranscriptEdit: async selected => {
         assert.equal(selected, recording);

@@ -10,6 +10,7 @@ export function getCaptureSession() {
     const supported = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus']
       .find(mime => globalThis.MediaRecorder?.isTypeSupported(mime));
     const options = { ...RecordingPresets.HIGH_QUALITY, mimeType: supported };
+    let pending: { uri: string; name: string; blob: Blob } | undefined;
     session = new CaptureSession({
       recorder: new AudioRecorderWeb(options),
       // prepareToRecordAsync opens the microphone once, after the actual Start gesture.
@@ -23,9 +24,15 @@ export function getCaptureSession() {
       },
       notification: async () => {}, audioMode: async () => {},
       recover: loadFiles,
+      retainFailedSave: true,
       save: async uri => {
-        try { return await storeAudio(await (await fetch(uri)).blob()); }
-        finally { URL.revokeObjectURL(uri); }
+        if (!pending || pending.uri !== uri) {
+          pending = { uri, name: 'Recording-' + Date.now() + '-' + crypto.randomUUID(), blob: await (await fetch(uri)).blob() };
+        }
+        const saved = await storeAudio(pending.blob, undefined, pending.name);
+        pending = undefined;
+        URL.revokeObjectURL(uri);
+        return saved;
       },
       savedMessage: recordingSavedMessage,
     });

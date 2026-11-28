@@ -8,6 +8,7 @@ import type { SpeakerResult } from './transcriptCompletion';
 import type { InnoSageServiceId } from './ServiceConfig';
 import allowedTargets from './recorder-free-targets.json';
 
+import { withGuestProvision } from './recordingCoordination';
 import { freeTargets } from './freeTargets';
 import { productionFreeEligible } from './productionFreeEligible';
 
@@ -34,7 +35,7 @@ const guests = createGatewayGuests({
   },
 });
 
-export const connectGateway = guests.connect;
+export const connectGateway = (service: InnoSageServiceId) => withGuestProvision(service, () => guests.connect(service));
 export const restoreGateway = guests.restore;
 
 type GuestJob = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };

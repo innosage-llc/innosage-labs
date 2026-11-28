@@ -13,13 +13,14 @@ export type RecordViewProps = {
   message: string;
   durationMillis: number;
   savedUri?: string;
+  retrySave?: boolean;
   savedRecording?: RecordingSummary;
   onPressRecord: () => void;
   onViewInLibrary: () => void;
 };
 
 export function RecordView({
-  phase, message, durationMillis, savedUri, savedRecording, onPressRecord, onViewInLibrary,
+  phase, message, durationMillis, savedUri, retrySave, savedRecording, onPressRecord, onViewInLibrary,
 }: RecordViewProps) {
   const { mode, palette, spacing, typography } = useTheme();
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -80,7 +81,8 @@ export function RecordView({
           ) : null}
         </View> : null}
         <View onLayout={android ? ({ nativeEvent }) => setControlHeight(nativeEvent.layout.height) : undefined}>
-          <RecordControl phase={phase} onPress={onPressRecord} />
+          {retrySave ? <ActionButton title="Retry saving recording" disabled={phase !== 'idle'} onPress={onPressRecord} />
+            : <RecordControl phase={phase} onPress={onPressRecord} />}
         </View>
       </View>
       {saved && android ? (

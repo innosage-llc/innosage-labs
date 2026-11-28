@@ -442,6 +442,7 @@ function RecorderScreen() {
         phase={phase}
         message={message}
         durationMillis={durationMillis}
+        retrySave={capture.retrySave}
         savedUri={handoff.savedUri}
         savedRecording={summaries.find(item => item.uri === handoff.savedUri)}
         onPressRecord={phase === 'recording' ? stop : start}
