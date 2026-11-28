@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { REPO, observe, changedPaths, recorderImpact, validatePlatform, artifact, writeJSON } from './core.mjs';
@@ -183,8 +183,10 @@ test('HTTP 200 index alone cannot mask a missing critical entry; only optional f
 });
 test('actual platform entry points fail closed for absent native targets and unavailable Web build tool',async()=>{
   const {source,g}=repository();const app=join(source,'examples/ai-recorder');mkdirSync(app,{recursive:true});
+  const base=g('rev-parse','HEAD');
   for(const name of ['app.json','package.json','package-lock.json'])writeFileSync(join(app,name),'{}');
-  g('add','.');g('commit','-m','synthetic build inputs');const candidate={...c,tested:g('rev-parse','HEAD'),tree:g('rev-parse','HEAD^{tree}')};
+  g('add','.');g('commit','-m','synthetic build inputs');const head=g('rev-parse','HEAD');
+  const candidate={...c,base,head,...integrationRevision(base,head,source)};g('switch','--detach',candidate.tested);
   for(const platform of ['android','ios','web']) {
     const output=mkdtempSync(join(tmpdir(),'labs-platform-missing-'));
     await assert.rejects(platformGate({platform,source,candidate,output,targets:{}}));
@@ -192,6 +194,29 @@ test('actual platform entry points fail closed for absent native targets and una
     assert.equal(result.status,'FAIL');assert.equal(result.stage,platform==='web'?'build':'preflight');
     if(platform!=='web')assert.deepEqual(result.commands,[]);
   }
+});
+test('standalone iOS rejects an inconsistent integration manifest before starting a Simulator', async () => {
+  const {source,g}=repository();const base=g('rev-parse','HEAD');
+  try {
+    writeFileSync(join(source,'head'),'topic');g('add','.');g('commit','-m','synthetic topic');const head=g('rev-parse','HEAD');
+    const candidate={...c,base,head,...integrationRevision(base,head,source)};
+    g('switch','--detach',candidate.tested);
+    const forgedTree=g('rev-parse',`${base}^{tree}`);
+    const forged=g('commit-tree',forgedTree,'-p',base,'-p',head,'-m','different integration tree');
+    for(const [manifest, revision, reason] of [
+      [{...candidate,tree:forgedTree},candidate.tested,/revision\/tree changed/],
+      [{...candidate,base:head,head:base},candidate.tested,/exact base\/head integration/],
+      [{...candidate,tree:forgedTree,tested:forged},forged,/integration result drift/],
+    ]) {
+      g('switch','--detach',revision);
+      const output=mkdtempSync(join(tmpdir(),'labs-ios-manifest-'));
+      try {
+        await assert.rejects(platformGate({platform:'ios',source,candidate:manifest,output,targets:{iosRuntime:'com.apple.CoreSimulator.SimRuntime.iOS-27-2'}}),reason);
+        const result=JSON.parse(readFileSync(join(output,'result.json'),'utf8'));
+        assert.equal(result.status,'FAIL');assert.equal(result.stage,'preflight');assert.deepEqual(result.commands,[]);
+      } finally { rmSync(output,{recursive:true,force:true}); }
+    }
+  } finally { rmSync(source,{recursive:true,force:true}); }
 });
 
 test('synchronous callbacks cannot beat a delayed timeout timer; final probe is also bounded', async()=>{

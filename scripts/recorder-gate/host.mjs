@@ -75,11 +75,16 @@ export function prepare({ repo, pr, head, base, output }) {
   const candidate = validateCandidate({ ...current, tested, tree });
   assertSnapshot(candidate, prSnapshot(repo, pr)); writeJSON(resolve(output), candidate); return candidate;
 }
-export function checkout(candidate, path) {
-  validateCandidate(candidate); requireThat(git('rev-parse', `${candidate.tested}^{tree}`) === candidate.tree, 'candidate tree drift');
-  const parents = git('show', '-s', '--format=%P', candidate.tested).split(' ');
+export function validateIntegration(candidate, cwd = root) {
+  validateCandidate(candidate);
+  const g = (...args) => run('git', args, { cwd }).trim();
+  requireThat(g('rev-parse', `${candidate.tested}^{tree}`) === candidate.tree, 'candidate tree drift');
+  const parents = g('show', '-s', '--format=%P', candidate.tested).split(' ');
   requireThat(parents.length === 2 && parents[0] === candidate.base && parents[1] === candidate.head, 'candidate is not exact base/head integration');
-  requireThat(git('merge-tree', '--write-tree', candidate.base, candidate.head).split('\n')[0] === candidate.tree, 'integration result drift');
+  requireThat(g('merge-tree', '--write-tree', candidate.base, candidate.head).split('\n')[0] === candidate.tree, 'integration result drift');
+}
+export function checkout(candidate, path) {
+  validateIntegration(candidate);
   requireThat(git('rev-parse', `${candidate.tested}:scripts`) === git('rev-parse', `${candidate.head}:scripts`), 'base changed gate scripts: reconcile PR before testing');
   run('git', ['worktree', 'add', '--detach', path, candidate.tested]); clean(path);
 }

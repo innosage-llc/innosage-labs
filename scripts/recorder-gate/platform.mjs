@@ -3,7 +3,7 @@ import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { artifact, sha, changedPaths, requireThat, writeJSON } from './core.mjs';
-import { run, runAsync, clean, cli, loadCandidate, outDir, appPath } from './host.mjs';
+import { run, runAsync, validateIntegration, sourceIdentity, cli, loadCandidate, outDir, appPath } from './host.mjs';
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
 import { observeNativeMarkdown, requiresNativeMarkdown } from './native-markdown.mjs';
@@ -37,7 +37,8 @@ export async function platformGate({ platform, source, candidate, output, target
     }
   }
   try {
-    clean(source); requireThat(run('git', ['rev-parse', 'HEAD'], { cwd: source }).trim() === candidate.tested, 'platform source revision mismatch');
+    sourceIdentity(source, candidate);
+    validateIntegration(candidate, source);
     receipt.inputs = Object.fromEntries(['app.json','package.json','package-lock.json'].map(name => [name, sha(readFileSync(join(app,name)))]));
     receipt.node = process.version;
     requireThat(!fault || ['terminate', 'missing-entry'].includes(fault), 'unsupported fault');
@@ -91,7 +92,7 @@ export async function platformGate({ platform, source, candidate, output, target
       requireThat(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])), 'screenshot is not a PNG');
       return { path:name,bytes:bytes.length,sha256:sha(bytes) };
     });
-    clean(source); receipt.stage = 'complete'; receipt.status = 'PASS'; return receipt;
+    sourceIdentity(source, candidate); receipt.stage = 'complete'; receipt.status = 'PASS'; return receipt;
   } catch (error) { receipt.error = error.message; throw error; }
   finally {
     if (uuid) { try { command('xcrun', ['simctl', 'shutdown', uuid], { timeout: 30000 }); } catch (e) { receipt.cleanup_error = e.message; receipt.status = 'FAIL'; } }
