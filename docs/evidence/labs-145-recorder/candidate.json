@@ -1,0 +1,18 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 145,
+    "head": "ff090dd8e1e294c07adfa8a61e0a81d6bdecadc0",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "b3c63bae044356e8032bafbf431adb276522a326",
+    "tree": "35f31250ace89436c66e10542b89ccd835346202"
+  },
+  "version": "0.1.9",
+  "build": 17,
+  "sha256": "43b82bab0c8e526bf85185a87c50e06389d78925d63db018e095a6ab15fcd277",
+  "stagingBinding": true,
+  "productionEligible": false,
+  "signedBundleMatchedRecompilation": true,
+  "ITSAppUsesNonExemptEncryption": false
+}

@@ -1,0 +1,59 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 145,
+    "head": "ff090dd8e1e294c07adfa8a61e0a81d6bdecadc0",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "b3c63bae044356e8032bafbf431adb276522a326",
+    "tree": "35f31250ace89436c66e10542b89ccd835346202"
+  },
+  "status": "PASS",
+  "typecheck": "PASS",
+  "controllerAndReceiptTests": 61,
+  "recorderTests": 167,
+  "iosDeviceSupportTests": 38,
+  "chromiumOutcomes": 16,
+  "releaseStartup": {
+    "android": "PASS",
+    "ios": "PASS",
+    "web": "PASS"
+  },
+  "iosFilesAcceptance": {
+    "status": "PASS",
+    "outcome": "ios-committed-markdown-save-to-files",
+    "candidate": {
+      "repo": "innosage-llc/innosage-labs",
+      "pr": 145,
+      "head": "ff090dd8e1e294c07adfa8a61e0a81d6bdecadc0",
+      "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+      "draft": true,
+      "tested": "b3c63bae044356e8032bafbf431adb276522a326",
+      "tree": "35f31250ace89436c66e10542b89ccd835346202"
+    },
+    "appArtifactSha256": "da71c7e9236c1d58048f0c14e55e821ca00248054d5d74956a1f9259bffc5b89",
+    "destination": "On My iPhone",
+    "cancelledThenRetried": true,
+    "source": "saved revision from Original view",
+    "saved": {
+      "bytes": 197,
+      "sha256": "d63636b8240a6c0df5fe1ad77d8add54d046c58fc8c613f0d6ec8fa38a318691"
+    },
+    "audio": {
+      "sha256": "07b0d24a10e960aa9b45bfff066318cd946da98d521d39b2ad2e51f8575fecb7"
+    },
+    "original": {
+      "sha256": "8b4ce33ca273efb85dd4d352bfb5ced7a7e4120680b3bc7791699d3c225d7ef7"
+    },
+    "revision": {
+      "sha256": "4132d0135a2f5f2abaef30a4b59e6e8f3f37149d17bf1b97b1349f97574ec544"
+    },
+    "testResult": {
+      "sha256": "99df2df4bb2769ea1c86859b7e8793af8d5360525a5945861de9feb321d7b938"
+    }
+  },
+  "independentV6SourceReview": "PASS; zero open P1 or P2 findings",
+  "uiWorker": "native gpt-6.2-sol HIGH",
+  "designPin": "be9d0cb",
+  "expoFilesChecked": 330
+}

@@ -1,0 +1,41 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 145,
+    "head": "ff090dd8e1e294c07adfa8a61e0a81d6bdecadc0",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "b3c63bae044356e8032bafbf431adb276522a326",
+    "tree": "35f31250ace89436c66e10542b89ccd835346202"
+  },
+  "runtime": "Chromium 158.0.8127.37",
+  "artifact": "62287eb4d81674ee4cbc27a787165ca2bcde88f62b111a908abe4a5d27f9f4e7",
+  "source": "synthetic microphone and M4A",
+  "provider": "local intercepted responses",
+  "passed": [
+    "capture storage failure, same-ID retry and offline byte-exact playback/seek",
+    "service setting/key verification",
+    "file import",
+    "byte-exact share/download",
+    "play/pause/seek",
+    "unreadable media rejected on import and before Free or direct OpenAI dispatch",
+    "explicit upload, same-operation recovery and stale RESERVED recheck",
+    "two-tab submission, edit conflict and first-use guest ownership",
+    "immutable original/edit",
+    "saved revision Markdown",
+    "revision-sourced summary",
+    "offline audio, original, revision and summary reopen",
+    "Back cancels held local decoder before any provider request",
+    "successful OpenAI response survives tab closure and a failed original commit without a second upload",
+    "dual write failure and tab loss require separate priced resend consent before a second upload",
+    "missing runtime image and entry script rollback, successful update and bounded cache"
+  ],
+  "liveBrowserStaging": {
+    "scope": "Browser preflight from loopback test origin only",
+    "method": "OPTIONS",
+    "requestedMethod": "POST",
+    "status": 403,
+    "allowOrigin": null,
+    "allowMethods": null
+  }
+}

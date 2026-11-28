@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "apkSha256": "7ec64315f05a4a3c7fb099491642b93afc1e3d7fbdb460010ebe2d758d1e17c3",
+  "audioSha256": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "fixtureSource": "Pre-seeded synthetic committed original, revision and summary. No service access.",
+  "originalUnmodified": true,
+  "audioUnmodified": true,
+  "summaryUnmodified": true,
+  "newRevisionRetained": true,
+  "sharedAndSavedMarkdownMatch": true,
+  "markdownSha256": "109810aa24ba423e348e710f55459d1785edfb2d2223e491c57e20068afc8ad4",
+  "airplaneModeAndWifiOff": true,
+  "providerSubmitCount": 0,
+  "mobileDataDisabled": true,
+  "test": "documents.py local-documents"
+}

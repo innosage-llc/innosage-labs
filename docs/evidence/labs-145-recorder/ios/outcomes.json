@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "candidate": "ff090dd8e1e294c07adfa8a61e0a81d6bdecadc0",
+  "sourceTree": "35f31250ace89436c66e10542b89ccd835346202",
+  "fixtureSource": "locally seeded synthetic committed original/revision/summary",
+  "hashesUnchanged": true,
+  "markdownReceivedSha256": "859b68f05509030148a25c2d079c7ac6bcd7340437d2fa8a1a94f64807343b37",
+  "nativeShareDestination": "On My iPhone",
+  "providerSubmitCount": 0
+}
