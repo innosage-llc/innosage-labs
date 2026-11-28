@@ -26,7 +26,7 @@ test('recording and provider policies have one implementation across platforms',
   // Platform suffixes here would silently replace shared policy in Metro. Add or change
   // reviewed adapter exceptions in the parity matrix when an OS needs different primitives.
   const shared = ['freeTargets', 'ServiceConfig', 'GatewayGuest', 'ProClient', 'operationRecovery',
-    'transcriptCompletion', 'transcriptExport', 'captureSession', 'audioShareFilename'];
+    'transcriptCompletion', 'transcriptExport', 'captureSession', 'audioShareFilename', 'libraryImport', 'm4aDuration'];
   for (const name of shared) {
     const source = readFileSync(new URL('./' + name + '.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /\bPlatform\s*\.\s*(OS|select)\b/, name);

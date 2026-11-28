@@ -1,0 +1,7 @@
+# Recorder Library Import
+
+Refs https://github.com/innosage-llc/innosage-labs/issues/146
+
+Dependency: this draft directly descends from build 18 (b4aca59089eeaf519220b80b39e1ceca3a4b9cb7), including Labs main 2ee517327b59e1a7393c97a8765a63f75e382563 and #140 at 62a2b0e09b47222329260cfba7d38610f02f67c5. The first increment extracts shared typed admission and outcomes with native bounded decode and separate picker/storage adapters. Original capture formats and service rollout rules retain their existing owners.
+
+Pending platform evidence and independent review. Owner acceptance is separate for both devices.

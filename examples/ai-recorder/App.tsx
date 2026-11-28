@@ -26,6 +26,8 @@ import { ThemeProvider, useTheme } from './ui/theme';
 import { selectedService } from './ProAccess';
 import { services } from './ServiceConfig';
 import { File } from './localFiles';
+import { importLibraryAudio, importMessages, importActionState } from './libraryImport';
+import { randomUUID } from 'expo-crypto';
 import { listRecordings, pickAudio, playbackSource } from './mediaLibrary';
 import { Host, Icon, ListItem, Text as NativeText } from '@expo/ui';
 import ChevronIcon from '@expo/material-symbols/chevron_right.xml';
@@ -280,9 +282,9 @@ function RecorderScreen() {
     dispatchHandoff({ type: 'reset' });
     setMessage('');
     try {
-      const result = await pickAudio();
-      if (result) setMessage(result);
-      setFiles(listRecordings());
+      const result = await importLibraryAudio(pickAudio, () => `Import-${Date.now()}-${randomUUID()}.m4a`);
+      setMessage(importMessages[result.kind]);
+      if (result.kind === 'saved') setFiles(listRecordings());
     } catch {
       setMessage('Could not import the audio. Check available storage and try again.');
     } finally {
@@ -400,7 +402,7 @@ function RecorderScreen() {
 
   return (
     <RootShell selected={destination} onSelect={navigate} enabled={canSwitchDestination(phase)}
-      libraryImport={{ importing: phase === 'importing', disabled: phase !== 'idle', onPress: importAudio }}>
+      libraryImport={importActionState(phase, importAudio)}>
       {detailRecording && detailFile && !transcriptRoute ? <RecordingDetail
         key={detailUri}
         recording={detailRecording}

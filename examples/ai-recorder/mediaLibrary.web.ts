@@ -1,3 +1,4 @@
+import type { ImportSelection } from './libraryImport';
 import { hasMP4AudioTrack } from './m4aDuration';
 import { getDocumentAsync } from 'expo-document-picker';
 import { File, recordings, storeAudio } from './localFiles.web';
@@ -7,7 +8,10 @@ export async function verifyTranscriptionMedia(file: Blob, signal?: AbortSignal)
   const audioTrack = await hasMP4AudioTrack(file.size, async (offset, length) =>
     new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()));
   signal?.throwIfAborted();
-  if (!audioTrack) return false;
+  return audioTrack && (await decodedSamples(file, signal)) > 0;
+}
+
+async function decodedSamples(file: Blob, signal?: AbortSignal) {
   // A movie header can declare an audio track and positive duration while the
   // payload has no readable samples. Verify local muted decode, without ever
   // expanding the entire compressed stream into a PCM buffer.
@@ -16,23 +20,23 @@ export async function verifyTranscriptionMedia(file: Blob, signal?: AbortSignal)
   media.preload = 'auto';
   const uri = URL.createObjectURL(file);
   try {
-    return await new Promise<boolean>(resolve => {
-      const abort = () => finish(false);
-      const finish = (valid: boolean) => { clearTimeout(timeout); clearInterval(interval); signal?.removeEventListener('abort', abort); resolve(valid); };
+    return await new Promise<number>(resolve => {
+      const abort = () => finish(0);
+      const finish = (samples: number) => { clearTimeout(timeout); clearInterval(interval); signal?.removeEventListener('abort', abort); resolve(samples); };
       const check = () => {
         const decoded = (media as HTMLAudioElement & { webkitAudioDecodedByteCount?: number }).webkitAudioDecodedByteCount;
         const hasSamples = decoded === undefined ? media.buffered.length > 0 : decoded > 0;
-        if (hasSamples && media.currentTime > 0 && media.readyState >= media.HAVE_CURRENT_DATA) finish(true);
-        else if (media.ended || media.error) finish(false);
+        if (hasSamples && media.currentTime > 0 && media.readyState >= media.HAVE_CURRENT_DATA) finish(1);
+        else if (media.ended || media.error) finish(0);
       };
-      const timeout = setTimeout(() => finish(false), 5000);
+      const timeout = setTimeout(() => finish(0), 5000);
       const interval = setInterval(check, 50);
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) { abort(); return; }
       media.onended = check;
-      media.onerror = () => finish(false);
+      media.onerror = () => finish(0);
       media.src = uri;
-      void media.play().then(check, () => finish(false));
+      void media.play().then(check, () => finish(0));
     });
   } finally {
     media.onended = media.onerror = null;
@@ -51,15 +55,15 @@ export function playbackSource(file: File) {
   const uri = URL.createObjectURL(file);
   return { uri, release: () => URL.revokeObjectURL(uri) };
 }
-export async function pickAudio(): Promise<string | undefined> {
+export async function pickAudio(): Promise<ImportSelection | undefined> {
   const result = await getDocumentAsync({ type: '*/*', base64: false });
-  if (result.canceled) return;
+  if (result.canceled || !result.assets.length) return;
   const { file, uri, name } = result.assets[0];
-  try {
-    if (!name.toLowerCase().endsWith('.m4a')) return 'Choose an M4A audio file.';
-    if (!file?.size) return 'The selected audio file is empty or unavailable.';
-    if (!await verifyTranscriptionMedia(file)) return 'Choose an M4A containing an MP4 audio track.';
-    await storeAudio(file.slice(0, file.size, 'audio/mp4'), name);
-    return 'Audio imported to this device.';
-  } finally { URL.revokeObjectURL(uri); }
+  return {
+    name, size: file?.size ?? 0,
+    read: async (offset, length) => new Uint8Array(await file!.slice(offset, offset + length).arrayBuffer()),
+    decodedSamples: () => decodedSamples(file!),
+    commit: async id => { await storeAudio(file!.slice(0, file!.size, 'audio/mp4'), name, id.slice(0, -4)); },
+    dispose: () => URL.revokeObjectURL(uri),
+  };
 }

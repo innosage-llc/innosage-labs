@@ -26,7 +26,7 @@ function graph(platform) {
         JSON.parse(readFileSync(base, 'utf8'));
         continue;
       }
-      const target = [`.${platform}.tsx`, `.${platform}.ts`, '.native.tsx', '.native.ts', '.tsx', '.ts']
+      const target = /\.tsx?$/.test(specifier) && existsSync(base) ? base : [`.${platform}.tsx`, `.${platform}.ts`, '.native.tsx', '.native.ts', '.tsx', '.ts']
         .map(ext => base + ext).find(existsSync);
       assert.ok(target, `Unresolved local import ${specifier} in ${file}`);
       visit(target);
@@ -40,7 +40,9 @@ test('iOS entry graph selects native SwiftUI adapters and never imports Compose 
   const files = graph('ios');
   for (const [file, source] of files) {
     assert.doesNotMatch(source, /from ['"]@expo\/ui\/jetpack-compose/);
-    assert.doesNotMatch(source, /requireNativeModule/);
+    if (file === resolve(root, 'mediaLibrary.ts')) {
+      assert.deepEqual([...source.matchAll(/requireNativeModule\(([^)]+)\)/g)].map(match => match[1]), ["'RecorderMediaProbe'"]);
+    } else assert.doesNotMatch(source, /requireNativeModule/);
     assert.ok(!file.endsWith('.android.ts') && !file.endsWith('.android.tsx'));
   }
   for (const name of ['ProSettings.tsx', 'PlaybackSeek.ios.tsx', 'RecorderSwitch.ios.tsx', 'ServiceChoice.ios.tsx',

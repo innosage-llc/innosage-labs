@@ -1,6 +1,7 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File, FileMode, Paths } from 'expo-file-system';
 import { getDocumentAsync } from 'expo-document-picker';
-import { randomUUID } from 'expo-crypto';
+import { requireNativeModule } from 'expo';
+import type { ImportSelection } from './libraryImport';
 
 const recordings = new Directory(Paths.document, 'recordings');
 
@@ -18,36 +19,44 @@ export function playbackSource(file: File) {
   return { uri: file.uri, release: () => {} };
 }
 
-export async function pickAudio(): Promise<string | undefined> {
-  let cached: File | undefined;
-  let label: File | undefined;
-  let imported = false;
-  try {
-    const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-    if (selection.canceled) return;
-    const asset = selection.assets[0];
-    cached = new File(asset.uri);
-    if (!asset.name.toLowerCase().endsWith('.m4a')) {
-      return 'Choose an M4A audio file.';
-    }
-    if (!cached.exists || !cached.size) {
-      return 'The selected audio file is empty or unavailable.';
-    }
-    recordings.create({ idempotent: true });
-    const name = `Import-${Date.now()}-${randomUUID()}.m4a`;
-    label = new File(recordings, name + '.name');
-    await label.write(asset.name);
-    await cached.move(new File(recordings, name));
-    cached = undefined;
-    imported = true;
-    return 'Audio imported to this device.';
-
-  } finally {
-    try {
-      if (cached?.exists) cached.delete();
-      if (!imported && label?.exists) label.delete();
-    } catch {
-      // A cache cleanup failure must not leave the import controls disabled.
-    }
-  }
+export async function pickAudio(): Promise<ImportSelection | undefined> {
+  const selection = await getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+  if (selection.canceled) return;
+  const asset = selection.assets[0];
+  const cached = new File(asset.uri);
+  let handle: ReturnType<File['open']> | undefined;
+  return {
+    name: asset.name,
+    get size() { return cached.size; },
+    async read(offset, length) {
+      handle ??= cached.open(FileMode.ReadOnly);
+      handle.offset = offset;
+      return handle.readBytes(length);
+    },
+    decodedSamples: () => requireNativeModule('RecorderMediaProbe').decodedSamples(cached.uri),
+    async commit(id) {
+      recordings.create({ idempotent: true });
+      const destination = new File(recordings, id);
+      const staged = new File(recordings, id + '.pending');
+      const label = new File(recordings, id + '.name');
+      if (destination.exists || label.exists || staged.exists) throw new Error('Recording ID in use');
+      // Only the last rename makes the recording visible to listRecordings.
+      try {
+        await cached.copy(staged);
+        if (staged.size !== cached.size) throw new Error('Incomplete recording copy');
+        await label.write(asset.name);
+        await staged.move(destination);
+      } catch (error) {
+        if (label.exists) label.delete();
+        throw error;
+      } finally {
+        // File.move updates the File object's URI. Reopen the staging path.
+        const pending = new File(recordings, id + '.pending');
+        if (pending.exists) pending.delete();
+      }
+    },
+    dispose() {
+      try { handle?.close(); } finally { if (cached.exists) cached.delete(); }
+    },
+  };
 }
