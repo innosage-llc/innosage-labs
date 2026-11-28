@@ -17,7 +17,7 @@ final class MarkdownGateTests: XCTestCase {
         repeat {
             for app in [recorder, files, springboard] {
                 let control = match(app, label, kind)
-                if control.exists && control.isHittable && control.isEnabled { return control }
+                if control.exists && control.isEnabled && control.isHittable { return control }
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
@@ -46,6 +46,18 @@ final class MarkdownGateTests: XCTestCase {
         XCTAssertNotNil(systemControl("DOCPicker.dismissButton", kind: .button, timeout: 6))
     }
 
+    private func waitForOriginalReader() {
+        let share = match(recorder, "Share transcript (.md)", .button)
+        // The reader stays in the accessibility tree while the system sheet animates away.
+        // Its button is enabled only after the native share promise settles.
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            share.exists && share.isEnabled
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 12), .completed,
+                       "The original reader did not become active after dismissal")
+        XCTAssertTrue(match(recorder, "Original marker only", .staticText, partial: true).exists)
+    }
+
     func testCancelAndSaveCommittedRevision() throws {
         continueAfterFailure = false
         recorder.launch()
@@ -62,7 +74,7 @@ final class MarkdownGateTests: XCTestCase {
         if systemControl("Save to Files", timeout: 2) != nil {
             recorder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
         }
-        XCTAssertNotNil(systemControl("Share transcript (.md)", kind: .button, timeout: 8))
+        waitForOriginalReader()
         capture("markdown-cancellation-returned")
 
         try openSavePicker()
@@ -78,8 +90,7 @@ final class MarkdownGateTests: XCTestCase {
                       "The system Files picker must be at the local on-device destination")
         capture("markdown-save-to-files")
         try XCTUnwrap(systemControl("DOCPicker.actionButton", kind: .button, timeout: 8)).tap()
-        XCTAssertNotNil(systemControl("Share transcript (.md)", kind: .button, timeout: 8))
-        XCTAssertTrue(match(recorder, "Original marker only", .staticText, partial: true).exists)
+        waitForOriginalReader()
         capture("markdown-returned-to-original")
     }
 }
