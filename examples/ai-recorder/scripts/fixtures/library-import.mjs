@@ -18,3 +18,15 @@ export function noPlayableSamples(audio) {
   const mdia = atom('mdia', Buffer.concat([handler, atom('minf', atom('stbl', stsd))]));
   return Buffer.concat([ftyp, atom('moov', Buffer.concat([atom('mvhd', movieHeader), atom('trak', mdia)])), atom('mdat', Buffer.from([0]))]);
 }
+
+// Keep the original codec configuration, timing and complete sample index. The
+// packet payload bytes are replaced while the referenced lengths stay intact.
+export function unreadablePayload(audio) {
+  const bytes = Buffer.from(audio);
+  const offset = bytes.indexOf('mdat');
+  assert.ok(offset >= 4);
+  const size = bytes.readUInt32BE(offset - 4);
+  assert.ok(size > 8 && offset - 4 + size <= bytes.length);
+  bytes.fill(0xff, offset + 4, offset - 4 + size);
+  return bytes;
+}

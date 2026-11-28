@@ -1,6 +1,7 @@
+import { requireThat } from '../core.mjs';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { noPlayableSamples } from '../../../examples/ai-recorder/scripts/fixtures/library-import.mjs';
+import { noPlayableSamples, unreadablePayload } from '../../../examples/ai-recorder/scripts/fixtures/library-import.mjs';
 import { observeIOSImport } from './ios.mjs';
 
 export async function observeImport({platform, command, source, output, candidate, artifact, uuid, derived, serial, built}) {
@@ -8,6 +9,7 @@ export async function observeImport({platform, command, source, output, candidat
   const fixture = join(app,'scripts/fixtures/recorder-test-tone.m4a');
   const forged = join(output,'forged.m4a');
   writeFileSync(forged,noPlayableSamples(readFileSync(fixture)));
+  writeFileSync(join(output,'damaged.m4a'),unreadablePayload(readFileSync(fixture)));
   let result;
   if (platform === 'ios') {
     result = observeIOSImport({command, uuid, output, derived, fixture, forged});
@@ -19,5 +21,6 @@ export async function observeImport({platform, command, source, output, candidat
     }
     result = JSON.parse(readFileSync(join(output,'library-'+platform+'.json'),'utf8'));
   }
+  if (platform === 'web') requireThat(result.artifact === artifact.sha256, 'focused observer loaded a different Web export');
   return {...result,outcome:'library-import',platform,candidate,artifact:artifact.sha256};
 }

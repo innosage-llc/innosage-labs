@@ -87,7 +87,7 @@ def select(filename):
 
 label, forged = 'Labs146Tone.m4a', 'Labs146Forged.m4a'
 valid = app / 'scripts/fixtures/recorder-test-tone.m4a'
-for file, name in [(valid,label),(out/'forged.m4a',forged)]:
+for file, name in [(valid,label),(out/'forged.m4a',forged),(out/'damaged.m4a','Labs146Damaged.m4a')]:
     adb('push', file, '/sdcard/Download/'+name)
     adb('shell','am','broadcast','-a','android.intent.action.MEDIA_SCANNER_SCAN_FILE','-d','file:///sdcard/Download/'+name)
 before = storage('inspect')
@@ -102,6 +102,8 @@ assert any('documentsui' in n.get('package','') for n in nodes())
 adb('shell','input','keyevent','4')
 find('Import audio')
 select(forged)
+find('Choose an M4A containing an MP4 audio track.')
+select('Labs146Damaged.m4a')
 find('Choose an M4A containing an MP4 audio track.')
 assert storage('inspect').get('count') == '0'
 # The app must already be mounted when the path becomes unavailable. Instrumentation

@@ -289,7 +289,7 @@ test('generated XCTest project has named products, startup and Markdown sources,
   run(ruby,['-rxcodeproj','-e','p=Xcodeproj::Project.new(ARGV[0]);a=p.new_target(:application,"AIRecorder",:ios,"16.4");p.save;s=Xcodeproj::XCScheme.new;s.add_build_target(a);s.save_as(ARGV[0],"AIRecorder",true)',project]);
   run(ruby,[new URL('add-ios-test.rb',import.meta.url).pathname,project,new URL('StartupGateTests.swift',import.meta.url).pathname]);
   const inspected=JSON.parse(run(ruby,['-rxcodeproj','-rjson','-e','p=Xcodeproj::Project.open(ARGV[0]);t=p.targets.find{|x|x.name=="StartupGateUITests"};puts JSON.generate({products:t.build_configurations.map{|c|c.build_settings["PRODUCT_NAME"]},sources:t.source_build_phase.files_references.map(&:display_name).sort,dependencies:t.dependencies.size,scheme:File.read(File.join(ARGV[0],"xcshareddata/xcschemes/AIRecorder.xcscheme")).include?(t.uuid)})',project]));
-  assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['MarkdownGateTests.swift','StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
+  assert.deepEqual(inspected,{products:['$(TARGET_NAME)','$(TARGET_NAME)'],sources:['LibraryImportTests.swift','MarkdownGateTests.swift','StabilityWindow.swift','StartupGateTests.swift'],dependencies:1,scheme:true});
 });
 
 

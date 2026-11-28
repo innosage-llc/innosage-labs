@@ -11,6 +11,9 @@ export const contracts = {
   'library-import': {
     policy: ['libraryImport.ts','m4aDuration.ts'],
     entry: 'App.tsx',
+    inputs: ['index.ts','captureSession.ts','ui/RootShell.tsx','ui/AppChrome.tsx','browserDatabase.web.ts',
+      'scripts/fixtures/library-import.mjs','scripts/fixtures/recorder-test-tone.m4a','package.json','package-lock.json','app.config.js','app.json',
+      'modules/recorder-media-probe/','scripts/library-import-web.mjs'],
     adapters: {
       android:['ui/AppChrome.tsx','mediaLibrary.ts','modules/recorder-media-probe/android/'],
       ios:['ui/RootShell.ios.tsx','mediaLibrary.ts','modules/recorder-media-probe/ios/'],
@@ -53,11 +56,21 @@ export function requiredOutcomes(source, candidate, paths) {
   const required = new Set(changedOutcomes(git('show',base+':'+matrix),read(matrix),
     promise(git('show',base+':'+readme)) !== promise(read(readme))));
   for (const [key,contract] of Object.entries(contracts)) {
-    const files = [contract.entry,...contract.policy,...Object.values(contract.adapters).flat()];
+    const files = [contract.entry,...contract.policy,...contract.inputs,...Object.values(contract.adapters).flat()];
     if (paths.some(path => files.some(file => file.endsWith('/') ? path.startsWith(app+file) : path === app+file)) ||
         paths.some(path => path.startsWith('scripts/recorder-gate/import-test/') || path.startsWith('scripts/recorder-gate/prd-outcomes') ||
-          path === 'scripts/recorder-gate/LibraryImportTests.swift' || path === app+'scripts/library-import-web.mjs')) required.add(key);
+          path === 'scripts/recorder-gate/LibraryImportTests.swift')) required.add(key);
     for (const file of files) requireThat(existsSync(join(source,app,file)), 'missing outcome source: '+file);
+    for (const [platform, adapters] of Object.entries(contract.adapters)) {
+      for (const file of [contract.entry, ...adapters].filter(name => /\.tsx?$/.test(name))) {
+        const stem = file.replace(/(?:\.(?:android|ios|web|native))?\.tsx?$/, '');
+        // Metro prefers platform, then native, then the unsuffixed implementation.
+        const suffixes = [platform,...(platform === 'web' ? [] : ['native']),''];
+        const selected = suffixes.flatMap(suffix => ['tsx','ts','jsx','js'].map(ext =>
+          [stem,suffix,ext].filter(Boolean).join('.'))).find(name => existsSync(join(source,app,name)));
+        requireThat(selected === file, 'unregistered '+platform+' adapter or entry: '+selected);
+      }
+    }
     for (const policy of contract.policy) {
       const folder = dirname(join(source,app,policy)), stem = basename(policy,'.ts');
       requireThat(!readdirSync(folder).some(name => name.startsWith(stem+'.') && /\.(android|ios|native|web)\.[cm]?[jt]sx?$/.test(name)), 'platform fork: '+policy);

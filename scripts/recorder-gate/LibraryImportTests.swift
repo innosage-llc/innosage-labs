@@ -49,6 +49,9 @@ final class LibraryImportTests: XCTestCase {
         select(forged)
         XCTAssertTrue(matching("Choose an M4A containing an MP4 audio track.").waitForExistence(timeout: 8))
         XCTAssertFalse(matching(forged, .button).exists)
+        select("Labs146Damaged")
+        XCTAssertTrue(matching("Choose an M4A containing an MP4 audio track.").waitForExistence(timeout: 8))
+        XCTAssertFalse(matching("Labs146Damaged", .button).exists)
     }
 
     func testFailedSave() {

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { noPlayableSamples } from './fixtures/library-import.mjs';
+import { noPlayableSamples, unreadablePayload } from './fixtures/library-import.mjs';
 import { serveExport } from '../../../scripts/recorder-gate/web.mjs';
 
 // Reuse the startup gate's export. This suite uses a fresh browser context and intercepts only storage faults.
@@ -65,6 +65,10 @@ try {
   }
   assert.deepEqual(await saved(), []);
   await select('Forged.m4a', noPlayableSamples(audio));
+  await page.getByText('Choose an M4A containing an MP4 audio track.', {exact:true}).waitFor();
+  assert.deepEqual(await saved(), []);
+  await select('DamagedPackets.m4a', unreadablePayload(audio));
+  await action.waitFor();
   await page.getByText('Choose an M4A containing an MP4 audio track.', {exact:true}).waitFor();
   assert.deepEqual(await saved(), []);
   const label = 'Library tone.m4a';

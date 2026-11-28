@@ -14,7 +14,7 @@ export function observeIOSImport({ command, uuid, output, derived, fixture, forg
   requireThat(providers.length === 1, 'local Files provider missing');
   const files = join(groups,providers[0],'File Provider Storage');
   mkdirSync(files, {recursive:true});
-  for (const [name, bytes] of [['Labs146Tone.m4a',fixture], ['Labs146Forged.m4a',forged]]) {
+  for (const [name, bytes] of [['Labs146Tone.m4a',fixture], ['Labs146Forged.m4a',forged], ['Labs146Damaged.m4a',join(output,'damaged.m4a')]]) {
     copyFileSync(bytes, join(files,name), 1);
   }
   const products = join(derived,'Build/Products');

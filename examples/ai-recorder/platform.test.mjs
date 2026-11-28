@@ -222,3 +222,20 @@ test('reviewed service rollout exceptions match the adapters actually selected b
   }
   assert.deepEqual(entries, expected, 'An undocumented or stale rollout exception requires review');
 });
+
+test('each mounted Library toolbar reaches the shared admission before committing', () => {
+  for (const platform of ['android','ios','web']) {
+    const files = graph(platform);
+    const screen = files.get(resolve(root,'App.tsx'));
+    assert.match(screen, /libraryImport=\{importActionState\(phase, importAudio\)\}/);
+    assert.match(screen, /async function importAudio\(\)\s*\{\s*if \(session\.getSnapshot\(\)\.phase !== 'idle'\) return;\s*setCapturePhase\('importing'\)/);
+    assert.match(screen, /await importLibraryAudio\(pickAudio,/);
+    const chrome = {ios:'ui/RootShell.ios.tsx',android:'ui/AppChrome.tsx',web:'ui/AppChrome.web.tsx'}[platform];
+    assert.match(files.get(resolve(root,chrome)), /(?:onClick|onPress)=\{(?:action|libraryImport)\.onPress\}/);
+    assert.ok(files.has(resolve(root,'libraryImport.ts')));
+    const adapter = files.get(resolve(root,platform === 'web' ? 'mediaLibrary.web.ts' : 'mediaLibrary.ts'));
+    const selected = adapter.split('export async function pickAudio')[1];
+    assert.match(selected, /decodedSamples:/);
+    assert.doesNotMatch(selected, /endsWith\(['"]\.m4a|importMessages|kind:\s*['"](?:saved|unsupported|malformed)/);
+  }
+});
