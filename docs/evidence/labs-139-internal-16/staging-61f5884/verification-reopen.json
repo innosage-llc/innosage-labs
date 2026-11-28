@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "phase": "reopen",
+  "candidate": "61f58840ac6b27987ce2fb913525dff27ed41728",
+  "sourceTree": "712f1433dd13f36fa2e7133060988b9229892644",
+  "fixtureDigest": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "appRecordingDigest": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "recordingIdentityDigest": "0fbbfb06faa3ef3706f09553d274f8c386100d8becba31f563a8fec56cd51d30",
+  "originalDigest": "a824ca7a9ab0b3b2061bc871b35ff2bbaaef817871423ea2ede7b07a81844a01",
+  "originalBytes": 85,
+  "syntheticMarkerMatch": true,
+  "revisionDigest": "38458d1ad1165977d9987adc05d800563859b82c0af38cca3bd5cc9ce56464e4",
+  "revisionDistinctAndRetained": true
+}

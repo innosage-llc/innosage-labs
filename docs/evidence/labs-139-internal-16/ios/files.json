@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "phase": "files",
+  "candidate": "62a2b0e09b47222329260cfba7d38610f02f67c5",
+  "sourceTree": "5058ed69265c55ad9e0ce58ad5fb2ac9dc6ea186",
+  "fixtureDigest": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "appRecordingDigest": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "recordingIdentityDigest": "519716d424c56a1b6cda3a30a6df7af32eb59f9b543d818cc3c667222a3f6a34",
+  "exportedReceivedDigest": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16"
+}

@@ -1,0 +1,33 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 140,
+    "head": "62a2b0e09b47222329260cfba7d38610f02f67c5",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "4330708d75f4a906472b7a3b99881efe045e8253",
+    "tree": "5058ed69265c55ad9e0ce58ad5fb2ac9dc6ea186"
+  },
+  "status": "PASS",
+  "ci": "PASS",
+  "platforms": {
+    "android": {
+      "startup": "PASS",
+      "artifact": "441f8885b156bca2c8fc695ec7c1444846b87ecd63943b25620c22f62f2ffdf6"
+    },
+    "ios": {
+      "startup": "PASS",
+      "artifact": "8676ad6bdd997cbb5d826048fb36b21f1136fd57802420ae99a689ebc2dbc235"
+    },
+    "web": {
+      "startup": "PASS",
+      "artifact": "31e8764510196d05185b6c329c05e992e899613ea1b15c415ec19deb11afa503"
+    }
+  },
+  "recorderPackageTests": 162,
+  "v6CorrectedUI": {
+    "status": "PASS",
+    "head": "dd75be0d9810b46ff82a56e0879a7659062b08ac",
+    "artifactHash": "0b3b6a5dc26161dddf871a93189590fea0736286daee5701ba059814596da8b7"
+  }
+}

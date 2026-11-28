@@ -1,0 +1,20 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 140,
+    "head": "62a2b0e09b47222329260cfba7d38610f02f67c5",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "4330708d75f4a906472b7a3b99881efe045e8253",
+    "tree": "5058ed69265c55ad9e0ce58ad5fb2ac9dc6ea186"
+  },
+  "version": "0.1.9",
+  "build": 16,
+  "sha256": "9c319b1b0a41c37167f9e6fe2227862c1ca5b14a0ab07be265284f63d32ab258",
+  "stagingBinding": true,
+  "productionEligible": false,
+  "signedBundleMatchedRecompilation": true,
+  "ITSAppUsesNonExemptEncryption": false,
+  "androidApkSHA256": "892f459603444d5fd38b599661d9b479a0ed14229471928117027131515213db",
+  "review": "PASS, independent native GPT-6.2 Sol High, read-only exact integration"
+}

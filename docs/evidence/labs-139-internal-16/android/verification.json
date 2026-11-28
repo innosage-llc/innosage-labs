@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "lane": "exact-staging",
+  "apkSha256": "892f459603444d5fd38b599661d9b479a0ed14229471928117027131515213db",
+  "fixtureSha256": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16",
+  "receipt": "App file arrived through Android DocumentsUI, played and sought while radios off, cold-reopened and shared under native chooser to the local test receiver.",
+  "recipientBytesMatch": true,
+  "radioAirplaneVerified": true,
+  "wifiOffVerified": true,
+  "providerSubmitCount": 0
+}
