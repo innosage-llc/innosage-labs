@@ -13,7 +13,7 @@ export function localCI(source, paths, output, deps = { run, clean }) {
   }
   try {
   check('git', ['diff', '--check', 'HEAD^1', 'HEAD']);
-  check(process.execPath, ['--test', 'scripts/recorder-gate/gate.test.mjs']);
+  check(process.execPath, ['--test', 'scripts/recorder-gate/gate.test.mjs', 'scripts/recorder-gate/native-markdown.test.mjs']);
   const npm = dir => { const cwd = join(source, 'examples', dir); check('npm', ['ci', '--offline', '--no-audit', '--no-fund'], cwd); check('npm', ['run', 'typecheck'], cwd); check('npm', ['test'], cwd); };
   // Recorder CI also runs for unknown/shared paths; it never becomes an unrelated skip.
   npm('ai-recorder');

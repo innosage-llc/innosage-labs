@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { PLATFORMS, recorderImpact, validatePlatform, writeJSON, requireThat } from './core.mjs';
 import { clean } from './host.mjs';
 import { platformGate } from './platform.mjs';
+import { requiresNativeMarkdown, validateNativeMarkdown } from './native-markdown.mjs';
 
 export async function aggregate({ source, candidate, paths, output, targets }, gate = platformGate) {
   clean(source); const impact = recorderImpact(paths);
@@ -14,7 +15,11 @@ export async function aggregate({ source, candidate, paths, output, targets }, g
         const out = join(output, platform); mkdirSync(out, { recursive: true });
         try {
           const result = await gate({ platform, source, candidate, output: out, targets });
-          validatePlatform(result, candidate, platform); receipt.platforms[platform] = result;
+          validatePlatform(result, candidate, platform);
+          if (platform === 'ios' && requiresNativeMarkdown(source, paths)) {
+            validateNativeMarkdown(result.nativeMarkdown, candidate, result.artifact);
+          }
+          receipt.platforms[platform] = result;
         } catch (error) { receipt.platforms[platform] = { status: 'FAIL', error: error.message }; }
       }
       requireThat(PLATFORMS.every(p => receipt.platforms[p]?.status === 'PASS'), 'one or more platform gates incomplete or failed');

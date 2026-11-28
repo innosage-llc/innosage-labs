@@ -2,10 +2,11 @@
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { artifact, sha, requireThat, writeJSON } from './core.mjs';
+import { artifact, sha, changedPaths, requireThat, writeJSON } from './core.mjs';
 import { run, runAsync, clean, cli, loadCandidate, outDir, appPath } from './host.mjs';
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
+import { observeNativeMarkdown, requiresNativeMarkdown } from './native-markdown.mjs';
 import { webObservation } from './web.mjs';
 
 export async function platformGate({ platform, source, candidate, output, targets = {}, fault }) {
@@ -73,6 +74,11 @@ export async function platformGate({ platform, source, candidate, output, target
       requireThat(existsSync(join(built, 'main.jsbundle')) && readFileSync(join(built, 'main.jsbundle')).length > 0, 'embedded iOS JS missing');
       receipt.artifact = artifact(built);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await iosObservation({ command, output, uuid, app: built, workspace: app, derived, fault, onFault })); receipt.runtime = `${runtime.name} / ${runtime.version} / ${runtime.buildversion}`;
+      const paths = changedPaths(run('git', ['diff', '--name-status', '-z', '--find-renames', candidate.base, candidate.head], { cwd: source }));
+      if (!fault && requiresNativeMarkdown(source, paths)) {
+        receipt.stage = 'native-markdown';
+        receipt.nativeMarkdown = observeNativeMarkdown({ command, source, output, candidate, uuid, derived, appArtifact: receipt.artifact });
+      }
     } else if (platform === 'web') {
       receipt.stage = 'build'; const directory = join(output, 'export');
       command('./node_modules/.bin/expo', ['export', '--platform', 'web', '--output-dir', directory]);
