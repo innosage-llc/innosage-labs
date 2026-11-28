@@ -19,7 +19,7 @@
     "ios:testflight:submit": "npx eas-cli submit --platform ios --profile testflight",
     "ios:device": "python3 scripts/ios_device.py",
     "test:ios-device": "python3 -m unittest discover -s scripts -p test_ios_device.py",
-    "export:web": "expo export --platform web --output-dir dist-web",
+    "export:web": "node scripts/export-web.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "verify:release:staging": "node scripts/verify-staging.mjs",
     "test:verify-release": "node --test scripts/verify-release.test.mjs",

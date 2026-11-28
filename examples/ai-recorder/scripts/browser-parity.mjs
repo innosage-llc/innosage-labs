@@ -25,7 +25,7 @@ const directory = temporary ?? resolve(process.argv[2]);
 let browser, server;
 try {
   if (temporary) {
-    const result = spawnSync(process.execPath, ['node_modules/expo/bin/cli', 'export', '--platform', 'web', '--output-dir', directory], {
+    const result = spawnSync(process.execPath, ['scripts/export-web.mjs', '--output-dir', directory], {
       cwd: app, stdio: 'inherit', env: { ...process.env, CI: '1', EXPO_OFFLINE: '1', EXPO_NO_TELEMETRY: '1',
         EXPO_PUBLIC_RECORDER_GATEWAY_URL: stage, EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL: '' },
     });
@@ -55,7 +55,7 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const calls = [];
-  let operationURL;
+  let operationURL, queued = false, finishJob = false;
   let releaseUpload;
   const resume = new Promise(resolve => { releaseUpload = resolve; });
   await context.route('**/*', async route => {
@@ -79,7 +79,9 @@ try {
         if (operationURL) {
           assert.equal(url.href, operationURL, 'Resumed upload changed operation');
           calls.push('resume upload');
-          return reply({ state: 'COMPLETED', transcript: original });
+          assert.equal(queued, false, 'A stale RESERVED tab submitted the audio again');
+          queued = true;
+          return reply({ state: 'QUEUED' });
         }
         calls.push('upload');
         operationURL = url.href;
@@ -88,7 +90,7 @@ try {
       }
       if (operationURL && url.href === operationURL && method === 'GET') {
         calls.push('recover');
-        return reply({ state: 'RESERVED' });
+        return reply(finishJob ? { state: 'COMPLETED', transcript: original } : { state: queued ? 'QUEUED' : 'RESERVED' });
       }
       if (url.origin === 'https://api.openai.com') {
         assert.equal(request.headers().authorization, 'Bearer ' + fakeKey);
@@ -183,23 +185,55 @@ try {
       await (await chooser).setFiles({ name, mimeType: 'audio/mp4', buffer });
       await page.getByText(expected, { exact: true }).waitFor();
     };
-    const unreadable = 'Unreadable duration fixture.m4a';
+    await importFile('Captured AAC round trip.m4a', Buffer.from(captured));
     await importFile('Renamed file.m4a', Buffer.from('OggS synthetic wrong container'), 'Choose an M4A containing an MP4 audio track.');
+    const unreadable = 'Unplayable audio fixture.m4a';
     const atom = (type, payload) => {
       const header = Buffer.alloc(8); header.writeUInt32BE(8 + payload.length); header.write(type, 4); return Buffer.concat([header, payload]);
     };
+    // A forged positive duration and codec declaration do not supply a playable AAC sample.
     const ftyp = atom('ftyp', Buffer.from('isom0000'));
+    const movieHeader = Buffer.alloc(28); movieHeader.writeUInt32BE(1000, 12); movieHeader.writeUInt32BE(3000, 16);
     const handler = atom('hdlr', Buffer.concat([Buffer.alloc(8), Buffer.from('soun')]));
-    const stsd = atom('stsd', Buffer.concat([Buffer.from([0,0,0,0,0,0,0,1]), atom('mp4a', Buffer.alloc(28))]));
+    const codecStart = audio.indexOf('mp4a') - 4;
+    assert.ok(codecStart > 0);
+    const realAACDeclaration = audio.subarray(codecStart, codecStart + audio.readUInt32BE(codecStart));
+    const stsd = atom('stsd', Buffer.concat([Buffer.from([0,0,0,0,0,0,0,1]), realAACDeclaration]));
     const mdia = atom('mdia', Buffer.concat([handler, atom('minf', atom('stbl', stsd))]));
-    await importFile(unreadable, Buffer.concat([ftyp, atom('moov', atom('trak', mdia)), atom('mdat', Buffer.from([0]))]));
-    await page.getByText(unreadable, { exact: true }).click();
-    await click('Transcript for ' + unreadable);
-    await click('Transcribe');
-    await visible('Could not verify the recording duration for Free transcription. Check that the recording plays, then retry.');
-    assert.deepEqual(calls, ['verify key', 'verify key'], 'Missing duration must stop before guest provision or upload');
-    await click('Back to recording details');
-    await click('Back to Library');
+    const badAudio = Buffer.concat([ftyp, atom('moov', Buffer.concat([atom('mvhd', movieHeader), atom('trak', mdia)])), atom('mdat', Buffer.from([0]))]);
+    await importFile(unreadable, badAudio, 'Choose an M4A containing an MP4 audio track.');
+    // Reopen a synthetic entry in the previous on-disk format. Both normal
+    // provider actions must refuse the original bytes before network dispatch.
+    await page.evaluate(async ({ bytes, label }) => {
+      const db = await new Promise((resolve, reject) => {
+        const open = indexedDB.open('innosage.audio-recorder'); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error);
+      });
+      const name = 'Import-' + Date.now() + '-' + crypto.randomUUID() + '.m4a';
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('files', 'readwrite'); const files = tx.objectStore('files');
+        files.add({ name, content: new Blob([new Uint8Array(bytes)], {type:'audio/mp4'}) }, name);
+        files.add({ name: name + '.name', content: label }, name + '.name');
+        tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+      });
+      db.close();
+    }, { bytes: Array.from(badAudio), label: unreadable });
+    await page.reload();
+    for (const selected of ['staging', 'openai']) {
+      if (selected === 'openai') {
+        await click('Settings'); await click('Choose service and manage keys');
+        await service.selectOption('openai'); await visible('Key saved'); await click('Back to settings');
+      }
+      await click('Library');
+      await page.getByText(unreadable, { exact: true }).click();
+      await click('Transcript for ' + unreadable);
+      await click('Transcribe');
+      await visible('Choose a supported M4A audio file to transcribe.');
+      assert.deepEqual(calls, ['verify key', 'verify key'], selected + ' dispatch must stop before network');
+      await click('Back to recording details'); await click('Back to Library');
+    }
+    await click('Settings'); await click('Choose service and manage keys');
+    await service.selectOption('staging'); await visible('Default saved for new transcriptions. Existing jobs keep their service.');
+    await click('Back to settings'); await click('Library');
     await importFile(label, audio);
     await page.getByText(label, { exact: true }).click();
     assert.deepEqual(await download('Share audio for ' + label), audio);
@@ -237,7 +271,15 @@ try {
     await page.reload();
     await openRecording();
     await click('Transcript for ' + label);
+    await openOtherTranscript();
+    await other.getByRole('button', { name: 'Resume upload', exact: true }).waitFor();
     await click('Resume upload');
+    await page.getByText('Queued', { exact: false }).first().waitFor();
+    const rechecked = other.waitForResponse(resp => resp.url() === operationURL && resp.request().method() === 'GET');
+    await otherClick('Resume upload');
+    assert.equal((await (await rechecked).json()).state, 'QUEUED');
+    assert.equal(calls.filter(call => call === 'resume upload').length, 1);
+    finishJob = true;
     await visible(original);
     await openOtherTranscript();
     await other.getByText(original, { exact: true }).waitFor();
@@ -286,15 +328,15 @@ try {
     await click('Back to transcript');
     await click('Open summary');
     await visible(summary);
-    assert.deepEqual(calls, ['verify key', 'verify key', 'guest', 'upload', 'recover', 'resume upload', 'list models', 'summary']);
+    assert.deepEqual(calls.filter(call => call !== 'recover'), ['verify key', 'verify key', 'guest', 'upload', 'resume upload', 'list models', 'summary']);
     assert.deepEqual(errors, []);
     await verifyGuestOwnership(browser, server.url, stage, audio);
     await verifyShellUpgrade(browser, directory);
     console.log(JSON.stringify({ runtime: 'Chromium ' + browser.version(), artifact: server.artifact.sha256,
       source: 'synthetic microphone and M4A', provider: 'local intercepted responses', passed: [
         'capture storage failure, same-ID retry and offline byte-exact playback/seek', 'service setting/key verification', 'file import', 'byte-exact share/download', 'play/pause/seek',
-        'unknown duration refused locally', 'explicit upload and same-operation recovery', 'two-tab submission, edit conflict and first-use guest ownership', 'immutable original/edit', 'saved revision Markdown',
-        'revision-sourced summary', 'offline audio, original, revision and summary reopen', 'broken shell rollback, successful update and bounded cache' ] }, null, 2));
+        'unreadable media rejected on import and before Free or direct OpenAI dispatch', 'explicit upload, same-operation recovery and stale RESERVED recheck', 'two-tab submission, edit conflict and first-use guest ownership', 'immutable original/edit', 'saved revision Markdown',
+        'revision-sourced summary', 'offline audio, original, revision and summary reopen', 'missing runtime image and entry script rollback, successful update and bounded cache' ] }, null, 2));
   } catch (error) {
     console.error('Browser parity fixture failed:', await page.locator('body').innerText(), errors);
     throw error;

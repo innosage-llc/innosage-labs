@@ -149,7 +149,7 @@ test('a surviving saved edit opens its export actions without starting or restor
 test('Free submission checks known limits and binds access before upload', async () => {
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
   const body = component.slice(component.indexOf('async function submit() {'), component.indexOf('\n  async function save() {'));
-  const run = async ({ service, state, resumed, size = 50_000_000, duration = 900_000, available = true }) => {
+  const run = async ({ service, state, resumed, size = 50_000_000, duration = 900_000, available = true, observed = 'RESERVED' }) => {
     const events = [];
     const operationId = 'original-operation';
     const guest = { service, accountScope: 'a'.repeat(64) };
@@ -167,7 +167,11 @@ test('Free submission checks known limits and binds access before upload', async
       restoreGateway: async existing => { assert.deepEqual(existing, prior); events.push('restore'); return guest; },
       randomUUID: () => 'new-operation', operationKey: 'synthetic-operation-key',
       SecureStore: { setItemAsync: async (_key, value) => { events.push(['save', JSON.parse(value)]); } },
-      request: async (operation, upload) => { assert.equal(upload, true); events.push(['upload', operation]); },
+      readOperationWithDeadline, statusRecoveryMessage,
+      request: async (operation, upload) => {
+        if (!upload) { assert.equal(operation.id, prior.id); events.push('check status'); return { state: observed }; }
+        events.push(['upload', operation]);
+      },
       setBusy() {}, setOperation() {}, setFreeOperation() {}, setPaidOperation() {}, setJob() {}, setStatusUnknown() {},
       setMessage: message => { if (message) events.push(message); },
       KnownServiceFailure, ProServiceError, speakerUnavailable: () => false,
@@ -188,7 +192,9 @@ test('Free submission checks known limits and binds access before upload', async
     const freshOperation = { lane: 'free', id: 'new-operation', identifySpeakers: false, ...fresh.guest };
     assert.deepEqual(fresh.events, ['guest', ['save', freshOperation], ['upload', freshOperation]]);
     const retry = await run({ service, state: 'RESERVED', resumed: true });
-    assert.deepEqual(retry.events, ['restore', ['save', retry.prior], ['upload', retry.prior]]);
+    assert.deepEqual(retry.events, ['check status', 'restore', ['save', retry.prior], ['upload', retry.prior]]);
+    const stale = await run({ service, state: 'RESERVED', resumed: true, observed: 'QUEUED' });
+    assert.deepEqual(stale.events, ['check status']);
   }
 });
 

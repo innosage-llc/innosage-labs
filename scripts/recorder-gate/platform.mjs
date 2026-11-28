@@ -81,7 +81,7 @@ export async function platformGate({ platform, source, candidate, output, target
       }
     } else if (platform === 'web') {
       receipt.stage = 'build'; const directory = join(output, 'export');
-      command('./node_modules/.bin/expo', ['export', '--platform', 'web', '--output-dir', directory]);
+      command(process.execPath, ['scripts/export-web.mjs', '--output-dir', directory]);
       receipt.artifact = artifact(directory);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await webObservation({ source, directory, output, fault, onFault }));
     } else throw new Error('unknown platform');

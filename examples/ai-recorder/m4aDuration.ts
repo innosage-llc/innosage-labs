@@ -38,6 +38,47 @@ export async function m4aDurationMillis(size: number, read: ReadAt) {
   }
 }
 
+// Each MPEG-4 descriptor starts with a tag and a base-128 length (up to four
+// bytes). mp4a is a container entry, not by itself an AAC codec declaration.
+function descriptor(bytes: Uint8Array, offset: number, end: number, tag: number) {
+  if (offset >= end || bytes[offset++] !== tag) return;
+  let size = 0;
+  for (let n = 0; n < 4 && offset < end; n++) {
+    const value = bytes[offset++];
+    size = size * 128 + (value & 127);
+    if (!(value & 128)) return size <= end - offset ? { start: offset, end: offset + size } : undefined;
+  }
+}
+
+async function declaresAAC(read: ReadAt, entry: {start: number; end: number}) {
+  const header = await read(entry.start, 28);
+  if (header.length < 28) return false;
+  const version = (header[8] << 8) + header[9];
+  if (version > 1) return false;
+  const children = entry.start + (version === 1 ? 44 : 28);
+  let esds = await atom(read, children, entry.end, 'esds');
+  if (!esds) {
+    const wave = await atom(read, children, entry.end, 'wave');
+    if (wave) esds = await atom(read, wave.start, wave.end, 'esds');
+  }
+  if (!esds || esds.end - esds.start > 4096) return false;
+  const data = await read(esds.start, esds.end - esds.start);
+  const stream = descriptor(data, 4, data.length, 3);
+  if (!stream || stream.end - stream.start < 3) return false;
+  const flags = data[stream.start + 2];
+  let offset = stream.start + 3;
+  if (flags & 128) offset += 2;
+  if (flags & 64) { if (offset >= stream.end) return false; offset += 1 + data[offset]; }
+  if (flags & 32) offset += 2;
+  const config = descriptor(data, offset, stream.end, 4);
+  if (!config || config.end - config.start < 13 || (data[config.start + 1] >> 2) !== 5) return false;
+  const objectType = data[config.start];
+  if ([0x66, 0x67, 0x68].includes(objectType)) return true; // MPEG-2 AAC profiles.
+  if (objectType !== 0x40) return false;
+  const asc = descriptor(data, config.start + 13, config.end, 5);
+  return !!asc && asc.end - asc.start >= 2 && [1, 2, 3, 4, 5, 17, 23, 29].includes(data[asc.start] >> 3);
+}
+
 // A suffix or reported MIME type cannot distinguish renamed WebM, video MP4,
 // or arbitrary data. Walk bounded atom headers; never buffer media payloads.
 export async function hasMP4AudioTrack(size: number, read: ReadAt) {
@@ -63,8 +104,10 @@ export async function hasMP4AudioTrack(size: number, read: ReadAt) {
         if (samples && samples.end - samples.start >= 8) {
           const prefix = await read(samples.start, 8);
           if (prefix.length !== 8 || !new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength).getUint32(4)) return false;
-          const codec = await atom(read, samples.start + 8, samples.end, 'mp4a') ?? await atom(read, samples.start + 8, samples.end, 'alac');
-          if (codec && codec.end - codec.start >= 28) audio = true;
+          const aac = await atom(read, samples.start + 8, samples.end, 'mp4a');
+          const alac = await atom(read, samples.start + 8, samples.end, 'alac');
+          if (aac && aac.end - aac.start >= 28 && await declaresAAC(read, aac)) audio = true;
+          if (alac && alac.end - alac.start >= 28 && await atom(read, alac.start + 28, alac.end, 'alac')) audio = true;
         }
       }
     }

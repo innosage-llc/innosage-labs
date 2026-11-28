@@ -407,6 +407,20 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         if (sizeLimit) throw new KnownServiceFailure(sizeLimit);
         const limit = freeRecordingLimit(recording.size, await recordingDurationMillis(recording).catch(() => undefined));
         if (limit) throw new KnownServiceFailure(limit);
+        if (freeOperation && job?.state === 'RESERVED') {
+          // The view can outlive another tab's upload. Check the original job
+          // again inside the submission lock before sending its audio bytes.
+          try {
+            const status = await readOperationWithDeadline(
+              signal => request(freeOperation, false, signal, undefined), controller.signal,
+            );
+            if (status.state !== 'RESERVED') return;
+          } catch (error) {
+            setStatusUnknown(true);
+            setMessage(statusRecoveryMessage(error));
+            return;
+          }
+        }
         const existing = terminalJob ? undefined : freeOperation;
         const guest = existing ? await restoreGateway(existing) : await connectGateway(service);
         controller.signal.throwIfAborted();

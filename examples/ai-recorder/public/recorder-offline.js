@@ -21,21 +21,37 @@ function checkAsset(response, url) {
   if (type.includes('text/html') || (/\.js$/.test(url.pathname) && !/javascript|ecmascript/i.test(type))
     || (/\.css$/.test(url.pathname) && !/text\/css/i.test(type))) throw new Error('Unexpected static asset type');
 }
+async function digest(bytes) {
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+}
 async function installRelease() {
   const response = await fetch(root, { cache: 'reload', credentials: 'omit', redirect: 'error' });
   if (!response.ok || response.url !== root || !response.headers.get('content-type')?.includes('text/html')) throw new Error('Recorder shell unavailable');
-  const html = await response.clone().text();
-  const assets = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/gi)].map(match => new URL(match[1], root)).filter(isAsset);
-  if (!assets.some(url => url.pathname.endsWith('.js'))) throw new Error('Recorder bundle unavailable');
-  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html));
-  const release = prefix + Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+  const manifestURL = new URL('./recorder-shell.json', root);
+  const manifestResponse = await fetch(manifestURL, { cache: 'reload', credentials: 'omit', redirect: 'error' });
+  if (!manifestResponse.ok || manifestResponse.url !== manifestURL.href) throw new Error('Missing Recorder asset manifest');
+  const manifest = await manifestResponse.json();
+  const indexBytes = await response.clone().arrayBuffer();
+  if (manifest.version !== 1 || manifest.index !== await digest(indexBytes) || !Array.isArray(manifest.files)) throw new Error('Mismatched Recorder shell');
+  const assets = new Map();
+  for (const file of manifest.files) {
+    const url = new URL(file.path, root);
+    if (!isAsset(url) || assets.has(url.href) || !/^[a-f0-9]{64}$/.test(file.sha256)) throw new Error('Invalid Recorder asset');
+    assets.set(url.href, file.sha256);
+  }
+  const entries = [...new TextDecoder().decode(indexBytes).matchAll(/(?:src|href)=["']([^"']+)["']/gi)].map(match => new URL(match[1], root)).filter(isAsset);
+  if (!entries.some(url => url.pathname.endsWith('.js')) || entries.some(url => !assets.has(url.href))) throw new Error('Missing Recorder bundle');
+  const release = prefix + await digest(new TextEncoder().encode(JSON.stringify(manifest)));
   const previous = await releases();
   if (previous[0] === release && await caches.has(release)) return response;
   const cache = await caches.open(release);
   try {
-    for (const url of assets) {
+    for (const [href, expected] of assets) {
+      const url = new URL(href);
       const asset = await fetch(url, { cache: 'reload', credentials: 'omit', redirect: 'error' });
       checkAsset(asset, url);
+      if (await digest(await asset.clone().arrayBuffer()) !== expected) throw new Error('Incomplete Recorder asset');
       await cache.put(url, asset);
     }
     await cache.put(root, response.clone());
@@ -77,8 +93,7 @@ self.addEventListener('fetch', event => {
       if (hit) return hit;
       const response = await fetch(request);
       checkAsset(response, url);
-      const [current] = await releases();
-      if (current) await (await caches.open(current)).put(request, response.clone());
+      // Only build-manifest entries are retained in a release cache.
       return response;
     })());
   }
