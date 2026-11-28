@@ -13,10 +13,11 @@ export function localCI(source, paths, output, deps = { run, clean }) {
   }
   try {
   check('git', ['diff', '--check', 'HEAD^1', 'HEAD']);
-  check(process.execPath, ['--test', 'scripts/recorder-gate/gate.test.mjs']);
+  check(process.execPath, ['--test', 'scripts/recorder-gate/gate.test.mjs', 'scripts/recorder-gate/native-markdown.test.mjs']);
   const npm = dir => { const cwd = join(source, 'examples', dir); check('npm', ['ci', '--offline', '--no-audit', '--no-fund'], cwd); check('npm', ['run', 'typecheck'], cwd); check('npm', ['test'], cwd); };
   // Recorder CI also runs for unknown/shared paths; it never becomes an unrelated skip.
   npm('ai-recorder');
+  check('npm', ['run', 'test:browser-parity'], join(source, 'examples/ai-recorder'));
   check('npm', ['run', 'test:ios-device'], join(source, 'examples/ai-recorder'));
   if (paths.some(p => p.startsWith('examples/ai-recorder/server/'))) check(process.env.LABS85_PYTHON ?? 'python3', ['-B','-m','unittest','discover','-s','server','-v'], join(source,'examples/ai-recorder'));
   for (const owner of new Set(paths.map(p => p.split('/')[0] === 'examples' ? p.split('/')[1] : null))) {

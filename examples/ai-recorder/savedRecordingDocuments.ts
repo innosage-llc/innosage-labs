@@ -1,6 +1,6 @@
-import { File } from 'expo-file-system';
+import { File } from './localFiles';
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './credentialStore';
 import { createDraftDocument } from './draftDocumentStore';
 import { draftText, editedSummaryCitations, readSummaryGeneration, type SummarySourceCitation } from './draftDocumentModel';
 import { committedSummary } from './summaryDraftLifecycle';

@@ -46,6 +46,7 @@ export function LibraryView({
   ref, recordings, phase, highlightedUri, onOpenRecording,
 }: LibraryViewProps) {
   const { palette, spacing, typography } = useTheme();
+  const ios = Platform.OS === 'ios';
   const data = useMemo(() => groupByDay(recordings), [recordings]);
   const today = new Date();
   const list = useRef<FlatList<LibraryItem>>(null);
@@ -122,7 +123,7 @@ export function LibraryView({
             disabled={disabled}
             onPress={() => onOpenRecording(uri)}
             android_ripple={{ color: palette.border }}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'flex-start',
               gap: spacing.md,
@@ -130,9 +131,9 @@ export function LibraryView({
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               borderRadius: spacing.md,
-              backgroundColor: highlighted ? palette.surface : undefined,
+              backgroundColor: ios && pressed ? palette.border : highlighted ? palette.surface : undefined,
               overflow: 'hidden',
-            }}
+            })}
           >
             <LibraryAudioIcon highlighted={highlighted} />
             <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
@@ -170,10 +171,10 @@ export function LibraryView({
                         {
                           color: palette.muted,
                           fontVariant: ['tabular-nums'],
-                          marginLeft: 'auto',
+                          marginLeft: ios ? undefined : 'auto',
                           flexShrink: 0,
                           maxWidth: '100%',
-                          textAlign: 'right',
+                          textAlign: ios ? 'left' : 'right',
                         },
                       ]}
                     >

@@ -89,12 +89,25 @@ test('unconfigured services fail closed and a staging release rejects invalid bu
   const parityFlag = 'RECORDER_PARITY_ANDROID_RELEASE';
   const stagingInput = 'EXPO_PUBLIC_RECORDER_GATEWAY_URL';
   const productionInput = 'EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL';
-  const variables = [stagingFlag, parityFlag, stagingInput, productionInput];
+  const iosFlag = 'RECORDER_STAGING_IOS_INTERNAL';
+  const variables = [stagingFlag, parityFlag, iosFlag, stagingInput, productionInput];
   const prior = variables.map(variable => process.env[variable]);
   const config = { name: 'Recorder' };
   try {
     for (const variable of variables) delete process.env[variable];
     assert.equal(configureApp({ config }), config);
+    const profileEnv = createRequire(import.meta.url)('./eas.json').build.testflight.env;
+    assert.equal(profileEnv[iosFlag], '1');
+    assert.equal(profileEnv[stagingInput], approved.staging);
+    process.env[iosFlag] = profileEnv[iosFlag];
+    assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
+    process.env[stagingInput] = approved.staging;
+    assert.equal(configureApp({ config }), config);
+    process.env[productionInput] = approved.production;
+    assert.throws(() => configureApp({ config }), /exclude the Production Free gateway/);
+    delete process.env[iosFlag];
+    delete process.env[stagingInput];
+    delete process.env[productionInput];
     process.env[stagingFlag] = '1';
     assert.throws(() => configureApp({ config }), /approved Staging Free gateway/);
     process.env[stagingInput] = production;
@@ -125,7 +138,9 @@ test('the same Free limits apply with exact inclusive decimal byte and duration 
   assert.match(freeRecordingLimit(50_000_001), /50 MB/);
   assert.match(freeRecordingLimit(50_000_000, 900_001), /15 minutes/);
   assert.match(freeRecordingLimit(0), /empty/);
-  assert.equal(freeRecordingLimit(1), undefined);
+  for (const duration of [undefined, 0, -1, NaN, Infinity]) {
+    assert.match(freeRecordingLimit(1, duration), /Could not verify the recording duration/);
+  }
 });
 
 

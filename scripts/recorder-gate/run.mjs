@@ -3,10 +3,9 @@
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { cli, loadCandidate, outDir, checkout, sourceIdentity, assertSnapshot, prSnapshot, run } from './host.mjs';
-import { changedPaths, writeJSON } from './core.mjs';
-import { localCI } from './local-ci.mjs';
-import { aggregate } from './aggregate.mjs';
+import { pathToFileURL } from 'node:url';
+import { clean, git, cli, loadCandidate, outDir, checkout, sourceIdentity, assertSnapshot, prSnapshot, run } from './host.mjs';
+import { changedPaths, requireThat, writeJSON } from './core.mjs';
 
 async function main() {
   const o = cli(process.argv.slice(2), ['candidate','output','android','ios-runtime']);
@@ -14,7 +13,15 @@ async function main() {
   const source = join(mkdtempSync(join(tmpdir(), 'labs-startup-')), 'source');
   const receipt = { candidate, status: 'FAIL' };
   try {
-    assertSnapshot(candidate, prSnapshot(candidate.repo, candidate.pr)); checkout(candidate, source);
+    requireThat(git('rev-parse', 'HEAD') === candidate.head, 'launch the local gate from the exact PR head');
+    clean();
+    assertSnapshot(candidate, prSnapshot(candidate.repo, candidate.pr));
+    checkout(candidate, source);
+    const observers = join(source, 'scripts', 'recorder-gate');
+    const [{ localCI }, { aggregate }] = await Promise.all([
+      import(pathToFileURL(join(observers, 'local-ci.mjs')).href),
+      import(pathToFileURL(join(observers, 'aggregate.mjs')).href),
+    ]);
     const paths = changedPaths(run('git', ['diff','--name-status','-z','--find-renames',candidate.base,candidate.head]));
     receipt.ci = localCI(source, paths, output); sourceIdentity(source,candidate);
     receipt.startup = await aggregate({ source,candidate,paths,output,targets:{ android:o.android,iosRuntime:o['ios-runtime'] } });

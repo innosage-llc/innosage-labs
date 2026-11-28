@@ -16,3 +16,5 @@ export async function readTranscriptSidecar(file: File) {
 export function transferTranscript(filename: string, markdown: string, save: boolean) {
   return transfer().exportMarkdown(filename, markdown, save);
 }
+
+export const markdownTransfer: 'share-and-save' | 'share-sheet' | 'unavailable' = 'share-and-save';

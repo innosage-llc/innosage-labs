@@ -1,7 +1,6 @@
 import { fetch } from 'expo/fetch';
-import { Platform } from 'react-native';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './credentialStore';
 import { createGatewayGuests, provisionedGuestToken, type FreeOperation, type GatewayGuest } from './GatewayGuest';
 import type { File } from 'expo-file-system';
 import { KnownServiceFailure } from './operationRecovery';
@@ -9,13 +8,14 @@ import type { SpeakerResult } from './transcriptCompletion';
 import type { InnoSageServiceId } from './ServiceConfig';
 import allowedTargets from './recorder-free-targets.json';
 
-const stagingInput = process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL?.replace(/\/$/, '');
-const productionInput = process.env.EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL?.replace(/\/$/, '');
-const targets: Partial<Record<InnoSageServiceId, string>> = {
-  staging: stagingInput === allowedTargets.staging ? allowedTargets.staging : undefined,
-  production: Platform.OS === 'android' && productionInput === allowedTargets.production
-    ? allowedTargets.production : undefined,
-};
+import { withGuestProvision } from './recordingCoordination';
+import { freeTargets } from './freeTargets';
+import { productionFreeEligible } from './productionFreeEligible';
+
+const targets = freeTargets(allowedTargets, {
+  staging: process.env.EXPO_PUBLIC_RECORDER_GATEWAY_URL,
+  production: process.env.EXPO_PUBLIC_RECORDER_PRODUCTION_GATEWAY_URL,
+}, productionFreeEligible);
 
 export const gatewayAvailable = (service: InnoSageServiceId) => !!targets[service];
 
@@ -35,7 +35,7 @@ const guests = createGatewayGuests({
   },
 });
 
-export const connectGateway = guests.connect;
+export const connectGateway = (service: InnoSageServiceId) => withGuestProvision(service, () => guests.connect(service));
 export const restoreGateway = guests.restore;
 
 type GuestJob = { state: string; transcript?: string; speakerLabeling?: SpeakerResult };

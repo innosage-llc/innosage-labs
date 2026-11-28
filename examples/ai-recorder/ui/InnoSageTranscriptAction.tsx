@@ -101,7 +101,7 @@ export function InnoSageTranscriptAction({
               {isProduction ? 'Free transcription is unavailable in Production.' : 'Free transcription is unavailable in this build.'}
             </Text>
           ) : null}
-          {proUnavailable ? <Text style={body}>Pro uploads are unavailable on iOS.</Text> : null}
+          {proUnavailable ? <Text style={body}>Pro uploads are unavailable on this platform.</Text> : null}
           {isProduction && !proUnavailable ? <Text style={muted}>A Production Pro key is required.</Text> : null}
         </View>
       ) : null}
@@ -109,6 +109,7 @@ export function InnoSageTranscriptAction({
       {canUpload ? (
         <View style={{ gap: spacing.xs }}>
           <Text style={body}>Transcribing uploads this M4A recording to InnoSage.</Text>
+          {!isProduction && !usePro ? <Text style={muted}>The Staging Gateway keeps the original transcript on its server.</Text> : null}
           <Text style={muted}>{limit}</Text>
         </View>
       ) : null}

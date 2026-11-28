@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Linking, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { RecorderSwitch } from './RecorderSwitch';
 import { randomUUID } from 'expo-crypto';
-import { File } from 'expo-file-system';
-import * as SecureStore from 'expo-secure-store';
+import { File } from './localFiles';
+import * as SecureStore from './credentialStore';
 import { meetingEssentials, thinkingBudgets, type ThinkingEffort, type SummaryCitation } from './OpenAIClient';
 import { openAIAccess } from './OpenAIAccess';
 import { useTheme } from './ui/theme';
@@ -68,9 +68,9 @@ export function TranscriptSummary({ original, hasRevision, readRevision, output,
       const next = new File(output.parentDirectory, `${output.name}.${Date.now()}-${randomUUID()}.json`);
       await save(next, JSON.stringify(result));
       for (const file of previous) {
-        try { file.delete(); } catch { /* The new summary has already been saved. */ }
+        try { await file.delete(); } catch { /* The new summary has already been saved. */ }
       }
-      try { if (output.exists) output.delete(); } catch { /* Legacy copy. */ }
+      try { if (output.exists) await output.delete(); } catch { /* Legacy copy. */ }
       setSummary(result);
       setUnsaved(undefined);
     } catch {

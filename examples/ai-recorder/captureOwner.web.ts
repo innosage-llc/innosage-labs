@@ -1,19 +1,41 @@
 import { AudioRecorderWeb } from 'expo-audio/build/AudioRecorder.web';
 import { RecordingPresets } from 'expo-audio';
 import { CaptureSession } from './captureSession';
+import { loadFiles, storeAudio } from './localFiles.web';
+import { recordingSavedMessage } from './ui/recordFeedback';
 
 let session: CaptureSession | undefined;
-/** Keep the real capture owner and idle recorder contract without requesting input.
- * Native storage capture is unavailable on Web; the control is explicitly disabled.
- */
 export function getCaptureSession() {
-  if (!session) session = new CaptureSession({
-    recorder: new AudioRecorderWeb(RecordingPresets.HIGH_QUALITY),
-    microphone: async () => { throw new Error('Recording is available in the native apps.'); },
-    notification: async () => {}, audioMode: async () => {},
-    save: async () => { throw new Error('Native file storage is unavailable on Web.'); },
-    permissionMessage: () => 'Recording is available in the native apps.',
-    savedMessage: '',
-  });
+  if (!session) {
+    const supported = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus']
+      .find(mime => globalThis.MediaRecorder?.isTypeSupported(mime));
+    const options = { ...RecordingPresets.HIGH_QUALITY, mimeType: supported };
+    let pending: { uri: string; name: string; blob: Blob } | undefined;
+    session = new CaptureSession({
+      recorder: new AudioRecorderWeb(options),
+      // prepareToRecordAsync opens the microphone once, after the actual Start gesture.
+      microphone: async () => ({ granted: !!supported && !!navigator.mediaDevices?.getUserMedia, canAskAgain: true }),
+      permissionMessage: () => 'This browser needs microphone access on a secure page to record.',
+      startErrorMessage: error => {
+        if (!(error instanceof DOMException)) return;
+        if (error.name === 'NotAllowedError') return 'Microphone access was denied. Allow the microphone for this site in your browser settings, then try again.';
+        if (error.name === 'NotFoundError') return 'No microphone is available to this browser.';
+        if (error.name === 'NotReadableError') return 'The browser could not open the microphone. Check the device, then try again.';
+      },
+      notification: async () => {}, audioMode: async () => {},
+      recover: loadFiles,
+      retainFailedSave: true,
+      save: async uri => {
+        if (!pending || pending.uri !== uri) {
+          pending = { uri, name: 'Recording-' + Date.now() + '-' + crypto.randomUUID(), blob: await (await fetch(uri)).blob() };
+        }
+        const saved = await storeAudio(pending.blob, undefined, pending.name);
+        pending = undefined;
+        URL.revokeObjectURL(uri);
+        return saved;
+      },
+      savedMessage: recordingSavedMessage,
+    });
+  }
   return session;
 }

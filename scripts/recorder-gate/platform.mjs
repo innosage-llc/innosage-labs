@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { artifact, sha, requireThat, writeJSON } from './core.mjs';
-import { run, runAsync, clean, cli, loadCandidate, outDir, appPath } from './host.mjs';
+import { artifact, sha, changedPaths, requireThat, writeJSON } from './core.mjs';
+import { root, run, runAsync, validateIntegration, sourceIdentity, cli, loadCandidate, outDir, appPath } from './host.mjs';
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
+import { observeNativeMarkdown, requiresNativeMarkdown } from './native-markdown.mjs';
 import { webObservation } from './web.mjs';
 
 export async function platformGate({ platform, source, candidate, output, targets = {}, fault }) {
@@ -36,7 +37,8 @@ export async function platformGate({ platform, source, candidate, output, target
     }
   }
   try {
-    clean(source); requireThat(run('git', ['rev-parse', 'HEAD'], { cwd: source }).trim() === candidate.tested, 'platform source revision mismatch');
+    sourceIdentity(source, candidate);
+    validateIntegration(candidate, source);
     receipt.inputs = Object.fromEntries(['app.json','package.json','package-lock.json'].map(name => [name, sha(readFileSync(join(app,name)))]));
     receipt.node = process.version;
     requireThat(!fault || ['terminate', 'missing-entry'].includes(fault), 'unsupported fault');
@@ -73,9 +75,14 @@ export async function platformGate({ platform, source, candidate, output, target
       requireThat(existsSync(join(built, 'main.jsbundle')) && readFileSync(join(built, 'main.jsbundle')).length > 0, 'embedded iOS JS missing');
       receipt.artifact = artifact(built);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await iosObservation({ command, output, uuid, app: built, workspace: app, derived, fault, onFault })); receipt.runtime = `${runtime.name} / ${runtime.version} / ${runtime.buildversion}`;
+      const paths = changedPaths(run('git', ['diff', '--name-status', '-z', '--find-renames', candidate.base, candidate.head], { cwd: source }));
+      if (!fault && requiresNativeMarkdown(source, paths)) {
+        receipt.stage = 'native-markdown';
+        receipt.nativeMarkdown = observeNativeMarkdown({ command, source, output, candidate, uuid, derived, appArtifact: receipt.artifact });
+      }
     } else if (platform === 'web') {
       receipt.stage = 'build'; const directory = join(output, 'export');
-      command('./node_modules/.bin/expo', ['export', '--platform', 'web', '--output-dir', directory]);
+      command(process.execPath, ['scripts/export-web.mjs', '--output-dir', directory]);
       receipt.artifact = artifact(directory);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await webObservation({ source, directory, output, fault, onFault }));
     } else throw new Error('unknown platform');
@@ -85,7 +92,7 @@ export async function platformGate({ platform, source, candidate, output, target
       requireThat(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])), 'screenshot is not a PNG');
       return { path:name,bytes:bytes.length,sha256:sha(bytes) };
     });
-    clean(source); receipt.stage = 'complete'; receipt.status = 'PASS'; return receipt;
+    sourceIdentity(source, candidate); receipt.stage = 'complete'; receipt.status = 'PASS'; return receipt;
   } catch (error) { receipt.error = error.message; throw error; }
   finally {
     if (uuid) { try { command('xcrun', ['simctl', 'shutdown', uuid], { timeout: 30000 }); } catch (e) { receipt.cleanup_error = e.message; receipt.status = 'FAIL'; } }
@@ -95,5 +102,7 @@ export async function platformGate({ platform, source, candidate, output, target
 }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const o = cli(process.argv.slice(2), ['platform', 'source', 'candidate', 'output', 'android', 'ios-runtime', 'fault']);
-  platformGate({ platform: o.platform, source: resolve(o.source), candidate: loadCandidate(o.candidate), output: outDir(o.output), targets: { android: o.android, iosRuntime: o['ios-runtime'] }, fault: o.fault }).catch(e => { console.error(e.message); process.exitCode = 1; });
+  const source = realpathSync(resolve(o.source));
+  requireThat(source === realpathSync(root), 'run the platform observer from the retained integration checkout');
+  platformGate({ platform: o.platform, source, candidate: loadCandidate(o.candidate), output: outDir(o.output), targets: { android: o.android, iosRuntime: o['ios-runtime'] }, fault: o.fault }).catch(e => { console.error(e.message); process.exitCode = 1; });
 }
