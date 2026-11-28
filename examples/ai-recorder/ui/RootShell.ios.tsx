@@ -1,7 +1,7 @@
 import { View, StatusBar } from 'react-native';
 import { Host } from '@expo/ui';
 import { Button, NavigationStack, RNHostView, TabView, Toolbar, ToolbarItem, VStack } from '@expo/ui/swift-ui';
-import { disabled, navigationTitle, navigationBarTitleDisplayMode } from '@expo/ui/swift-ui/modifiers';
+import { disabled, labelStyle, navigationTitle, navigationBarTitleDisplayMode } from '@expo/ui/swift-ui/modifiers';
 import { destinations, type RootDestination } from './navigation';
 import type { RootShellProps } from './RootShell';
 import { useTheme } from './theme';
@@ -29,8 +29,8 @@ export function RootShell({ selected, onSelect, enabled, libraryImport, children
               {action ? <Toolbar modifiers={modifiers}>
                 <VStack>{content}</VStack>
                 <Toolbar.Content><ToolbarItem placement="topBarTrailing">
-                  <Button label={action.importing ? 'Importing audio' : 'Import audio'}
-                    onPress={action.onPress} modifiers={[disabled(action.disabled)]} />
+                  <Button label={action.accessibilityName} systemImage="square.and.arrow.down"
+                    onPress={action.onPress} modifiers={[labelStyle('iconOnly'), disabled(action.disabled)]} />
                 </ToolbarItem></Toolbar.Content>
               </Toolbar> : <VStack modifiers={modifiers}>{content}</VStack>}
             </NavigationStack>

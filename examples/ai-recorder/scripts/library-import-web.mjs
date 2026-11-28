@@ -39,6 +39,9 @@ try {
   await page.evaluate(() => navigator.serviceWorker.ready);
   await button('Library').click();
   assert.equal(await action.count(), 1);
+  assert.equal(await action.evaluate(element => element.tagName), 'BUTTON');
+  assert.equal(await action.innerText(), '');
+  assert.equal(await action.locator('svg[aria-hidden="true"]').isVisible(), true);
   const open = page.waitForEvent('filechooser');
   await action.focus();
   await page.keyboard.press('Enter');

@@ -9,6 +9,7 @@ import DownloadIcon from '@expo/material-symbols/download.xml';
 import RecordIcon from '@expo/material-symbols/mic.xml';
 import LibraryIcon from '@expo/material-symbols/folder.xml';
 import SettingsIcon from '@expo/material-symbols/settings.xml';
+import type { importActionState } from '../libraryImport';
 import { useTheme } from './theme';
 import { destinations, type RootDestination } from './navigation';
 
@@ -20,7 +21,7 @@ export type AppHeaderProps = {
   backLabel?: string;
   backDisabled?: boolean;
   quietTitle?: boolean;
-  libraryImport?: { importing: boolean; disabled: boolean; onPress: () => void };
+  libraryImport?: ReturnType<typeof importActionState>;
 };
 
 export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = false, quietTitle = false, libraryImport }: AppHeaderProps) {
@@ -50,7 +51,7 @@ export function AppHeader({ title, onBack, backLabel = 'Back', backDisabled = fa
           >
             <Icon
               source={DownloadIcon}
-              contentDescription={libraryImport.importing ? 'Importing audio' : 'Import audio'}
+              contentDescription={libraryImport.accessibilityName}
               size={24}
               tint={libraryImport.disabled ? palette.muted : palette.text}
             />
