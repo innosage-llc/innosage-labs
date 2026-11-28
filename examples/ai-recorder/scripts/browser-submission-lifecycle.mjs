@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 
 export async function verifySubmissionLifecycle(browser, root, audio) {
+  await exercise(browser, root, audio, false);
+  await exercise(browser, root, audio, true);
+}
+
+async function exercise(browser, root, audio, failJournal) {
   const context = await browser.newContext();
   const label = 'Local recovery.m4a', result = 'Synthetic OpenAI result recovered without resending.';
   const fakeKey = ['sk','local-recovery-test'].join('-');
@@ -58,18 +63,41 @@ export async function verifySubmissionLifecycle(browser, root, audio) {
     await page.getByRole('combobox',{name:'Transcription service'}).selectOption('openai');
     await page.getByLabel('OpenAI API key',{exact:true}).fill(fakeKey); await click(page,'Verify and save key');
     await see(page,'Key saved'); await click(page,'Back to settings'); await open(page);
-    await page.evaluate(() => {
+    await page.evaluate(failJournal => {
+      if (failJournal) {
+        const put = IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put = function(value,key) {
+          const request = put.call(this,value,key);
+          if (this.name === 'files' && String(key).endsWith('.openai-success.json')) this.transaction.abort();
+          return request;
+        };
+      }
       const add = IDBObjectStore.prototype.add;
       IDBObjectStore.prototype.add = function(value,key) {
         const request = add.call(this,value,key);
         if (this.name === 'files' && String(key).endsWith('.original.txt')) this.transaction.abort();
         return request;
       };
-    });
+    }, failJournal);
     await click(page,'Transcribe'); await page.getByRole('button',{name:'Retry save',exact:true}).waitFor();
     await see(page,'Transcription is ready. Retry saving before closing this screen.');
     assert.deepEqual(calls,['key','transcription']);
     await page.evaluate(() => navigator.serviceWorker.ready);
+    if (failJournal) {
+      const peer = await context.newPage(); await peer.goto(root); await open(peer);
+      await see(peer,'A completed transcript is waiting in another tab. Return there to retry saving it.');
+      await peer.close();
+      await page.close(); // loses all in-memory result text and browser locks
+      page = await context.newPage(); await page.goto(root); await open(page);
+      await click(page,'Review resend');
+      await see(page,'The previous upload may already have used your OpenAI quota. Sending this audio again can incur another charge.');
+      await click(page,'Cancel resend');
+      assert.deepEqual(calls,['key','transcription']);
+      await click(page,'Review resend'); await click(page,'Resend audio to OpenAI');
+      await see(page,result); await page.reload(); await open(page); await see(page,result);
+      assert.deepEqual(calls,['key','transcription','transcription']); assert.deepEqual(unexpected,[]);
+      return;
+    }
     await page.close(); // destroy the only tab that received the provider response
     await context.setOffline(true);
     page = await context.newPage(); await page.goto(root); await open(page);

@@ -100,9 +100,9 @@ test('unsupported uploader fails explicitly without loading a native module or p
 
 test('Pro upload cannot reserve an operation on unsupported platforms', () => {
   const transcript = readFileSync(resolve(root, 'Transcript.tsx'), 'utf8');
-  const submit = transcript.slice(transcript.indexOf('async function submit()'));
+  const submit = transcript.slice(transcript.indexOf('async function submit('));
   assert.match(submit, /if \(\(!supportsProUpload && \(usePro \|\| service === 'production'\)\)/);
-  const request = transcript.slice(transcript.indexOf('async function request('), transcript.indexOf('async function submit()'));
+  const request = transcript.slice(transcript.indexOf('async function request('), transcript.indexOf('async function submit('));
   assert.match(request, /if \(upload && !supportsProUpload\) throw new Error/);
   assert.match(transcript, /supportsPro=\{supportsProUpload\}/);
 });

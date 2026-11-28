@@ -7,6 +7,19 @@ type Result = { id: string; text: string };
 const memory = new Map<string, Result>();
 const sidecar = (recording: File) => new File(recording.parentDirectory, recording.name + '.openai-success.json');
 
+// Older operations also reached this store before requesting transcription.
+// With no local result, both legacy and current attempts require fresh consent.
+export function previousOpenAIDispatch(raw: string | null, expectedID?: string): string | undefined {
+  if (!raw && !expectedID) return;
+  const stored = raw && JSON.parse(raw);
+  if (!stored || stored.lane !== 'openai' || stored.id !== expectedID || !expectedID) {
+    throw new Error('The saved operation changed. Reopen this recording to check its status.');
+  }
+  const dispatch = stored.unresolvedDispatch ?? expectedID;
+  if (typeof dispatch !== 'string' || !dispatch) throw new Error('Could not verify the previous OpenAI submission.');
+  return dispatch;
+}
+
 export async function readPendingOpenAI(recording: File, id: string) {
   const file = sidecar(recording);
   let saved = memory.get(file.uri);

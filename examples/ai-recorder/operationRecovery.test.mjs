@@ -52,7 +52,7 @@ test('a completed same-operation read returns its result without cancelling its 
 test('status reads retain authorization guidance and treat speaker denial as terminal', async () => {
   // Exercise the real component handlers without mounting native React views.
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
-  const manual = component.slice(component.indexOf('async function checkOperationStatus() {'), component.indexOf('\n  async function submit() {'));
+  const manual = component.slice(component.indexOf('async function checkOperationStatus() {'), component.indexOf('\n  async function submit('));
   const poll = component.slice(component.indexOf('async function poll() {'), component.indexOf('\n    void poll();'));
   const cases = [
     new ProServiceError('Pro authorization is unavailable or expired. Check your API key.', 'authorization'),
@@ -148,7 +148,7 @@ test('a surviving saved edit opens its export actions without starting or restor
 
 test('Free submission checks known limits and binds access before upload', async () => {
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
-  const body = component.slice(component.indexOf('async function submit() {'), component.indexOf('\n  async function save() {'));
+  const body = component.slice(component.indexOf('async function submit('), component.indexOf('\n  async function save() {'));
   const run = async ({ service, state, resumed, size = 50_000_000, duration = 900_000, available = true, observed = 'RESERVED' }) => {
     const events = [];
     const operationId = 'original-operation';
@@ -200,7 +200,7 @@ test('Free submission checks known limits and binds access before upload', async
 
 test('Pro denial offers Free only before transfer on a fresh attempt', async () => {
   const component = await readFile(new URL('./Transcript.tsx', import.meta.url), 'utf8');
-  const body = stripTypeScriptTypes(component.slice(component.indexOf('async function submit() {'), component.indexOf('\n  async function save() {')));
+  const body = stripTypeScriptTypes(component.slice(component.indexOf('async function submit('), component.indexOf('\n  async function save() {')));
   const denied = new ProServiceError('Pro authorization is unavailable.', 'authorization');
   const cases = [
     { stage: 'identity' },

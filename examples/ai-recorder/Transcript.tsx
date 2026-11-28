@@ -1,4 +1,4 @@
-import { clearPendingOpenAI, readPendingOpenAI, stagePendingOpenAI } from './pendingOpenAI';
+import { clearPendingOpenAI, previousOpenAIDispatch, readPendingOpenAI, stagePendingOpenAI } from './pendingOpenAI';
 import { commitCompletion } from './completionStorage';
 import { withRecordingSubmission } from './recordingCoordination';
 import { verifyTranscriptionMedia } from './mediaLibrary';
@@ -84,6 +84,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
   const [proDenied, setProDenied] = useState(false);
   const preparation = useRef<AbortController | null>(null);
   const [preparing, setPreparing] = useState(false);
+  const [resendPrompt, setResendPrompt] = useState<string>();
   const submission = useRef<AbortController | null>(null);
   const [identifySpeakers, setIdentifySpeakers] = useState(false);
   const [job, setJob] = useState<Job>();
@@ -363,7 +364,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
   }
 
-  async function submit() {
+  async function submit(confirmedDispatch?: string) {
     if ((!supportsProUpload && (usePro || service === 'production')) || connecting || !serviceReady || submission.current || busy) return;
     if (!/\.m4a$/i.test(recording.name)) return;
     const terminalJob = !!job && terminal.has(job.state);
@@ -393,7 +394,18 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         const pendingText = unsavedOpenAI ?? await readPendingOpenAI(recording, id);
         controller.signal.throwIfAborted();
         if (!pendingText) {
-          await SecureStore.setItemAsync(operationKey, JSON.stringify({ id, identifySpeakers: false, lane: 'openai' }));
+          const previous = previousOpenAIDispatch(await SecureStore.getItemAsync(operationKey), operation);
+          controller.signal.throwIfAborted();
+          if (previous && previous !== confirmedDispatch) {
+            setResendPrompt(previous);
+            return;
+          }
+          setResendPrompt(undefined);
+          // Commit the attempt before sending any bytes. Even total subsequent
+          // storage failure and tab loss cannot turn it into a fresh submission.
+          await SecureStore.setItemAsync(operationKey, JSON.stringify({
+            id, identifySpeakers: false, lane: 'openai', unresolvedDispatch: randomUUID(),
+          }));
           controller.signal.throwIfAborted();
         }
         setOperation(id);
@@ -533,7 +545,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
     }
   }
 
-  async function requestSubmission() {
+  async function requestSubmission(confirmedDispatch?: string) {
     if (preparation.current || submission.current || busy || connecting || !serviceReady) return;
     const controller = new AbortController();
     preparation.current = controller;
@@ -548,7 +560,7 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
         }
         controller.signal.throwIfAborted();
         setPreparing(false);
-        await submit();
+        await submit(confirmedDispatch);
       });
     } catch (error) {
       if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'Could not prepare the recording for transcription.');
@@ -659,8 +671,14 @@ function RecordingTranscript({ recording, recordingTitle, recordingSummary, back
       <Text style={{ color: palette.muted }}>M4A under 25 MB. OpenAI transcription uses your project quota. If the connection drops during submission, this app cannot check OpenAI job status; retrying may submit the recording again.</Text>
       {busy || connecting || preparing ? <ActivityIndicator accessibilityLabel={iosSetup && !busy ? "Loading OpenAI transcription settings" : "Connecting to OpenAI"} /> : iosSetup && !serviceReady ? (
         <ActionButton title="Retry" variant="primary" onPress={retryService} />
+      ) : resendPrompt && !unsavedOpenAI ? (
+        <>
+          <Text style={{ color: palette.text }}>The previous upload may already have used your OpenAI quota. Sending this audio again can incur another charge.</Text>
+          <ActionButton title="Resend audio to OpenAI" variant="primary" onPress={() => requestSubmission(resendPrompt)} />
+          <ActionButton title="Cancel resend" variant="text" onPress={() => setResendPrompt(undefined)} />
+        </>
       ) : (openAIConfigured || unsavedOpenAI) ? (
-        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Retry transcription' : 'Transcribe'} variant="primary" onPress={requestSubmission} />
+        <ActionButton title={unsavedOpenAI ? 'Retry save' : operation ? 'Review resend' : 'Transcribe'} variant="primary" onPress={() => requestSubmission()} />
       ) : (
         <Text style={{ color: palette.text }}>Verify and save your OpenAI API key in Transcription service.</Text>
       )}

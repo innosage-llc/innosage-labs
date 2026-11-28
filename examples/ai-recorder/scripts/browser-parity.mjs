@@ -338,7 +338,8 @@ try {
       source: 'synthetic microphone and M4A', provider: 'local intercepted responses', passed: [
         'capture storage failure, same-ID retry and offline byte-exact playback/seek', 'service setting/key verification', 'file import', 'byte-exact share/download', 'play/pause/seek',
         'unreadable media rejected on import and before Free or direct OpenAI dispatch', 'explicit upload, same-operation recovery and stale RESERVED recheck', 'two-tab submission, edit conflict and first-use guest ownership', 'immutable original/edit', 'saved revision Markdown',
-        'revision-sourced summary', 'offline audio, original, revision and summary reopen', 'Back cancels held local decoder before any provider request', 'successful OpenAI response survives tab closure and a failed original commit without a second upload', 'missing runtime image and entry script rollback, successful update and bounded cache' ] }, null, 2));
+        'revision-sourced summary', 'offline audio, original, revision and summary reopen', 'Back cancels held local decoder before any provider request', 'successful OpenAI response survives tab closure and a failed original commit without a second upload',
+        'dual write failure and tab loss require separate priced resend consent before a second upload', 'missing runtime image and entry script rollback, successful update and bounded cache' ] }, null, 2));
   } catch (error) {
     console.error('Browser parity fixture failed:', await page.locator('body').innerText(), errors);
     throw error;
