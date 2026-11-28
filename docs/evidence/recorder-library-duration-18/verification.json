@@ -1,0 +1,148 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 145,
+    "head": "b4aca59089eeaf519220b80b39e1ceca3a4b9cb7",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "237ae78ee412b63536c236c7bf1038c3c828407f",
+    "tree": "9aca9734807d591f3b020f8d8fbdbbdfa76e5bdc"
+  },
+  "independentReview": "PASS",
+  "file": "examples/ai-recorder/ui/library-view.tsx",
+  "gate": {
+    "android": "PASS",
+    "ios": "PASS",
+    "web": "PASS"
+  },
+  "applicableCI": "PASS",
+  "workerArtifact": "b440767133aada2bcb244e1d2662cb3649cb0b89dd7597cb03b02f6f107888c8",
+  "normalIOSContentSize": "large (system default)",
+  "enlargedIOSContentSize": "accessibility-large",
+  "androidFontScales": [
+    1,
+    1.45
+  ],
+  "iosDevice": "iPhone SE (3rd generation), iOS 27.2",
+  "iosWidthPoints": 375,
+  "testInputs": "Local synthetic M4A fixtures: approximately 4 seconds and 65 minutes 17 seconds. One additional capture-style row omits secondary time.",
+  "samples": {
+    "long": "59c5f7cde5c86446190fe1f2e2bae0a8924e7da20927fb227ac1e54f0864d94e",
+    "short": "8a295edf4add565869f510cb0de211bec2005d531ff7a4fb86cca7f8c36a9d16"
+  },
+  "runtime": {
+    "android-normal": {
+      "screenshotSha256": "a742f792ebfadae93b3ef670a303d26c879abe1a14a286b3889cfe49bfd6b1ee",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": [
+        "Short clip, 9:20 AM, 3 sec",
+        "Long clip, 9:19 AM, 65 min 17 sec",
+        "9:18 AM, 3 sec"
+      ],
+      "durationLeftEdgeFraction": [
+        0.845,
+        0.725,
+        0.848
+      ]
+    },
+    "android-large": {
+      "screenshotSha256": "453e69925edd5ace4c0fa958be2fe616e9614d19ccb9d003004e35dd66b60376",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": [
+        "Short clip, 9:20 AM, 3 sec",
+        "Long clip, 9:19 AM, 65 min 17 sec",
+        "9:18 AM, 3 sec"
+      ],
+      "durationLeftEdgeFraction": [
+        0.813,
+        0.635,
+        0.816
+      ]
+    },
+    "baseline-normal": {
+      "screenshotSha256": "5fc85e15a0834610ce68049fa59ea528c8d966de198c05b4682ac2787145666c",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": "Short clip, 09:20, 3s Long clip, 09:19, 3,900s 17s 09:18, 3s"
+    },
+    "baseline-large": {
+      "screenshotSha256": "e6d3af0fc16e128424dc097056f4411237b3963891a9d7b857228c20fa1a5c1a",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": "Short clip, 09:20, 3s Long clip, 09:19, 3,900s 17s 09:18, 3s"
+    },
+    "candidate-normal": {
+      "screenshotSha256": "b498daa5ded7bd996f180e7ca16794ebf0d6e1ae36a70055a0a75feeee29da13",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": "Short clip, 09:20, 3s Long clip, 09:19, 3,900s 17s 09:18, 3s",
+      "navigation": "Library tab; open native Import, cancel; open long row in recording detail"
+    },
+    "candidate-large": {
+      "screenshotSha256": "f9c0df6c6b3c8ecc4c681e70b5795eb2037de00e8dd58d42d26da37e7c3183bf",
+      "pixels": [
+        750,
+        1334
+      ],
+      "accessibleLabels": "Short clip, 09:20, 3s Long clip, 09:19, 3,900s 17s 09:18, 3s",
+      "navigation": "Library tab; open native Import, cancel; open long row in recording detail"
+    }
+  },
+  "iosDurationPlacement": {
+    "units": "points in a 375-point viewport, estimated from screenshot text bounds",
+    "measurements": {
+      "normal": {
+        "09:20": {
+          "beforeDurationX": 333.0,
+          "afterDurationX": 104.0,
+          "afterTimeRightX": 102.8
+        },
+        "09:19": {
+          "beforeDurationX": 282.0,
+          "afterDurationX": 105.2,
+          "afterTimeRightX": 103.6
+        },
+        "timeOnlyTitle": {
+          "beforeDurationX": 333.0,
+          "afterDurationX": 64.0,
+          "afterTitleX": 58.9
+        }
+      },
+      "large": {
+        "09:20": {
+          "beforeDurationX": 313.9,
+          "afterDurationX": 140.1,
+          "afterTimeRightX": 137.6
+        },
+        "09:19": {
+          "beforeDurationX": 215.9,
+          "afterDurationX": 138.2,
+          "afterTimeRightX": 134.9
+        },
+        "timeOnlyTitle": {
+          "beforeDurationX": 319.0,
+          "afterDurationX": 64.0,
+          "afterTitleX": 64.0
+        }
+      },
+      "maximum": {
+        "size": "accessibility-extra-extra-extra-large",
+        "longDurationWrappedToNextLine": true,
+        "timeX": 64.8,
+        "wrappedDurationX": 64.8
+      }
+    }
+  }
+}

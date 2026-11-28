@@ -1,0 +1,33 @@
+{
+  "candidate": {
+    "repo": "innosage-llc/innosage-labs",
+    "pr": 145,
+    "head": "b4aca59089eeaf519220b80b39e1ceca3a4b9cb7",
+    "base": "2ee517327b59e1a7393c97a8765a63f75e382563",
+    "draft": true,
+    "tested": "237ae78ee412b63536c236c7bf1038c3c828407f",
+    "tree": "9aca9734807d591f3b020f8d8fbdbbdfa76e5bdc"
+  },
+  "version": "0.1.9",
+  "build": 18,
+  "sha256": "4e1496399863a07484c7203e42cfa158b9dc4cf15b7661ecd48cb1e8f8a8805a",
+  "stagingBinding": true,
+  "productionEligible": false,
+  "signedBundleMatchedRecompilation": true,
+  "ITSAppUsesNonExemptEncryption": false,
+  "uploadAcceptedUTC": "2026-11-28T08:55:49Z",
+  "distribution": "TestFlight internal only",
+  "appleReported": "Uploaded package is processing.",
+  "finalProcessing": "processed",
+  "group": "Recorder Test Group v2",
+  "groupAssociation": "verified on the internal build row; automatic assignment",
+  "phoneAcceptance": "Pending Jim’s review of the Library change on build 18.",
+  "symbolWarnings": [
+    "React",
+    "ReactNativeDependencies",
+    "hermesvm"
+  ],
+  "ownerConfirmedGroupAlias": "Recorder iPhone #51",
+  "appleBuildStatus": "Testing (正在测试)",
+  "processingAndGroupObservedUTC": "2026-11-28T09:02:54Z"
+}
