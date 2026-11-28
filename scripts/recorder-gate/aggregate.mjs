@@ -1,7 +1,8 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PLATFORMS, recorderImpact, validatePlatform, writeJSON, requireThat } from './core.mjs';
 import { clean } from './host.mjs';
+import { requiredOutcomes, verifyOutcome } from './prd-outcomes.mjs';
 import { platformGate } from './platform.mjs';
 import { requiresNativeMarkdown, validateNativeMarkdown } from './native-markdown.mjs';
 
@@ -16,6 +17,11 @@ export async function aggregate({ source, candidate, paths, output, targets }, g
         try {
           const result = await gate({ platform, source, candidate, output: out, targets });
           validatePlatform(result, candidate, platform);
+          if (existsSync(join(source,'examples/ai-recorder/package.json'))) {
+            for (const key of requiredOutcomes(source,candidate,paths)) {
+              verifyOutcome(result.outcomes?.[key],platform,candidate,result.artifact);
+            }
+          }
           if (platform === 'ios' && requiresNativeMarkdown(source, paths)) {
             validateNativeMarkdown(result.nativeMarkdown, candidate, result.artifact);
           }

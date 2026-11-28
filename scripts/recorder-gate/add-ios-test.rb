@@ -8,7 +8,7 @@ raise 'AIRecorder application target missing' unless app
 raise 'startup target already present; use a fresh candidate' if project.targets.any? { |t| t.name == 'StartupGateUITests' }
 folder = File.join(File.dirname(project_path), 'StartupGateUITests')
 FileUtils.mkdir_p(folder)
-sources = ['StartupGateTests.swift', 'StabilityWindow.swift', 'MarkdownGateTests.swift']
+sources = ['StartupGateTests.swift', 'StabilityWindow.swift', 'MarkdownGateTests.swift', 'LibraryImportTests.swift']
 sources.each { |name| FileUtils.cp(File.join(File.dirname(swift_source), name), File.join(folder, name)) }
 target = project.new_target(:ui_test_bundle, 'StartupGateUITests', :ios, '16.4')
 target.add_dependency(app)

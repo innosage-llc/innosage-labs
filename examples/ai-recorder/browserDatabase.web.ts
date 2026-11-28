@@ -22,7 +22,15 @@ export async function transaction<T>(storeName: 'files' | 'settings', mode: IDBT
   const db = await recorderDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, mode);
-    const request = run(tx.objectStore(storeName));
+    let request: IDBRequest<T>;
+    try {
+      request = run(tx.objectStore(storeName));
+    } catch (error) {
+      // A synchronous error scheduling a later operation must roll back prior writes.
+      tx.abort();
+      reject(error);
+      return;
+    }
     tx.oncomplete = () => resolve(request.result);
     tx.onabort = () => reject(tx.error ?? request.error ?? new Error('Browser storage operation failed.'));
   });

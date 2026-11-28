@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 
 export function noPlayableSamples(audio) {
   const atom = (type, payload) => {
-  const header = Buffer.alloc(8); header.writeUInt32BE(8 + payload.length); header.write(type, 4); return Buffer.concat([header, payload]);
+    const header = Buffer.alloc(8);
+    header.writeUInt32BE(8 + payload.length);
+    header.write(type, 4);
+    return Buffer.concat([header, payload]);
   };
   // A forged positive duration and codec declaration do not supply a playable AAC sample.
   const ftyp = atom('ftyp', Buffer.from('isom0000'));

@@ -7,12 +7,14 @@ import { root, run, runAsync, validateIntegration, sourceIdentity, cli, loadCand
 import { androidObservation } from './android.mjs';
 import { iosObservation } from './ios.mjs';
 import { observeNativeMarkdown, requiresNativeMarkdown } from './native-markdown.mjs';
+import { requiredOutcomes, verifyOutcome } from './prd-outcomes.mjs';
+import { observeImport } from './import-test/observe.mjs';
 import { webObservation } from './web.mjs';
 
 export async function platformGate({ platform, source, candidate, output, targets = {}, fault }) {
   const receipt = { platform, candidate, status: 'FAIL', stage: 'preflight', commands: [], fault: { requested: fault ?? null, applied: false } };
   const onFault = () => { receipt.fault.applied = true; };
-  const app = join(source, appPath); let uuid;
+  const app = join(source, appPath); let uuid, built, derived;
   function command(cmd, args, options = {}) {
     const entry = { command: cmd, args: args.map(a => String(a).replaceAll(source, '<candidate>').replaceAll(output, '<evidence>')), stage: receipt.stage };
     receipt.commands.push(entry); const began = performance.now();
@@ -51,7 +53,7 @@ export async function platformGate({ platform, source, candidate, output, target
       requireThat(['arm64-v8a', 'x86_64'].includes(abi), 'unsupported emulator ABI');
       receipt.stage = 'build'; command('./node_modules/.bin/expo', ['prebuild', '--platform', 'android', '--no-install']);
       command('./android/gradlew', ['-p', 'android', 'app:assembleRelease', '--offline', '--no-daemon', `-PreactNativeArchitectures=${abi}`, '-Porg.gradle.java.installations.auto-download=false', ...(process.env.LABS85_JAVA_TOOLCHAINS ? [`-Porg.gradle.java.installations.paths=${process.env.LABS85_JAVA_TOOLCHAINS}`] : [])]);
-      const apk = join(app, 'android/app/build/outputs/apk/release/app-release.apk');
+      const apk = built = join(app, 'android/app/build/outputs/apk/release/app-release.apk');
       requireThat(/assets\/index.android.bundle/.test(command('unzip', ['-l', apk])), 'embedded Android JS missing');
       receipt.artifact = artifact(apk);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await androidObservation({ command, asyncCommand, output, serial: targets.android, apk, fault, onFault }));
@@ -69,9 +71,9 @@ export async function platformGate({ platform, source, candidate, output, target
       receipt.stage = 'build'; command('./node_modules/.bin/expo', ['prebuild', '--platform', 'ios', '--no-install']);
       command('pod', ['install', '--no-repo-update'], { cwd: join(app, 'ios') });
       command(ruby, [join(source, 'scripts/recorder-gate/add-ios-test.rb'), join(app, 'ios/AIRecorder.xcodeproj'), join(source, 'scripts/recorder-gate/StartupGateTests.swift')]);
-      const derived = join(output, 'derived');
+      derived = join(output, 'derived');
       command('xcodebuild', ['build-for-testing', '-workspace', 'ios/AIRecorder.xcworkspace', '-scheme', 'AIRecorder', '-configuration', 'Release', '-sdk', 'iphonesimulator', '-destination', `id=${uuid}`, '-derivedDataPath', derived, 'CODE_SIGNING_ALLOWED=NO']);
-      const built = join(derived, 'Build/Products/Release-iphonesimulator/AIRecorder.app');
+      built = join(derived, 'Build/Products/Release-iphonesimulator/AIRecorder.app');
       requireThat(existsSync(join(built, 'main.jsbundle')) && readFileSync(join(built, 'main.jsbundle')).length > 0, 'embedded iOS JS missing');
       receipt.artifact = artifact(built);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await iosObservation({ command, output, uuid, app: built, workspace: app, derived, fault, onFault })); receipt.runtime = `${runtime.name} / ${runtime.version} / ${runtime.buildversion}`;
@@ -81,11 +83,23 @@ export async function platformGate({ platform, source, candidate, output, target
         receipt.nativeMarkdown = observeNativeMarkdown({ command, source, output, candidate, uuid, derived, appArtifact: receipt.artifact });
       }
     } else if (platform === 'web') {
-      receipt.stage = 'build'; const directory = join(output, 'export');
+      receipt.stage = 'build'; const directory = built = join(output, 'export');
       command(process.execPath, ['scripts/export-web.mjs', '--output-dir', directory]);
       receipt.artifact = artifact(directory);
       receipt.stage = 'launch-observe'; Object.assign(receipt, await webObservation({ source, directory, output, fault, onFault }));
     } else throw new Error('unknown platform');
+    if (!fault) {
+      const paths = changedPaths(run('git',['diff','--name-status','-z','--find-renames',candidate.base,candidate.head],{cwd:source}));
+      receipt.outcomes = {};
+      for (const key of requiredOutcomes(source,candidate,paths)) {
+        requireThat(key === 'library-import', 'implement the required runtime observer: '+key);
+        receipt.stage = key;
+        const result = await observeImport({platform,command,source,output,candidate,artifact:receipt.artifact,
+          uuid,derived,serial:targets.android,built});
+        verifyOutcome(result,platform,candidate,receipt.artifact);
+        receipt.outcomes[key] = result;
+      }
+    }
     requireThat(!fault, 'controlled fault unexpectedly survived the observation');
     receipt.screenshots = (platform === 'web' ? ['desktop.png','narrow.png'] : ['screen.png']).map(name => {
       const bytes=readFileSync(join(output,name));
